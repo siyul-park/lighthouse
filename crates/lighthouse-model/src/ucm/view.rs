@@ -16,10 +16,10 @@ use lighthouse_graph::{Error, Graph};
 use typed_arena::Arena;
 
 use super::{
-    Boxed, Comment, DECLARATIONS, Declarations, EDGES, Edge, Edges, File, FunctionSummary,
-    INCOMING, Incoming, LoadNeed, MODULE_CASES, Model, Module, Node, PATHS, Place, RESOLVED,
-    Resolved, SITES, SYMBOLS, Site, Sites, Symbol, SymbolId, Table, TestCase, Tie, When, key,
-    kinds::DUPLICATED, load_needs,
+    Boxed, Comment, DECLARATIONS, Declarations, EDGES, EDGES_IN, Edge, Edges, File,
+    FunctionSummary, INCOMING, Incoming, LoadNeed, MODULE_CASES, Model, Module, Node, PATHS,
+    PLACES, Place, RESOLVED, Resolved, SITES, SYMBOLS, Site, Sites, Symbol, SymbolId, Table,
+    TestCase, Tie, When, key, kinds::DUPLICATED, load_needs,
 };
 
 /// The model of the project as the graph holds it.
@@ -29,6 +29,7 @@ pub struct View<'v> {
     table: OnceCell<&'v Table>,
     resolved: RefCell<HashMap<PathBuf, &'v Resolved>>,
     incoming: RefCell<HashMap<PathBuf, &'v Incoming>>,
+    placed: RefCell<HashMap<PathBuf, &'v [Place]>>,
     declared_in: RefCell<HashMap<PathBuf, &'v Declarations>>,
     homes: RefCell<HashMap<SymbolId, Rc<Home<'v>>>>,
     files: RefCell<HashMap<String, Option<&'v File>>>,
@@ -37,6 +38,7 @@ pub struct View<'v> {
     cases: RefCell<HashMap<String, &'v [TestCase]>>,
     sited: OnceCell<&'v Sites>,
     resolved_all: OnceCell<()>,
+    edges_all: OnceCell<()>,
     declared_all: OnceCell<()>,
     everything: Everything<'v>,
     failed: RefCell<Option<Error>>,
@@ -71,9 +73,15 @@ pub struct Held {
     declarations: Arena<Arc<Declarations>>,
     sites: Arena<Arc<Sites>>,
     edges: Arena<Arc<Edges>>,
+    listed: Arena<Arc<Listed>>,
+    places: Arena<Arc<Vec<Place>>>,
     cases: Arena<Arc<Vec<TestCase>>>,
     files: Arena<File>,
 }
+
+/// The edges of a file in the order they stand, each with the file of the
+/// fragment about it when it starts at a module.
+type Listed = Vec<(Edge, Option<PathBuf>)>;
 
 impl<'v> View<'v> {
     /// The view of the project `graph` holds.
@@ -84,6 +92,7 @@ impl<'v> View<'v> {
             table: OnceCell::new(),
             resolved: RefCell::default(),
             incoming: RefCell::default(),
+            placed: RefCell::default(),
             declared_in: RefCell::default(),
             homes: RefCell::default(),
             files: RefCell::default(),
@@ -92,6 +101,7 @@ impl<'v> View<'v> {
             cases: RefCell::default(),
             sited: OnceCell::new(),
             resolved_all: OnceCell::new(),
+            edges_all: OnceCell::new(),
             declared_all: OnceCell::new(),
             everything: Everything::default(),
             failed: RefCell::new(None),
@@ -132,25 +142,19 @@ impl<'v> View<'v> {
             let edges = self.keep(self.graph.query(&EDGES, &()));
             let edges = edges.map(|edges| &**self.held.edges.alloc(edges));
             let (mut all, mut origins) = (Vec::new(), BTreeMap::new());
-            for path in self.resolved_paths() {
-                let Some(resolved) = self.resolved(Path::new(&path)) else {
+            for path in self.edges_paths() {
+                let Some(listed) = self.listed(Path::new(&path)) else {
                     continue;
                 };
                 let dropped = edges
                     .and_then(|edges| edges.dropped.get(Path::new(&path)))
                     .map_or(&[][..], Vec::as_slice);
-                let mut files = resolved
-                    .slice
-                    .runs
-                    .iter()
-                    .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
-                for (at, edge) in resolved.slice.fragment.edges.iter().enumerate() {
-                    let file = files.next().flatten();
+                for (at, (edge, origin)) in listed.iter().enumerate() {
                     if dropped.binary_search(&(at as u32)).is_ok() {
                         continue;
                     }
-                    if let (Node::Module(_), Some(file)) = (&edge.from, file) {
-                        origins.insert(all.len(), file.clone());
+                    if let Some(origin) = origin {
+                        origins.insert(all.len(), origin.clone());
                     }
                     all.push(edge);
                 }
@@ -182,6 +186,34 @@ impl<'v> View<'v> {
             });
         });
         paths
+    }
+
+    /// [`View::paths`], with the edges of the files pulled likewise.
+    fn edges_paths(&self) -> Vec<String> {
+        let paths = self.paths();
+        self.edges_all.get_or_init(|| {
+            self.graph.par_map(paths.clone(), |graph, path| {
+                let _ = graph.query(&EDGES_IN, path);
+            });
+        });
+        paths
+    }
+
+    /// The edges of the file at `path`, in the order they stand.
+    fn listed(&self, path: &Path) -> Option<&'v Listed> {
+        let listed = self.keep(self.graph.query(&EDGES_IN, &key(path)))?;
+        Some(&**self.held.listed.alloc(listed))
+    }
+
+    /// Where the symbols of the file at `path` are.
+    fn places(&self, path: &Path) -> Option<&'v [Place]> {
+        if let Some(found) = self.placed.borrow().get(path) {
+            return Some(found);
+        }
+        let places = self.keep(self.graph.query(&PLACES, &key(path)))?;
+        let places = &***self.held.places.alloc(places);
+        self.placed.borrow_mut().insert(path.to_owned(), places);
+        Some(places)
     }
 
     /// The paths of the project's files.
@@ -360,10 +392,7 @@ impl<'v> Model for View<'v> {
     fn place(&self, id: &SymbolId) -> Option<&Place> {
         let home = self.home(id);
         *home.place.get_or_init(|| {
-            self.resolved(home.file.as_deref()?)?
-                .slice
-                .fragment
-                .places
+            self.places(home.file.as_deref()?)?
                 .iter()
                 .find(|place| place.symbol == *id)
         })

@@ -1,7 +1,7 @@
 //! The judgments of one file: what each frame of a check reads, and the
 //! diagnostics it reports.
 
-use std::path::Path;
+use std::{cell::LazyCell, path::Path};
 
 use lighthouse_model::Document;
 
@@ -164,7 +164,9 @@ impl Evaluation<'_> {
 
     pub(super) fn check_project(&self, ctx: &Context) -> Result<Vec<Diagnostic>, PluginError> {
         let project = ctx.model;
-        let declared = modules::index(project);
+        // Where the modules are is read when a finding needs it: a decision
+        // about edges that finds none does not depend on it.
+        let declared = LazyCell::new(|| modules::index(project));
         let mut found = Vec::new();
         match self.rule.select {
             Select::Module => {
@@ -186,12 +188,10 @@ impl Evaluation<'_> {
             }
             Select::Edge => {
                 for (at, edge) in project.edges().enumerate() {
-                    let Some(place) = edge_anchor(ctx, &declared, at, edge) else {
-                        continue;
-                    };
                     let value = cel_fact(&facts::edge(project, edge));
                     let key = format!("{:?}->{:?}", edge.from, edge.to);
-                    found.extend(self.judge(value, place, &key)?);
+                    let place = || edge_anchor(ctx, &declared, at, edge);
+                    found.extend(self.judge_at(value, place, &key)?);
                 }
             }
             Select::Decision => found.extend(self.check_decisions(ctx.documents)?),
@@ -242,6 +242,17 @@ impl Evaluation<'_> {
         place: Anchor,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
+        self.judge_at(value, || Some(place), key)
+    }
+
+    /// [`Evaluation::judge`] for a subject whose place is found only when the
+    /// subject is, and that is no subject of the decision where it has none.
+    fn judge_at(
+        &self,
+        value: impl Into<Subject>,
+        place: impl FnOnce() -> Option<Anchor>,
+        key: &str,
+    ) -> Result<Option<Diagnostic>, PluginError> {
         self.judge_value(value.into(), place, key).map_err(|error| {
             self.shared.failed.get().map_or(error, |message| {
                 PluginError::Incomplete(format!("{}: execution error: {message}", self.meta.id))
@@ -252,7 +263,7 @@ impl Evaluation<'_> {
     fn judge_value(
         &self,
         value: Subject,
-        place: Anchor,
+        place: impl FnOnce() -> Option<Anchor>,
         key: &str,
     ) -> Result<Option<Diagnostic>, PluginError> {
         let rule = self.rule;
@@ -266,6 +277,9 @@ impl Evaluation<'_> {
             (Some(abstain), false) if !abstain.asks(&frame)? => return Ok(None),
             _ => {}
         }
+        let Some(place) = place() else {
+            return Ok(None);
+        };
         // The message and evidence of a subject only suspected may read what
         // the subject does not have: they are then left empty.
         let message = frame.text(&rule.message);

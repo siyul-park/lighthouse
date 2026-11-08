@@ -3,7 +3,7 @@
 //! makes of the same fragments, and what a file's keys follow is what its
 //! neighbors can see.
 
-use lighthouse_graph::{Graph, Options};
+use lighthouse_graph::{Error, Graph, Options, Query};
 use lighthouse_model::{
     Position, Span,
     ucm::{
@@ -191,6 +191,15 @@ impl World {
                 file.path
             );
         }
+        let edges: Vec<_> = view.edges().collect();
+        assert_eq!(edges, merged.edges().collect::<Vec<_>>(), "{at}: edges");
+        for from in 0..edges.len() {
+            assert_eq!(
+                view.origin(from),
+                merged.origin(from),
+                "{at}: origin {from}"
+            );
+        }
         assert_eq!(
             *self.graph.query(&NOTICES, &()).unwrap(),
             merged.notices(),
@@ -316,5 +325,54 @@ fn a_body_edit_runs_no_resolution_and_the_symbol_table_stays_equal() {
         count("incoming("),
         0,
         "nothing it is tied to changed: {ran:?}"
+    );
+}
+
+/// What a decision over the whole project reads of the model: the edges and
+/// where the symbols are.
+static READER: Query<(), (usize, usize)> = Query::new("reader", read);
+
+fn read(graph: &Graph, _: &()) -> Result<(usize, usize), Error> {
+    let held = Held::default();
+    let view = View::new(graph, &held)?;
+    let placed = view
+        .symbols()
+        .filter(|s| view.place(&s.id).is_some())
+        .count();
+    Ok((view.edges().count(), placed))
+}
+
+#[test]
+fn what_reads_the_edges_and_the_places_of_the_project_runs_when_one_moves_only() {
+    let mut world = World::new(two());
+    let pull = |world: &World| {
+        world.graph.take_executed();
+        world.graph.query(&READER, &()).unwrap();
+        world.graph.take_executed()
+    };
+    pull(&world);
+
+    world.specs[1].statements = 9;
+    world.set();
+    let ran = pull(&world);
+    assert!(
+        !ran.iter().any(|label| label.starts_with("reader(")),
+        "a body that moves no line: {ran:?}"
+    );
+
+    world.specs[1].shift = 3;
+    world.set();
+    let ran = pull(&world);
+    assert!(
+        ran.iter().any(|label| label.starts_with("reader(")),
+        "the places moved: {ran:?}"
+    );
+
+    world.specs[0].imports.push("b".to_owned());
+    world.set();
+    let ran = pull(&world);
+    assert!(
+        ran.iter().any(|label| label.starts_with("reader(")),
+        "an edge was added: {ran:?}"
     );
 }

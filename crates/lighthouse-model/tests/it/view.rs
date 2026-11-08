@@ -7,7 +7,7 @@ use lighthouse_model::{
     Position, Span,
     ucm::{
         File, Fragment, Held, Host, Model, Place, Symbol, SymbolId, SymbolKind, TestCase,
-        TestStyle, View, Visibility,
+        TestStyle, View, Visibility, register,
     },
 };
 
@@ -110,4 +110,45 @@ fn view_symbols_ignore_places() {
 
     assert_eq!(*graph.query(&SYMBOL_COUNT, &()).unwrap(), 2);
     assert_eq!(RUNS.load(Ordering::SeqCst), 1);
+}
+
+static PLACED: Query<(), bool> = Query::new("placed", placed);
+
+fn placed(graph: &Graph, _: &()) -> Result<bool, Error> {
+    let held = Held::default();
+    let view = View::new(graph, &held)?;
+    let id = SymbolId::new("a", &[], "f", SymbolKind::Function);
+    Ok(view.place(&id).is_some())
+}
+
+fn reopened(path: &std::path::Path, parts: &[Fragment]) -> Graph {
+    let mut graph = Graph::open(path, Options::default()).unwrap();
+    Host::set_units(&mut graph, parts).unwrap();
+    graph
+}
+
+#[test]
+fn register_lets_a_stored_node_that_read_places_be_validated_before_any_is_pulled() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("graph.db");
+    let mut first = reopened(
+        &path,
+        &[fragment("a", "f", false), fragment("b", "g", false)],
+    );
+    first.query(&PLACED, &()).unwrap();
+    first.commit().unwrap();
+    drop(first);
+
+    let mut moved = fragment("b", "g", false);
+    let at = Position { line: 5, col: 1 };
+    moved.places[0].span = Span { start: at, end: at };
+    let second = reopened(&path, &[fragment("a", "f", false), moved]);
+    register(&second).unwrap();
+    second.query(&PLACED, &()).unwrap();
+
+    let ran = second.take_executed();
+    assert!(
+        !ran.iter().any(|label| label.starts_with("placed(")),
+        "{ran:?}"
+    );
 }

@@ -26,9 +26,9 @@ pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
 pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
 pub use kinds::{
-    CASES, COLLISIONS, DECLARATIONS, DUPLICATED, EDGES, HOST, Host, IMPLEMENTS, INCOMING, MARKERS,
-    MEMBERS, METHODS, MODULE_CASES, NOTICES, ORDERED_BY, PATHS, PAYLOAD, PROJECT, Payload,
-    REGIONS_UNIT, RESOLVED, SETTLED, SITES, SLICE, SYMBOLS, key,
+    CASES, COLLISIONS, DECLARATIONS, DUPLICATED, EDGES, EDGES_IN, HOST, Host, IMPLEMENTS, INCOMING,
+    MARKERS, MEMBERS, METHODS, MODULE_CASES, NOTICES, ORDERED_BY, PATHS, PAYLOAD, PLACES, PROJECT,
+    Payload, REGIONS_UNIT, RESOLVED, SETTLED, SITES, SLICE, SYMBOLS, key, register,
 };
 pub use load_order::{LoadNeed, LoadPoint, load_needs};
 pub use markers::Markers;

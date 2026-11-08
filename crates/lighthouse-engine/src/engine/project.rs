@@ -8,7 +8,7 @@ use lighthouse_spec::key;
 
 use super::{index::Call, regions::Views, *};
 use lighthouse_model::ucm::{
-    HOST, Held, Host, MARKERS, MEMBERS, NOTICES, PATHS, PROJECT, REGIONS_UNIT, View,
+    HOST, Held, Host, MARKERS, MEMBERS, NOTICES, PATHS, PROJECT, REGIONS_UNIT, View, register,
 };
 
 /// The unit each file of a run is in, and whether the unit is a host unit:
@@ -139,6 +139,7 @@ impl Engine {
         }
         paths.sort();
         graph.set_input(&PATHS, &(), paths, Durability::Volatile)?;
+        register(graph)?;
         Ok(())
     }
 }

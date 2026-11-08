@@ -5,9 +5,10 @@
 //! in, `part` makes the fragments of a file as the host stamps them, `slice`
 //! qualifies them, `declared` is the modules a file declares and `declarations` what
 //! the table takes of a slice, `symbols` is the table of all declarations,
-//! `resolved` the slice with its targets resolved against it, `edges` the
-//! reverse maps of all edges, `sites` where they refer from and `incoming` what the rest of
-//! the project says of the symbols of one file. `project` puts the files
+//! `resolved` the slice with its targets resolved against it, `places` and
+//! `edges_in` the parts of it that a read of the whole project takes of a file,
+//! `edges` the reverse maps of all edges, `sites` where they refer from and
+//! `incoming` what the rest of the project says of the symbols of one file. `project` puts the files
 //! together; it is held in memory only.
 //!
 //! Each kind is a function of the kinds it reads: an edit that changes
@@ -24,9 +25,9 @@ use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Declarations, Edges, File, Fragment, Implemented, Incoming, Markers, Methods, ORDERED, Project,
-    REGIONS, Resolved, Settled, Sites, Slice, Symbol, SymbolId, Table, TestCase, ambiguity,
-    collisions, declared, merge::duplicate_notice, methods,
+    Declarations, Edge, Edges, File, Fragment, Implemented, Incoming, Markers, Methods, Node,
+    ORDERED, Place, Project, REGIONS, Resolved, Settled, Sites, Slice, Symbol, SymbolId, Table,
+    TestCase, ambiguity, collisions, declared, merge::duplicate_notice, methods,
 };
 
 /// The id of the unit that holds the regions selected in the project's files.
@@ -74,6 +75,14 @@ pub static DUPLICATED: Query<(), BTreeSet<SymbolId>> = Query::new("duplicated", 
 pub static SYMBOLS: Query<(), Table> = Query::new("symbols", symbols);
 /// A slice with its targets resolved against the table.
 pub static RESOLVED: Query<String, Resolved> = Query::new("resolved", resolved);
+/// Where the symbols of a file are, with what the file says of each: what a
+/// read of the position of a declaration takes of the file, so that an edit of
+/// a comment or a body that moves nothing leaves it equal.
+pub static PLACES: Query<String, Vec<Place>> = Query::new("places", places);
+/// The edges of a file in the order they stand, each with the file the fragment
+/// about it is about when it starts at a module: what a read of the edges of the
+/// project takes of the file.
+pub static EDGES_IN: Query<String, Vec<(Edge, Option<PathBuf>)>> = Query::new("edges_in", edges_in);
 /// The reverse maps of all edges.
 pub static EDGES: Query<(), Edges> = Query::new("edges", edges);
 /// Where the edges refer from.
@@ -278,6 +287,35 @@ pub fn key(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+/// Makes the queries of the model known to `graph` before anything pulls them,
+/// so that a node stored as having read one is validated by name.
+///
+/// # Errors
+///
+/// A kind is registered with another type.
+pub fn register(graph: &Graph) -> Result<(), Error> {
+    METHODS.register(graph)?;
+    IMPLEMENTS.register(graph)?;
+    SETTLED.register(graph)?;
+    PART.register(graph)?;
+    DECLARED.register(graph)?;
+    COLLISIONS.register(graph)?;
+    SLICE.register(graph)?;
+    DECLARATIONS.register(graph)?;
+    DUPLICATED.register(graph)?;
+    SYMBOLS.register(graph)?;
+    RESOLVED.register(graph)?;
+    PLACES.register(graph)?;
+    EDGES_IN.register(graph)?;
+    EDGES.register(graph)?;
+    SITES.register(graph)?;
+    INCOMING.register(graph)?;
+    CASES.register(graph)?;
+    MODULE_CASES.register(graph)?;
+    NOTICES.register(graph)?;
+    PROJECT.register(graph)
+}
+
 /// The fragments of a file, as the host stamps them: the ones of its unit,
 /// then the ones of the regions routed to other languages, each stamped with
 /// what the host knows of the file.
@@ -366,6 +404,31 @@ fn resolved(graph: &Graph, path: &String) -> Result<Resolved, Error> {
     let slice = graph.query(&SLICE, path)?;
     let table = graph.query(&SYMBOLS, &())?;
     Ok(Resolved::new(&slice, &table))
+}
+
+fn places(graph: &Graph, path: &String) -> Result<Vec<Place>, Error> {
+    let resolved = graph.query(&RESOLVED, path)?;
+    Ok(resolved.slice.fragment.places.clone())
+}
+
+fn edges_in(graph: &Graph, path: &String) -> Result<Vec<(Edge, Option<PathBuf>)>, Error> {
+    let resolved = graph.query(&RESOLVED, path)?;
+    let mut files = resolved
+        .slice
+        .runs
+        .iter()
+        .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
+    Ok(resolved
+        .slice
+        .fragment
+        .edges
+        .iter()
+        .map(|edge| {
+            let file = files.next().flatten();
+            let origin = file.filter(|_| matches!(edge.from, Node::Module(_)));
+            (edge.clone(), origin.cloned())
+        })
+        .collect())
 }
 
 fn edges(graph: &Graph, _: &()) -> Result<Edges, Error> {
