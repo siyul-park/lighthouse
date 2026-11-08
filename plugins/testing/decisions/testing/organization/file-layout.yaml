@@ -146,25 +146,39 @@ spec:
       # place is a number of thousandths of a position; a helper that is used
       # by a helper is placed after that one (chains of three are placed in one
       # step, longer ones in the next round).
+      - name: permuting
+        expression: "comparable.all(t, size(t.load_after) == 0)"
       - name: slots
         expression: "comparable.map(t, t.pos).sortBy(p, p)"
+      - name: is_comparable
+        params: [s]
+        expression: >-
+          s.kind == 'test' && has(s.owned) && s.owned != null && home != '' && s.owned.file == home
       - name: base
         params: [s]
         expression: >-
-          1000 * (s.kind == 'test' && s.id in sorted_tests && comparable.all(t, size(t.load_after) == 0)
-            ? slots[sorted_tests.indexOf(s.id)] : s.pos)
+          1000 * (is_comparable(s) && permuting ? slots[sorted_tests.indexOf(s.id)] : s.pos)
+      # The last use each helper that moves goes below, as [id, use].
+      - name: sink_pairs
+        expression: >-
+          file.symbols.filter(d, late_helper(d)).map(d, [d.id, sinks(d)[size(sinks(d)) - 1]])
       - name: sink_of
         params: [s]
-        expression: "sinks(s)[size(sinks(s)) - 1]"
+        expression: >-
+          cel.bind(f, sink_pairs.filter(p, p[0] == s.id),
+            size(f) > 0 ? file.symbols.filter(d, d.id == f[0][1].id)[0] : {})
+      - name: moves_below
+        params: [s]
+        expression: "s.test_role == 'test-helper' && sink_pairs.exists(p, p[0] == s.id)"
       - name: below_1
         params: [s]
-        expression: "late_helper(s) ? base(sink_of(s)) + 1 : base(s)"
+        expression: "moves_below(s) ? base(sink_of(s)) + 1 : base(s)"
       - name: below_2
         params: [s]
-        expression: "late_helper(s) ? below_1(sink_of(s)) + 1 : base(s)"
+        expression: "moves_below(s) ? below_1(sink_of(s)) + 1 : base(s)"
       - name: below_3
         params: [s]
-        expression: "late_helper(s) ? below_2(sink_of(s)) + 1 : base(s)"
+        expression: "moves_below(s) ? below_2(sink_of(s)) + 1 : base(s)"
       # A fixture goes before its anchor, the fixtures of one anchor in the
       # order of their groups. One that needs a fixture below the tests goes
       # after it: the fixtures that move are found step by step (a fixture
@@ -183,14 +197,18 @@ spec:
             - 500 + group_rank(s)
       - name: step_1
         expression: "file.symbols.filter(d, late_fixture(d))"
+      - name: ids_1
+        expression: "step_1.map(e, e.id)"
       - name: step_2
         expression: >-
           file.symbols.filter(d, below_tests(d)
-            && d.load_after.all(c, c.pos < first.pos || c.id in step_1.map(e, e.id)))
+            && d.load_after.all(c, c.pos < first.pos || c.id in ids_1))
+      - name: ids_2
+        expression: "step_2.map(e, e.id)"
       - name: step_3
         expression: >-
           file.symbols.filter(d, below_tests(d)
-            && d.load_after.all(c, c.pos < first.pos || c.id in step_2.map(e, e.id)))
+            && d.load_after.all(c, c.pos < first.pos || c.id in ids_2))
       # The place of each fixture of a step, as [id, place].
       - name: places_1
         expression: "step_1.map(d, [d.id, lift(d)])"
@@ -207,11 +225,17 @@ spec:
       - name: place
         params: [s]
         expression: >-
-          cel.bind(f, places_3.filter(p, p[0] == s.id), size(f) > 0 ? f[0][1] : below_3(s))
+          late_fixture(s) ? lift(s)
+          : below_tests(s) ? cel.bind(f, places_3.filter(p, p[0] == s.id), size(f) > 0 ? f[0][1] : below_3(s))
+          : below_3(s)
       - name: ordered
         expression: >-
-          file.symbols.filter(s, s.declaration || s.kind == 'test').sortBy(s, s.pos)
-            .sortBy(s, place(s)).map(s, s.id)
+          (file.symbols.filter(s, (s.declaration || s.kind == 'test') && !is_comparable(s))
+              .sortBy(s, s.pos).map(s, [place(s), s.pos, s.id])
+            + (permuting
+               ? lists.range(size(comparable)).map(i, [1000 * slots[i], 0, sorted_tests[i]])
+               : comparable.map(t, [1000 * t.pos, 0, t.id])))
+            .sortBy(r, r[0]).map(r, r[2])
     where: >-
       (misplaced_fixture || misplaced_helper || misplaced_order)
     message: >-
@@ -787,6 +811,7 @@ spec:
           import { get } from "./store";
 
           const base = 1;
+
           const want = base + 1;
 
           it("returns the wanted value", () => {
@@ -819,6 +844,8 @@ spec:
       - path: test_limits.py
         body: |-
           _BASE = 2
+
+
           MAX = _BASE * 2
 
 
@@ -840,7 +867,7 @@ spec:
       kind: invalid
       fixed:
       - path: test_rows.py
-        body: |
+        body: |-
           class Base:
               pass
 
@@ -868,7 +895,7 @@ spec:
               assert make() == 4
       files:
       - path: test_rows.py
-        body: |
+        body: |-
           def test_make() -> None:
               assert make() == 4
 

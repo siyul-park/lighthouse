@@ -686,11 +686,11 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> (Vec<TextEdit>, V
         .filter(|b| !kept.contains(&b.symbol.id))
         .map(|b| carried(text, b))
         .collect();
+    let mut removed: Vec<Range<usize>> = Vec::new();
     for range in joined(text, moved) {
-        edits.push(TextEdit::delete(
-            file.clone(),
-            with_blank(text, range, Some(separation)),
-        ));
+        let range = with_blank(text, range, Some(separation));
+        edits.push(TextEdit::delete(file.clone(), range.clone()));
+        removed.push(range);
     }
     let first_kept = current.iter().find(|b| kept.contains(&b.symbol.id));
     let mut after: Option<&Block> = None;
@@ -712,7 +712,14 @@ fn moves(text: &str, current: &[&Block], wanted: &[&Block]) -> (Vec<TextEdit>, V
         };
         let Some(beside) = beside else { continue };
         let (at, inserted) = if anchor.is_some() {
-            let at = beside.lines.end;
+            // The last block of a file that has no line end takes the line end
+            // before it with it: what goes in after `beside` goes in before it.
+            let end = beside.lines.end;
+            let at = if removed.iter().any(|r| r.start + 1 == end && r.end > end) {
+                end - 1
+            } else {
+                end
+            };
             (at, spacing::after(text, at, separation, &bodies, eol))
         } else {
             let at = carried(text, beside).start;

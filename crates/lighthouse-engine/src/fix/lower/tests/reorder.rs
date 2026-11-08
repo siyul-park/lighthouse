@@ -220,6 +220,73 @@ fn reorder_moves_adjacent_blocks_when_the_last_ends_the_file() {
     );
 }
 
+#[test]
+fn reorder_moves_adjacent_blocks_when_the_last_has_no_line_end() {
+    let text = "fn a() {}\n\nfn b() {}\n\nfn c() {}\n\nfn d() {}\n\nfn e() {}";
+    let symbols = [
+        ("a", 1, 1),
+        ("b", 3, 3),
+        ("c", 5, 5),
+        ("d", 7, 7),
+        ("e", 9, 9),
+    ];
+    for (order, want) in [
+        (
+            ["d", "e", "a", "b", "c"],
+            "fn d() {}\n\nfn e() {}\n\nfn a() {}\n\nfn b() {}\n\nfn c() {}",
+        ),
+        (
+            ["e", "b", "c", "a", "d"],
+            "fn e() {}\n\nfn b() {}\n\nfn c() {}\n\nfn a() {}\n\nfn d() {}",
+        ),
+        (
+            ["b", "e", "a", "d", "c"],
+            "fn b() {}\n\nfn e() {}\n\nfn a() {}\n\nfn d() {}\n\nfn c() {}",
+        ),
+    ] {
+        let op = EditOp::Reorder {
+            owner: Owner::File(FILE.into()),
+            order: order.map(id).to_vec(),
+        };
+
+        let lowered = case(text, &symbols, vec![]).run(&[op]);
+
+        assert_eq!(lowered.unwrap(), want, "{order:?}");
+    }
+}
+
+#[test]
+fn every_order_of_blocks_without_a_final_line_end_lowers_to_that_order() {
+    let names = ["a", "b", "c", "d", "e", "f"];
+    let text = "fn a() {}\n\nfn b() {}\n\nfn c() {}\n\nfn d() {}\n\nfn e() {}\n\nfn f() {}";
+    let symbols: Vec<(&str, u32, u32)> = (0..6)
+        .map(|n| (names[n], 2 * n as u32 + 1, 2 * n as u32 + 1))
+        .collect();
+    for n in 0..720usize {
+        let mut pool = names.to_vec();
+        let mut order = Vec::new();
+        let mut rest = n;
+        for i in (1..=6).rev() {
+            let factorial: usize = (1..i).product();
+            order.push(pool.remove(rest / factorial));
+            rest %= factorial;
+        }
+        let want = order
+            .iter()
+            .map(|s| format!("fn {s}() {{}}"))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let op = EditOp::Reorder {
+            owner: Owner::File(FILE.into()),
+            order: order.iter().map(|s| id(s)).collect(),
+        };
+
+        let lowered = case(text, &symbols, vec![]).run(&[op]);
+
+        assert_eq!(lowered.unwrap(), want, "{order:?}");
+    }
+}
+
 /// A deterministic shuffle (xorshift), so that a failure repeats.
 fn shuffled(n: usize, seed: u64) -> Vec<usize> {
     let mut state = seed | 1;

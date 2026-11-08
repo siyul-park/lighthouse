@@ -118,3 +118,39 @@ fn go_moves_a_const_group_and_a_var_with_their_comments_and_one_blank_line() {
 
     assert_eq!(fixed(&dir, "design/declaration-groups", "a.go"), GO_FIXED);
 }
+
+const GO_NO_END: &str = "package demo\n\nimport \"testing\"\n\nfunc TestRows(t *testing.T) {\n\tif build().n != limit {\n\t\tt.Fatal(\"rows\")\n\t}\n}\n\nvar limit = base + 1\n\nfunc build() row {\n\treturn row{n: base}\n}\n\nconst base = 2\n\ntype row struct{ n int }";
+const GO_NO_END_FIXED: &str = "package demo\n\nimport \"testing\"\n\ntype row struct{ n int }\n\nconst base = 2\n\nvar limit = base + 1\n\nfunc build() row {\n\treturn row{n: base}\n}\n\nfunc TestRows(t *testing.T) {\n\tif build().n != limit {\n\t\tt.Fatal(\"rows\")\n\t}\n}";
+
+#[test]
+fn go_fixes_a_test_file_without_a_final_line_end_in_one_reorder() {
+    let Some(dir) = go_project(&[("a_test.go", GO_NO_END)], "") else {
+        return;
+    };
+
+    assert_eq!(
+        fixed(&dir, "testing/file-layout", "a_test.go"),
+        GO_NO_END_FIXED
+    );
+}
+
+const PYTHON_NO_END: &str = "def test_make():\n    assert make() == 4\n\n\nLIMIT = 4\n\n\ndef register(limit):\n    def wrap(function):\n        return function\n\n    return wrap\n\n\n@register(LIMIT)\ndef make(size=LIMIT):\n    return size\n\n\nclass Base:\n    pass\n\n\nclass Row(Base):\n    pass";
+
+#[test]
+fn python_fixes_a_test_file_without_a_final_line_end_in_one_reorder() {
+    let Some(dir) = python(&[("test_rows.py", PYTHON_NO_END)]) else {
+        return;
+    };
+
+    let fixed = fixed(&dir, "testing/file-layout", "test_rows.py");
+
+    assert!(!fixed.ends_with('\n'), "{fixed:?}");
+    assert!(
+        fixed.find("class Row").unwrap() < fixed.find("def test_make").unwrap(),
+        "{fixed}"
+    );
+    assert!(
+        fixed.find("def make").unwrap() < fixed.find("def test_make").unwrap(),
+        "{fixed}"
+    );
+}
