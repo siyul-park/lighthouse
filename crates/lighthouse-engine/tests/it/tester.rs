@@ -69,7 +69,11 @@ impl Rule for Marker {
             .get("word")
             .and_then(|w| w.as_str())
             .unwrap_or(self.word);
-        let found = text.lines().enumerate().filter(|(_, l)| l.contains(word));
+        let found = text
+            .get()
+            .lines()
+            .enumerate()
+            .filter(|(_, l)| l.contains(word));
         Ok(found
             .map(|(i, _)| {
                 let at = Position {

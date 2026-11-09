@@ -7,7 +7,7 @@ use lighthouse_model::{
     Position, Span,
     ucm::{File, Fragment, Place, Project, Symbol, SymbolId, SymbolKind, SymbolRole, Visibility},
 };
-use lighthouse_plugin::{Context, Workspace};
+use lighthouse_plugin::{Context, Text, Workspace};
 
 fn at(line: u32) -> Span {
     let p = Position { line, col: 1 };
@@ -64,10 +64,11 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
     }]);
     let ws = Workspace::new(".");
     let facts = Default::default();
+    let given = Text::given("");
     let ctx = Context {
         workspace: &ws,
         model: &project,
-        file: Some((&file, "")),
+        file: Some((&file, &given)),
         facts: &facts,
         trusted: false,
         annotations: &lighthouse_plugin::Annotations::default(),

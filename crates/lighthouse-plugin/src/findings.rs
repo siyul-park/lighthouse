@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Annotations, Batch, Context, Error as PluginError, Facts, Models, NoModels, Notices, Queries,
-    Rule, Runtime, Workspace, analysis::required, queries::NoQueries,
+    Rule, Runtime, Text, Workspace, analysis::required, queries::NoQueries,
 };
 
 /// The kind of the answer of a batch, as a rule pulls it.
@@ -185,10 +185,10 @@ pub fn judge(
     let options = options_of(judged, id)?;
     let held = Held::default();
     let view = View::new(graph, &held)?;
-    let text = match file {
-        "" => None,
-        file => (runtime.text)(graph, file)?.as_ref().clone(),
-    };
+    let text = Text::lazy(|| match file {
+        "" => Ok(Arc::new(None)),
+        file => (runtime.text)(graph, file),
+    });
     let found = match file {
         "" => None,
         file => Some(match view.file(Path::new(file)) {
@@ -222,9 +222,7 @@ pub fn judge(
     let ctx = Context {
         workspace: &workspace,
         model: &view,
-        file: found
-            .as_ref()
-            .map(|found| (found, text.as_deref().unwrap_or_default())),
+        file: found.as_ref().map(|found| (found, &text)),
         facts: &facts,
         trusted: runtime.trusted,
         annotations: judging.annotations,
@@ -244,7 +242,7 @@ pub fn judge(
         .entry(id.to_owned())
         .or_default() += started.elapsed();
     let found = checked.map_err(|e| outcome(e, id))?;
-    if let Some(error) = view.failure() {
+    if let Some(error) = view.failure().or_else(|| text.failure()) {
         return Err(error);
     }
     Ok(Findings {

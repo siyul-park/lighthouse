@@ -15,7 +15,7 @@ use lighthouse_model::{
     Position, Span,
     ucm::{Comment, FunctionSummary, LoadNeed, Model, Symbol, SymbolId, SymbolKind, Visibility},
 };
-use lighthouse_plugin::{Annotations, Context, Error, Reads, Workspace};
+use lighthouse_plugin::{Annotations, Context, Error, Reads, Text, Workspace};
 use serde_json::{Map, Value, json};
 
 use crate::{
@@ -327,8 +327,13 @@ impl<'a> Builder<'a> {
     }
 
     /// A file with the facts about its text and its symbols.
-    pub(crate) fn file(&self, file: &lighthouse_model::ucm::File, text: &str) -> Value {
-        let mut value = facts::file(self.project, file, text);
+    pub(crate) fn file(&self, file: &lighthouse_model::ucm::File, text: &Text) -> Value {
+        let lines = if self.needs.field("lines") {
+            text.get().lines().count()
+        } else {
+            0
+        };
+        let mut value = facts::file(self.project, file, lines);
         // Whether a file is generated is what the merged model says, not what
         // the run read from disk.
         value["generated"] = json!(self.project.file(&file.path).is_none_or(|f| f.generated));
@@ -341,13 +346,13 @@ impl<'a> Builder<'a> {
             value["comments"] = Value::Array(
                 self.project
                     .comments_in(&file.path)
-                    .map(|comment| self.comment(comment, text))
+                    .map(|comment| self.comment(comment, text.get()))
                     .collect(),
             );
         }
         self.file_facts(&mut value, file);
         if self.needs.field("line_widths") {
-            value["line_widths"] = widths::line_widths(text);
+            value["line_widths"] = widths::line_widths(text.get());
         }
         if self.needs.field("annotations") {
             value["annotations"] = self

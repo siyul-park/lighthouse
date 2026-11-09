@@ -7,5 +7,6 @@ mod notices;
 mod queries;
 
 mod registry;
+mod text;
 
 mod workspace;

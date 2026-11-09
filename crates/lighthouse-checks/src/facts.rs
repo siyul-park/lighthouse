@@ -202,7 +202,7 @@ pub(crate) fn module(m: &Module, declared: &Declared) -> Value {
     })
 }
 
-pub(crate) fn file(project: &dyn Model, f: &lighthouse_model::ucm::File, text: &str) -> Value {
+pub(crate) fn file(project: &dyn Model, f: &lighthouse_model::ucm::File, lines: usize) -> Value {
     let functions = project
         .symbols_in(&f.path)
         .filter(|s| matches!(s.kind, SymbolKind::Function | SymbolKind::Method))
@@ -213,7 +213,7 @@ pub(crate) fn file(project: &dyn Model, f: &lighthouse_model::ucm::File, text: &
         "host_lang": f.lang,
         "test": f.test,
         "generated": f.generated,
-        "lines": text.lines().count(),
+        "lines": lines,
         "functions": functions,
     })
 }

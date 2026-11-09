@@ -66,11 +66,11 @@ impl Rule for Ghost {
             .file
             .ok_or_else(|| PluginError::Failed("no file".into()))?;
         let declared = self.reads.declared(ctx);
-        if file.path != Path::new("ghost.toy") || !declared || !text.contains("BOO") {
+        if file.path != Path::new("ghost.toy") || !declared || !text.get().contains("BOO") {
             return Ok(Vec::new());
         }
-        let index = LineIndex::new(text);
-        let at = text.find("BOO").unwrap_or_default();
+        let index = LineIndex::new(text.get());
+        let at = text.get().find("BOO").unwrap_or_default();
         let len = 3;
         Ok(vec![Diagnostic::new(
             "fake/ghost",

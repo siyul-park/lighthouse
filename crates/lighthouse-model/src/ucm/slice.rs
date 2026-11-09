@@ -5,7 +5,7 @@
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -35,6 +35,26 @@ impl Resolved {
         let mut slice = slice.clone();
         let ambiguous = resolve_in(&mut slice.fragment, table);
         Self { slice, ambiguous }
+    }
+
+    /// The edges of the slice in the order they stand, each with the file the
+    /// fragment about it is about when it starts at a module.
+    pub fn listed(&self) -> Vec<(Edge, Option<PathBuf>)> {
+        let slice = &self.slice;
+        let mut files = slice
+            .runs
+            .iter()
+            .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
+        slice
+            .fragment
+            .edges
+            .iter()
+            .map(|edge| {
+                let file = files.next().flatten();
+                let origin = file.filter(|_| matches!(edge.from, Node::Module(_)));
+                (edge.clone(), origin.cloned())
+            })
+            .collect()
     }
 }
 
@@ -89,27 +109,22 @@ pub struct Edges {
 }
 
 impl Edges {
-    /// `resolved` are the slices in the order of their paths.
-    pub fn new<'a>(table: &Table, resolved: impl IntoIterator<Item = &'a Resolved>) -> Self {
+    /// `listed` are the edges of the files, [`Resolved::listed`], in the order
+    /// of their paths.
+    pub fn new<'a>(
+        table: &Table,
+        listed: impl IntoIterator<Item = (&'a Path, &'a [(Edge, Option<PathBuf>)])>,
+    ) -> Self {
         let mut seen = HashSet::new();
         let mut dropped: BTreeMap<PathBuf, Vec<u32>> = BTreeMap::new();
         let mut kept: Vec<&Edge> = Vec::new();
-        for resolved in resolved {
-            let slice = &resolved.slice;
-            let mut files = slice
-                .runs
-                .iter()
-                .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
-            for (at, edge) in slice.fragment.edges.iter().enumerate() {
-                files.next();
+        for (path, edges) in listed {
+            for (at, (edge, _)) in edges.iter().enumerate() {
                 let key = (edge.kind, &edge.from, &edge.to, edge.resolution, edge.when);
                 if seen.insert(key) {
                     kept.push(edge);
                 } else {
-                    dropped
-                        .entry(slice.path.clone())
-                        .or_default()
-                        .push(at as u32);
+                    dropped.entry(path.to_owned()).or_default().push(at as u32);
                 }
             }
         }

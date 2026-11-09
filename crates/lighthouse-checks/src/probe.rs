@@ -2,7 +2,7 @@
 //! what the facts depend on. Not part of the API.
 
 use lighthouse_model::ucm::{File, Model, Symbol};
-use lighthouse_plugin::{Context, Error, Queries, Workspace};
+use lighthouse_plugin::{Context, Error, Queries, Text, Workspace};
 use serde_json::Value;
 
 use lighthouse_spec::Env;
@@ -33,7 +33,7 @@ pub fn file_fact(
     let needs = Needs::of(cel, [format!("x.{fact}").as_str()], []);
     let indexes = Computed::new(model, ctx.workspace);
     let builder = Builder::new(ctx, &indexes, &needs)?;
-    Ok(builder.file(file, text)[fact].clone())
+    Ok(builder.file(file, &Text::given(text))[fact].clone())
 }
 
 /// The indexes of `model` as a fixer pulls them, made from the model alone.

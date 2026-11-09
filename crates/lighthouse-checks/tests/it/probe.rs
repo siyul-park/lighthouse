@@ -3,7 +3,7 @@
 
 use lighthouse_checks::probe;
 use lighthouse_model::ucm::{Applicability, File, Model, Project};
-use lighthouse_plugin::{Annotations, Context, NoModels, NoQueries, Notices, Workspace};
+use lighthouse_plugin::{Annotations, Context, NoModels, NoQueries, Notices, Text, Workspace};
 use serde_json::json;
 
 use crate::support::World;
@@ -25,10 +25,11 @@ fn file_fact() {
     let ws = Workspace::new(".");
     let facts = Default::default();
     let notices = Notices::default();
+    let given = Text::given("");
     let ctx = Context {
         workspace: &ws,
         model: &project,
-        file: Some((&file, "")),
+        file: Some((&file, &given)),
         facts: &facts,
         trusted: false,
         annotations: &Annotations::default(),

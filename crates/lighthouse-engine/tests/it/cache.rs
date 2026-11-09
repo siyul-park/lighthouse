@@ -90,6 +90,9 @@ struct Counting {
     runs: Arc<AtomicUsize>,
     /// Whether a run takes a while, as a rule's does.
     slow: Arc<AtomicBool>,
+    /// Whether the rule reads the text of its file, and not only what the
+    /// model says of it.
+    reads_text: bool,
 }
 
 impl Rule for Counting {
@@ -106,7 +109,13 @@ impl Rule for Counting {
         }
         ctx.notices.push(format!("{} ran", self.meta.id));
         let (file, message) = match ctx.file {
-            Some((file, text)) => (file.path.clone(), format!("{} bytes", text.len())),
+            Some((file, text)) if self.reads_text => {
+                (file.path.clone(), format!("{} bytes", text.get().len()))
+            }
+            Some((file, _)) => (
+                file.path.clone(),
+                format!("{} symbols", ctx.model.symbols_in(&file.path).count()),
+            ),
             None => match ctx.model.files().next() {
                 Some(first) => (
                     first.path.clone(),
@@ -132,6 +141,7 @@ impl Rule for Counting {
 pub(crate) struct Counted {
     pub(crate) local: Arc<AtomicUsize>,
     global: Arc<AtomicUsize>,
+    shape: Arc<AtomicUsize>,
     rows: Arc<AtomicUsize>,
     /// The requests the provider got.
     indexed: Arc<AtomicUsize>,
@@ -186,16 +196,25 @@ impl Plugin for CountingPlugin {
                 meta: meta("counting/local", RunScope::File),
                 runs: Arc::clone(&self.counted.local),
                 slow: Arc::clone(&self.counted.slow),
+                reads_text: true,
+            }),
+            Box::new(Counting {
+                meta: meta("counting/shape", RunScope::File),
+                runs: Arc::clone(&self.counted.shape),
+                slow: Arc::clone(&self.counted.slow),
+                reads_text: false,
             }),
             Box::new(Counting {
                 meta: meta("counting/global", RunScope::Project),
                 runs: Arc::clone(&self.counted.global),
                 slow: Arc::clone(&self.counted.slow),
+                reads_text: true,
             }),
             Box::new(Counting {
                 meta: meta("counting/rows", RunScope::File),
                 runs: Arc::clone(&self.counted.rows),
                 slow: Arc::clone(&self.counted.slow),
+                reads_text: true,
             }),
         ]
     }
@@ -209,6 +228,7 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
     let counted = Counted {
         local: Arc::default(),
         global: Arc::default(),
+        shape: Arc::default(),
         rows: Arc::default(),
         indexed: Arc::default(),
         down: Arc::default(),
@@ -227,6 +247,7 @@ pub(crate) fn engine_with(root: &Path, config: &str) -> (Engine, Counted) {
             counted: Counted {
                 local: Arc::clone(&counted.local),
                 global: Arc::clone(&counted.global),
+                shape: Arc::clone(&counted.shape),
                 rows: Arc::clone(&counted.rows),
                 indexed: Arc::clone(&counted.indexed),
                 down: Arc::clone(&counted.down),
@@ -371,6 +392,31 @@ fn a_rule_that_reads_the_project_runs_for_every_file_when_the_project_changes() 
     let third = third.check(&[], &[]).unwrap();
     let (plain, _) = engine_with(dir.path(), ROWS);
     assert_eq!(found(&third), found(&plain.check(&[], &[]).unwrap()));
+}
+
+#[test]
+fn a_rule_that_never_reads_the_text_of_its_file_stays_green_when_the_text_changes() {
+    const BOTH: &str = "plugins = [\"counting\"]\n[rules]\n\"counting/local\" = \"warn\"\n\"counting/shape\" = \"warn\"\n";
+    let dir = project();
+    let cache = tempfile::tempdir().unwrap();
+    let cached = || {
+        let (engine, counted) = engine_with(dir.path(), BOTH);
+        (
+            engine.with_cache(cache.path().join("cache"), u64::MAX),
+            counted,
+        )
+    };
+    let (first, first_runs) = cached();
+    first.check(&[], &[]).unwrap();
+    assert_eq!(first_runs.shape.load(Ordering::SeqCst), 2);
+
+    fs::write(dir.path().join("b.txt"), "bbbb").unwrap();
+    let (second, second_runs) = cached();
+    let second = second.check(&[], &[]).unwrap();
+    assert_eq!(second_runs.local.load(Ordering::SeqCst), 1);
+    assert_eq!(second_runs.shape.load(Ordering::SeqCst), 0);
+    let (plain, _) = engine_with(dir.path(), BOTH);
+    assert_eq!(found(&second), found(&plain.check(&[], &[]).unwrap()));
 }
 
 /// Sizes of every file under `dir`.

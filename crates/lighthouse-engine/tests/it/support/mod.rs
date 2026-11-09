@@ -193,8 +193,9 @@ impl Rule for Word {
         let (file, text) = ctx
             .file
             .ok_or_else(|| PluginError::Failed("no file".into()))?;
-        let index = LineIndex::new(text);
+        let index = LineIndex::new(text.get());
         Ok(text
+            .get()
             .match_indices(self.word)
             .enumerate()
             .map(|(n, (at, _))| {

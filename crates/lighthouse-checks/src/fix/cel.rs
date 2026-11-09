@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use cel::{Context, Program, common::value::CowVal, context::VariableResolver};
-use lighthouse_plugin::{Error as PluginError, FixRequest, ValuesRequest};
+use lighthouse_plugin::{Error as PluginError, FixRequest, Text, ValuesRequest};
 use lighthouse_spec::{CelCheck, Decision, Select};
 use serde_json::{Map, Value, json};
 
@@ -243,7 +243,7 @@ impl CelFix {
             .project
             .file(request.file)
             .filter(|_| needs_file)
-            .map(|f| builder.file(f, request.text));
+            .map(|f| builder.file(f, &Text::given(request.text)));
         let mut scope = self.library.new_inner_scope();
         scope.add_variable_as_val("options", cel_fact(&Value::Object(options)));
         if let Some(file) = &file {

@@ -5,7 +5,7 @@ use lighthouse_model::{
     Options, Severity,
     ucm::{File, Fragment, Project},
 };
-use lighthouse_plugin::{Context, Error, Facts, Workspace};
+use lighthouse_plugin::{Context, Error, Facts, Text, Workspace};
 use lighthouse_spec::{Config, Rules};
 use serde_json::json;
 
@@ -42,10 +42,11 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
     let ws = Workspace::new(".");
     let project = Project::merge([Fragment::default()]);
     let facts = Facts::new();
+    let given = Text::given(text);
     let ctx = Context {
         workspace: &ws,
         model: &project,
-        file: Some((&file, text)),
+        file: Some((&file, &given)),
         facts: &facts,
         trusted: false,
         annotations: &lighthouse_plugin::Annotations::default(),

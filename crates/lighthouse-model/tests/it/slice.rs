@@ -72,7 +72,14 @@ fn assemble_the_slices_resolved_against_the_table_as_merge_does() {
     let entry: &Entry = table.entry(&b).unwrap();
     assert_eq!(entry.name, "g");
     let resolved: Vec<Resolved> = slices.iter().map(|s| Resolved::new(s, &table)).collect();
-    let edges = Edges::new(&table, &resolved);
+    let listed: Vec<_> = resolved.iter().map(Resolved::listed).collect();
+    let edges = Edges::new(
+        &table,
+        resolved
+            .iter()
+            .zip(&listed)
+            .map(|(resolved, listed)| (resolved.slice.path.as_path(), listed.as_slice())),
+    );
     let reverse: &Reverse = &edges.reverse;
     let incoming = Incoming::new(&resolved[1], &table, reverse);
     assert_eq!(incoming.by_symbol[&b].callers.len(), 1);

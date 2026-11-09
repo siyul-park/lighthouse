@@ -16,7 +16,7 @@ use lighthouse_graph::{Error, Graph};
 use typed_arena::Arena;
 
 use super::{
-    Boxed, Comment, DECLARATIONS, Declarations, EDGES, EDGES_IN, Edge, Edges, File,
+    Boxed, Comment, DECLARATIONS, Declarations, EDGES, EDGES_IN, Edge, Edges, FUNCTIONS, File,
     FunctionSummary, INCOMING, Incoming, LoadNeed, MODULE_CASES, Model, Module, Node, PATHS,
     PLACES, Place, RESOLVED, Resolved, SITES, SYMBOLS, Site, Sites, Symbol, SymbolId, Table,
     TestCase, Tie, When, key, kinds::DUPLICATED, load_needs,
@@ -30,6 +30,7 @@ pub struct View<'v> {
     resolved: RefCell<HashMap<PathBuf, &'v Resolved>>,
     incoming: RefCell<HashMap<PathBuf, &'v Incoming>>,
     placed: RefCell<HashMap<PathBuf, &'v [Place]>>,
+    summarized: RefCell<HashMap<PathBuf, &'v [FunctionSummary]>>,
     declared_in: RefCell<HashMap<PathBuf, &'v Declarations>>,
     homes: RefCell<HashMap<SymbolId, Rc<Home<'v>>>>,
     files: RefCell<HashMap<String, Option<&'v File>>>,
@@ -37,7 +38,7 @@ pub struct View<'v> {
     commented: RefCell<HashMap<String, Rc<Vec<usize>>>>,
     cases: RefCell<HashMap<String, &'v [TestCase]>>,
     sited: OnceCell<&'v Sites>,
-    resolved_all: OnceCell<()>,
+    summarized_all: OnceCell<()>,
     edges_all: OnceCell<()>,
     declared_all: OnceCell<()>,
     everything: Everything<'v>,
@@ -75,6 +76,7 @@ pub struct Held {
     edges: Arena<Arc<Edges>>,
     listed: Arena<Arc<Listed>>,
     places: Arena<Arc<Vec<Place>>>,
+    summaries: Arena<Arc<Vec<FunctionSummary>>>,
     cases: Arena<Arc<Vec<TestCase>>>,
     files: Arena<File>,
 }
@@ -93,6 +95,7 @@ impl<'v> View<'v> {
             resolved: RefCell::default(),
             incoming: RefCell::default(),
             placed: RefCell::default(),
+            summarized: RefCell::default(),
             declared_in: RefCell::default(),
             homes: RefCell::default(),
             files: RefCell::default(),
@@ -100,7 +103,7 @@ impl<'v> View<'v> {
             commented: RefCell::default(),
             cases: RefCell::default(),
             sited: OnceCell::new(),
-            resolved_all: OnceCell::new(),
+            summarized_all: OnceCell::new(),
             edges_all: OnceCell::new(),
             declared_all: OnceCell::new(),
             everything: Everything::default(),
@@ -177,12 +180,12 @@ impl<'v> View<'v> {
         paths
     }
 
-    /// [`View::paths`], with the resolved slices pulled likewise.
-    fn resolved_paths(&self) -> Vec<String> {
+    /// [`View::paths`], with the summaries of the functions pulled likewise.
+    fn summarized_paths(&self) -> Vec<String> {
         let paths = self.paths();
-        self.resolved_all.get_or_init(|| {
+        self.summarized_all.get_or_init(|| {
             self.graph.par_map(paths.clone(), |graph, path| {
-                let _ = graph.query(&RESOLVED, path);
+                let _ = graph.query(&FUNCTIONS, path);
             });
         });
         paths
@@ -214,6 +217,19 @@ impl<'v> View<'v> {
         let places = &***self.held.places.alloc(places);
         self.placed.borrow_mut().insert(path.to_owned(), places);
         Some(places)
+    }
+
+    /// The summaries of the functions of the file at `path`.
+    fn summaries(&self, path: &Path) -> Option<&'v [FunctionSummary]> {
+        if let Some(found) = self.summarized.borrow().get(path) {
+            return Some(found);
+        }
+        let summaries = self.keep(self.graph.query(&FUNCTIONS, &key(path)))?;
+        let summaries = &***self.held.summaries.alloc(summaries);
+        self.summarized
+            .borrow_mut()
+            .insert(path.to_owned(), summaries);
+        Some(summaries)
     }
 
     /// The paths of the project's files.
@@ -413,10 +429,7 @@ impl<'v> Model for View<'v> {
     fn function(&self, id: &SymbolId) -> Option<&FunctionSummary> {
         let home = self.home(id);
         *home.function.get_or_init(|| {
-            self.resolved(home.file.as_deref()?)?
-                .slice
-                .fragment
-                .functions
+            self.summaries(home.file.as_deref()?)?
                 .iter()
                 .find(|function| function.symbol == *id)
         })
@@ -540,10 +553,10 @@ impl<'v> Model for View<'v> {
     fn functions(&self) -> Boxed<'_, FunctionSummary> {
         let all = self.everything.functions.get_or_init(|| {
             let mut all: Vec<&FunctionSummary> = self
-                .resolved_paths()
+                .summarized_paths()
                 .iter()
-                .filter_map(|path| self.resolved(Path::new(path)))
-                .flat_map(|resolved| &resolved.slice.fragment.functions)
+                .filter_map(|path| self.summaries(Path::new(path)))
+                .flatten()
                 .collect();
             all.sort_by(|a, b| a.symbol.cmp(&b.symbol));
             all.dedup_by(|a, b| a.symbol == b.symbol);

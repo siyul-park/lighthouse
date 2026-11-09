@@ -96,7 +96,7 @@ impl CommandRule {
             if let Some(found) = self.answered((meta, ctx, options), &file.path)? {
                 return Ok(found);
             }
-            return run(program)?.one(&file.path, Some(text));
+            return run(program)?.one(&file.path, Some(text.get()));
         }
         let mut found = Vec::new();
         for (program, files) in self.assigned(ctx) {

@@ -28,7 +28,7 @@ impl Rule for Owned {
             .ok_or_else(|| PluginError::Failed("no file".into()))?;
         let mut found = self.0.check(ctx, options)?;
         for d in &mut found {
-            let before = text.lines().take(d.span.start.line as usize);
+            let before = text.get().lines().take(d.span.start.line as usize);
             d.symbol = before
                 .filter_map(|line| line.strip_prefix("fn "))
                 .last()

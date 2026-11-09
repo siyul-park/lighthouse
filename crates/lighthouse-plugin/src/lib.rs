@@ -12,6 +12,7 @@ mod notices;
 mod queries;
 mod registry;
 mod report;
+mod text;
 
 use std::{
     borrow::Cow,
@@ -57,6 +58,7 @@ pub use notices::Notices;
 pub use queries::{NoQueries, Pulling, Queries, Reads};
 pub use registry::{Language, Registry, plugin_of};
 pub use report::{REPORT, RUN, Read, Reported, quiet_report, set_run, state_report};
+pub use text::Text;
 
 /// Identity of a plugin: `id` prefixes every analyzer, rule and fixer
 /// it contributes. Every plugin kind describes itself through a manifest, a
@@ -112,7 +114,7 @@ pub struct Context<'a> {
     /// recorded as a dependency of its findings.
     pub model: &'a dyn CodeModel,
     /// The focused file and its text; `None` for project scope.
-    pub file: Option<(&'a File, &'a str)>,
+    pub file: Option<(&'a File, &'a Text<'a>)>,
     pub facts: &'a Facts,
     /// The user trusts the project to run the commands it names. The user
     /// decides that, never the repository.

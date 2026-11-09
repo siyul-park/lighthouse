@@ -25,10 +25,10 @@ use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Declarations, Edge, Edges, File, Fragment, Held, Implemented, Incoming, Markers, Methods,
-    Model, Node, ORDERED, Place, Project, REGIONS, Resolved, Settled, Sites, Slice, Symbol,
-    SymbolId, Table, TestCase, View, ambiguity, collisions, declared, merge::duplicate_notice,
-    methods,
+    Declarations, Edge, Edges, File, Fragment, FunctionSummary, Held, Implemented, Incoming,
+    Markers, Methods, Model, ORDERED, Place, Project, REGIONS, Resolved, Settled, Sites, Slice,
+    Symbol, SymbolId, Table, TestCase, View, ambiguity, collisions, declared,
+    merge::duplicate_notice, methods,
 };
 
 /// The id of the unit that holds the regions selected in the project's files.
@@ -80,6 +80,10 @@ pub static RESOLVED: Query<String, Resolved> = Query::new("resolved", resolved);
 /// read of the position of a declaration takes of the file, so that an edit of
 /// a comment or a body that moves nothing leaves it equal.
 pub static PLACES: Query<String, Vec<Place>> = Query::new("places", places);
+/// The summaries of the functions of a file: what a read of a function takes of
+/// the file, so that an edit of a comment, or of a function that changes no
+/// summary, leaves it equal.
+pub static FUNCTIONS: Query<String, Vec<FunctionSummary>> = Query::new("functions", functions);
 /// The edges of a file in the order they stand, each with the file the fragment
 /// about it is about when it starts at a module: what a read of the edges of the
 /// project takes of the file.
@@ -314,6 +318,7 @@ pub fn register(graph: &Graph) -> Result<(), Error> {
     SYMBOLS.register(graph)?;
     RESOLVED.register(graph)?;
     PLACES.register(graph)?;
+    FUNCTIONS.register(graph)?;
     EDGES_IN.register(graph)?;
     EDGES.register(graph)?;
     SITES.register(graph)?;
@@ -430,30 +435,26 @@ fn places(graph: &Graph, path: &String) -> Result<Vec<Place>, Error> {
     Ok(resolved.slice.fragment.places.clone())
 }
 
-fn edges_in(graph: &Graph, path: &String) -> Result<Vec<(Edge, Option<PathBuf>)>, Error> {
+fn functions(graph: &Graph, path: &String) -> Result<Vec<FunctionSummary>, Error> {
     let resolved = graph.query(&RESOLVED, path)?;
-    let mut files = resolved
-        .slice
-        .runs
-        .iter()
-        .flat_map(|(len, file)| std::iter::repeat_n(file.as_ref(), *len));
-    Ok(resolved
-        .slice
-        .fragment
-        .edges
-        .iter()
-        .map(|edge| {
-            let file = files.next().flatten();
-            let origin = file.filter(|_| matches!(edge.from, Node::Module(_)));
-            (edge.clone(), origin.cloned())
-        })
-        .collect())
+    Ok(resolved.slice.fragment.functions.clone())
+}
+
+fn edges_in(graph: &Graph, path: &String) -> Result<Vec<(Edge, Option<PathBuf>)>, Error> {
+    Ok(graph.query(&RESOLVED, path)?.listed())
 }
 
 fn edges(graph: &Graph, _: &()) -> Result<Edges, Error> {
     let table = graph.query(&SYMBOLS, &())?;
-    let resolved = each(graph, |graph, path| graph.query(&RESOLVED, path))?;
-    Ok(Edges::new(&table, resolved.iter().map(Arc::as_ref)))
+    let paths = paths(graph)?;
+    let listed = each(graph, |graph, path| graph.query(&EDGES_IN, path))?;
+    Ok(Edges::new(
+        &table,
+        paths
+            .iter()
+            .map(Path::new)
+            .zip(listed.iter().map(|listed| listed.as_slice())),
+    ))
 }
 
 fn sites(graph: &Graph, _: &()) -> Result<Sites, Error> {

@@ -108,7 +108,7 @@ impl Abstain {
             return Vec::new();
         }
         if ctx.models.collecting() {
-            let seen = candidates.iter().map(|c| self.subject(ctx, text, c));
+            let seen = candidates.iter().map(|c| self.subject(ctx, text.get(), c));
             ctx.models.observe(seen.collect());
         }
         let candidates: Vec<Candidate> = candidates.into_iter().filter(|c| !c.decided).collect();
@@ -117,7 +117,7 @@ impl Abstain {
         }
         let subjects = candidates
             .iter()
-            .map(|c| self.subject(ctx, text, c))
+            .map(|c| self.subject(ctx, text.get(), c))
             .collect();
         let ask = Ask {
             rule: rule.id.clone(),
