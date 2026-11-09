@@ -456,9 +456,12 @@ impl<'e> Proposer<'e> {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        for (tool, identity) in
-            tools::identities(&self.engine.ws.root, &outcome.project.files, &programs)
-        {
+        for (tool, identity) in tools::identities(
+            graph,
+            &self.engine.ws.root,
+            &outcome.project.files,
+            &programs,
+        )? {
             graph.set_input(
                 &lighthouse_plugin::TOOL,
                 &tool,

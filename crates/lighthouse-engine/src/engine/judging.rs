@@ -250,7 +250,9 @@ impl Engine {
         }
         COMMAND.register(graph)?;
         let tools: Vec<String> = programs.into_iter().collect();
-        for (tool, identity) in tools::identities(&self.ws.root, run.project.files(), &tools) {
+        for (tool, identity) in
+            tools::identities(graph, &self.ws.root, run.project.files(), &tools)?
+        {
             graph.set_input(&TOOL, &tool, identity, Durability::Stable)?;
         }
         if batching {

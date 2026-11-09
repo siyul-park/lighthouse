@@ -1,19 +1,18 @@
 //! What the findings of a program depend on besides the project's code: the
 //! program as the host finds it, its version, and the files that choose the
 //! version or configure it. A tool is as it was when its file, its version
-//! answer, and those files are. The answer to `--version` is kept for the
-//! process under the file's identity, so that a fix run that checks many times
-//! starts each program once.
+//! answer, and those files are. The answer to `--version` is kept in the graph
+//! under the file's identity, so that no run starts a program it has asked.
 
 use std::{
     collections::{BTreeSet, HashMap},
     env, fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{Mutex, OnceLock, PoisonError},
     time::{Duration, Instant, UNIX_EPOCH},
 };
 
+use lighthouse_graph::{Durability, Error, Graph, Input};
 use lighthouse_model::ucm::File;
 use lighthouse_protocol::hash::Hasher;
 use rayon::prelude::*;
@@ -66,14 +65,36 @@ const GLOBAL_SELECTORS: [&str; 2] = [".goenv/version", ".rustup/settings.toml"];
 const SELECTING_VARIABLES: [&str; 3] = ["RUSTUP_TOOLCHAIN", "GOENV_VERSION", "GOROOT"];
 /// How long a program may take to say its version.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
+/// What a program said to `--version`, by the file the search path finds and
+/// what chooses the version it runs ([`locate`]). Persisted: a run that finds
+/// the key as it was starts no program.
+static VERSION: Input<String, String> = Input::new("tool_version").persisted();
+
+/// Where a program stands: not on the search path, not readable, or the file
+/// the search path finds with the key its answer to `--version` is kept under.
+enum Located {
+    Missing,
+    Unreadable,
+    Found {
+        path: PathBuf,
+        file: String,
+        key: String,
+    },
+}
 
 /// The identity of each program of `tools`, by name, as the host finds it now:
 /// the program, its version and what chooses the version or configures it
 /// ([`selectors`]). What a program answers to `--version` is asked once for
-/// each file the search path finds in a process, side by side.
-pub(crate) fn identities(root: &Path, files: &[File], tools: &[String]) -> Vec<(String, String)> {
+/// each file the search path finds and what chooses its version, and kept in
+/// the graph.
+pub(crate) fn identities(
+    graph: &mut Graph,
+    root: &Path,
+    files: &[File],
+    tools: &[String],
+) -> Result<Vec<(String, String)>, Error> {
     if tools.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let selectors = selectors(root, files);
     let mut hasher = Hasher::new();
@@ -87,21 +108,48 @@ pub(crate) fn identities(root: &Path, files: &[File], tools: &[String]) -> Vec<(
     }
     hasher.update(&selectors);
     let shared = hasher.hex();
-    let found: Vec<String> = tools
+    let located: Vec<Located> = tools.iter().map(|tool| locate(tool, &selectors)).collect();
+    let mut asked = Vec::new();
+    for (tool, at) in tools.iter().zip(&located) {
+        if let Located::Found { key, path, .. } = at
+            && graph.input(&VERSION, key)?.is_none()
+        {
+            asked.push((tool, key, path));
+        }
+    }
+    let answers: Vec<Result<String, String>> = asked
         .par_iter()
-        .map(|tool| found(tool, &selectors))
+        .map(|(tool, _, path)| Ok(probe(path, &["--version"])? + &companion(tool)?))
         .collect();
-    tools
-        .iter()
-        .zip(found)
-        .map(|(tool, found)| {
-            let mut hasher = Hasher::new();
-            hasher.update(&shared);
-            hasher.update(tool);
-            hasher.update(found);
-            (tool.clone(), hasher.hex())
-        })
-        .collect()
+    let mut said = HashMap::new();
+    for ((_, key, _), answer) in asked.into_iter().zip(answers) {
+        match answer {
+            Ok(version) => graph.set_input(&VERSION, key, version, Durability::Volatile)?,
+            Err(trouble) => {
+                said.insert(key, trouble);
+            }
+        }
+    }
+    let mut out = Vec::with_capacity(tools.len());
+    for (tool, at) in tools.iter().zip(&located) {
+        let found = match at {
+            Located::Missing => format!("{tool}: not found"),
+            Located::Unreadable => format!("{tool}: unreadable"),
+            Located::Found { key, file, .. } => {
+                let version = match said.get(key) {
+                    Some(trouble) => trouble.clone(),
+                    None => graph.input(&VERSION, key)?.unwrap_or_default().to_string(),
+                };
+                format!("{file}:{version}")
+            }
+        };
+        let mut hasher = Hasher::new();
+        hasher.update(&shared);
+        hasher.update(tool);
+        hasher.update(found);
+        out.push((tool.clone(), hasher.hex()));
+    }
+    Ok(out)
 }
 
 /// What tells the programs of `tools` apart from other ones, without asking
@@ -157,35 +205,26 @@ pub(crate) fn selectors(root: &Path, files: &[File]) -> String {
 }
 
 /// What tells this version of `tool` from another: the file the search path
-/// finds, and what it and its companion say of their versions.
-fn found(tool: &str, selectors: &str) -> String {
-    static ANSWERS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+/// finds, the files and variables that choose the version it runs.
+fn locate(tool: &str, selectors: &str) -> Located {
     let Some(path) = which(tool) else {
-        return format!("{tool}: not found");
+        return Located::Missing;
     };
     let Some(file) = identity_of(&path) else {
-        return format!("{tool}: unreadable");
+        return Located::Unreadable;
     };
-    let mut key = format!("{file}\0{selectors}");
+    let mut hasher = Hasher::new();
+    hasher.update(&file);
+    hasher.update(selectors);
     for variable in SELECTING_VARIABLES {
-        key.push('\0');
-        key.push_str(&env::var_os(variable).unwrap_or_default().to_string_lossy());
+        hasher.update(variable);
+        hasher.update(env::var_os(variable).unwrap_or_default().as_encoded_bytes());
     }
-    let answers = ANSWERS.get_or_init(Mutex::default);
-    let known = answers
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .get(&key)
-        .cloned();
-    let version = known.unwrap_or_else(|| {
-        let version = probe(&path, &["--version"]) + &companion(tool);
-        answers
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(key, version.clone());
-        version
-    });
-    format!("{file}:{version}")
+    Located::Found {
+        path,
+        file,
+        key: hasher.hex(),
+    }
 }
 
 /// The file the search path finds for `tool`, by path, size and time.
@@ -205,17 +244,17 @@ fn identity_of(path: &Path) -> Option<String> {
 }
 
 /// The version of the toolchain a program without a version flag belongs to.
-fn companion(tool: &str) -> String {
+fn companion(tool: &str) -> Result<String, String> {
     match tool {
-        "gofmt" => which("go")
-            .map(|go| probe(&go, &["version"]))
-            .unwrap_or_default(),
-        _ => String::new(),
+        "gofmt" => which("go").map_or(Ok(String::new()), |go| probe(&go, &["version"])),
+        _ => Ok(String::new()),
     }
 }
 
-/// What `program` prints when asked `args`, and how it ended.
-fn probe(program: &Path, args: &[&str]) -> String {
+/// What `program` prints when asked `args`, and how it ended; what says that
+/// it did not start or did not answer is the error: a run's trouble, not the
+/// program's version.
+fn probe(program: &Path, args: &[&str]) -> Result<String, String> {
     let Ok(mut child) = Command::new(program)
         .args(args)
         .stdin(Stdio::null())
@@ -223,7 +262,7 @@ fn probe(program: &Path, args: &[&str]) -> String {
         .stderr(Stdio::piped())
         .spawn()
     else {
-        return "does not start".to_owned();
+        return Err("does not start".to_owned());
     };
     let started = Instant::now();
     loop {
@@ -235,21 +274,21 @@ fn probe(program: &Path, args: &[&str]) -> String {
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return "no answer".to_owned();
+                return Err("no answer".to_owned());
             }
         }
     }
-    child.wait_with_output().map_or_else(
-        |_| "no answer".to_owned(),
-        |out| {
+    child
+        .wait_with_output()
+        .map_err(|_| "no answer".to_owned())
+        .map(|out| {
             format!(
                 "{}{}{:?}",
                 String::from_utf8_lossy(&out.stdout),
                 String::from_utf8_lossy(&out.stderr),
                 out.status.code()
             )
-        },
-    )
+        })
 }
 
 /// The file the search path finds for `tool`.
@@ -263,3 +302,6 @@ fn which(tool: &str) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
         .and_then(|candidate| candidate.canonicalize().ok())
 }
+
+#[cfg(test)]
+mod tests;
