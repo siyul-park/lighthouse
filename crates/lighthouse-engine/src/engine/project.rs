@@ -8,7 +8,7 @@ use lighthouse_spec::key;
 
 use super::{index::Call, regions::Views, *};
 use lighthouse_model::ucm::{
-    HOST, Held, Host, MARKERS, MEMBERS, NOTICES, PATHS, PROJECT, REGIONS_UNIT, View, register,
+    HOST, Host, MARKERS, MEMBERS, NOTICES, PATHS, PROJECT, REGIONS_UNIT, register,
 };
 
 /// The unit each file of a run is in, and whether the unit is a host unit:
@@ -48,16 +48,11 @@ impl Engine {
             .host_inputs(graph, inputs, (units, views))
             .and_then(|()| {
                 let graph: &Graph = graph;
-                Ok(in_pool(|| {
-                    let held = Held::default();
-                    let view = View::new(graph, &held)?;
-                    let stated = Stated::of(&view);
+                in_pool(|| {
+                    let stated = Stated::of(graph)?;
                     let notices = graph.query(&NOTICES, &())?;
-                    match view.failure() {
-                        Some(e) => Err(e),
-                        None => Ok((stated, notices)),
-                    }
-                })?)
+                    Ok::<_, Error>((stated, notices))
+                })
             });
         match built {
             Ok((stated, notices)) => {

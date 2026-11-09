@@ -25,9 +25,10 @@ use lighthouse_graph::{Durability, Error, Graph, Input, Query};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Declarations, Edge, Edges, File, Fragment, Implemented, Incoming, Markers, Methods, Node,
-    ORDERED, Place, Project, REGIONS, Resolved, Settled, Sites, Slice, Symbol, SymbolId, Table,
-    TestCase, ambiguity, collisions, declared, merge::duplicate_notice, methods,
+    Declarations, Edge, Edges, File, Fragment, Held, Implemented, Incoming, Markers, Methods,
+    Model, Node, ORDERED, Place, Project, REGIONS, Resolved, Settled, Sites, Slice, Symbol,
+    SymbolId, Table, TestCase, View, ambiguity, collisions, declared, merge::duplicate_notice,
+    methods,
 };
 
 /// The id of the unit that holds the regions selected in the project's files.
@@ -101,6 +102,13 @@ pub static MODULE_CASES: Query<String, Vec<TestCase>> =
 /// to see: the ids declared in several files and the targets that stayed
 /// ambiguous.
 pub static NOTICES: Query<(), Vec<String>> = Query::new("notices", notices);
+/// How many targets of a file stayed ambiguous: what `notices` takes of its
+/// resolved slice, so that an edit leaves the notices of the other files alone.
+pub static AMBIGUOUS: Query<String, usize> = Query::new("ambiguous", ambiguous);
+/// A file as the model states it, and whether it declares test code or is test
+/// code; none for a path no provider declared. What a run takes of each file
+/// besides the queries of the graph, so that an edit re-states its own files.
+pub static STATED: Query<String, Option<(File, bool)>> = Query::new("stated", stated);
 /// The files put together; held in memory only.
 pub static PROJECT: Query<(), Project> = Query::new("project", project).transient();
 
@@ -313,7 +321,18 @@ pub fn register(graph: &Graph) -> Result<(), Error> {
     CASES.register(graph)?;
     MODULE_CASES.register(graph)?;
     NOTICES.register(graph)?;
+    AMBIGUOUS.register(graph)?;
+    STATED.register(graph)?;
     PROJECT.register(graph)
+}
+
+/// The files the project states, with whether each declares test code: one
+/// `stated` query per path, fanned out.
+pub fn stated_files(graph: &Graph) -> Result<Vec<(File, bool)>, Error> {
+    let stated = each(graph, |graph, path| {
+        graph.query(&STATED, path).map(|stated| (*stated).clone())
+    })?;
+    Ok(stated.into_iter().flatten().collect())
 }
 
 /// The fragments of a file, as the host stamps them: the ones of its unit,
@@ -465,14 +484,32 @@ fn notices(graph: &Graph, _: &()) -> Result<Vec<String>, Error> {
     let mut symbols: Vec<&Symbol> = declared.iter().flat_map(|d| &d.symbols).collect();
     symbols.sort_by(|a, b| a.id.cmp(&b.id));
     let mut notices: Vec<String> = duplicate_notice(&symbols).into_iter().collect();
-    let ambiguous: usize = each(graph, |graph, path| graph.query(&RESOLVED, path))?
+    let ambiguous: usize = each(graph, |graph, path| graph.query(&AMBIGUOUS, path))?
         .iter()
-        .map(|resolved| resolved.ambiguous)
+        .map(|ambiguous| **ambiguous)
         .sum();
     if ambiguous > 0 {
         notices.push(ambiguity(ambiguous));
     }
     Ok(notices)
+}
+
+fn ambiguous(graph: &Graph, path: &String) -> Result<usize, Error> {
+    Ok(graph.query(&RESOLVED, path)?.ambiguous)
+}
+
+fn stated(graph: &Graph, path: &String) -> Result<Option<(File, bool)>, Error> {
+    let held = Held::default();
+    let view = View::new(graph, &held)?;
+    let path = Path::new(path);
+    let stated = view.file(path).map(|file| {
+        let tested = file.test || view.symbols_in(path).any(|symbol| view.in_test(&symbol.id));
+        (file.clone(), tested)
+    });
+    match view.failure() {
+        Some(failed) => Err(failed),
+        None => Ok(stated),
+    }
 }
 
 fn cases(graph: &Graph, _: &()) -> Result<BTreeMap<String, Vec<TestCase>>, Error> {

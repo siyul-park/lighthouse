@@ -9,7 +9,7 @@ use lighthouse_model::{
     ucm::{
         Edge, EdgeKind, File, Fragment, FunctionSummary, Held, Model, Module, NOTICES, Node,
         PROJECT, Place, Project, Resolution, Symbol, SymbolId, SymbolKind, Target, View,
-        Visibility,
+        Visibility, stated_files,
     },
 };
 
@@ -205,6 +205,20 @@ impl World {
             merged.notices(),
             "{at}: notices"
         );
+        let mut stated = stated_files(&self.graph).unwrap();
+        stated.sort_by(|a, b| a.0.path.cmp(&b.0.path));
+        let mut files: Vec<_> = merged
+            .files()
+            .map(|file| {
+                let tested = file.test
+                    || merged
+                        .symbols_in(&file.path)
+                        .any(|symbol| merged.in_test(&symbol.id));
+                (file.clone(), tested)
+            })
+            .collect();
+        files.sort_by(|a, b| a.0.path.cmp(&b.0.path));
+        assert_eq!(stated, files, "{at}: stated files");
     }
 
     fn merged(&self) -> Project {

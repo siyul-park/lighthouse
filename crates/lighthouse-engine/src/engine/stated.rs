@@ -8,9 +8,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use lighthouse_graph::{Error, Graph};
 use lighthouse_model::{
     Document,
-    ucm::{File, Model},
+    ucm::{File, stated_files},
 };
 
 #[derive(Debug, Default)]
@@ -21,27 +22,24 @@ pub(super) struct Stated {
 }
 
 impl Stated {
-    /// What `model` states of the files, sorted by path.
-    pub(super) fn of(model: &dyn Model) -> Self {
-        // A view lists the files as their keys sort, which is not how paths
+    /// What the graph states of the files, sorted by path.
+    pub(super) fn of(graph: &Graph) -> Result<Self, Error> {
+        let stated = stated_files(graph)?;
+        // The graph lists the files as their keys sort, which is not how paths
         // sort: `a.rs` comes before `a/b.rs` as text, after it as a path.
-        let mut files: Vec<File> = model.files().cloned().collect();
+        let (mut files, mut tested) = (Vec::with_capacity(stated.len()), BTreeSet::new());
+        for (file, declares_tests) in stated {
+            if declares_tests {
+                tested.insert(file.path.clone());
+            }
+            files.push(file);
+        }
         files.sort_by(|a, b| a.path.cmp(&b.path));
-        let tested = files
-            .iter()
-            .filter(|file| {
-                file.test
-                    || model
-                        .symbols_in(&file.path)
-                        .any(|symbol| model.in_test(&symbol.id))
-            })
-            .map(|file| file.path.clone())
-            .collect();
-        Self {
+        Ok(Self {
             files,
             tested,
             documents: Vec::new(),
-        }
+        })
     }
 
     /// The same with the project's own documents.

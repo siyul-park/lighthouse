@@ -28,7 +28,8 @@ pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, Type
 pub use kinds::{
     CASES, COLLISIONS, DECLARATIONS, DUPLICATED, EDGES, EDGES_IN, HOST, Host, IMPLEMENTS, INCOMING,
     MARKERS, MEMBERS, METHODS, MODULE_CASES, NOTICES, ORDERED_BY, PATHS, PAYLOAD, PLACES, PROJECT,
-    Payload, REGIONS_UNIT, RESOLVED, SETTLED, SITES, SLICE, SYMBOLS, key, register,
+    Payload, REGIONS_UNIT, RESOLVED, SETTLED, SITES, SLICE, STATED, SYMBOLS, key, register,
+    stated_files,
 };
 pub use load_order::{LoadNeed, LoadPoint, load_needs};
 pub use markers::Markers;

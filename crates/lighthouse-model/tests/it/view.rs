@@ -70,6 +70,20 @@ fn view() {
 }
 
 #[test]
+fn stated_files() {
+    let graph = graph(&[fragment("a", "f", false), fragment("a", "t", true)]);
+
+    let mut stated = lighthouse_model::ucm::stated_files(&graph).unwrap();
+    stated.sort_by(|a, b| a.0.path.cmp(&b.0.path));
+
+    let stated: Vec<_> = stated
+        .iter()
+        .map(|(file, tested)| (file.path.to_str().unwrap(), *tested))
+        .collect();
+    assert_eq!(stated, [("a/f.go", false), ("a/t.go", true)]);
+}
+
+#[test]
 fn view_new() {
     let graph = graph(&[]);
     let held = Held::default();
