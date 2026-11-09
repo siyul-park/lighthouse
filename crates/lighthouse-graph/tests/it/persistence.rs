@@ -630,12 +630,16 @@ mod file_size {
     use lighthouse_graph::{Durability, Graph, Input, Options, Query};
 
     static SEED: Input<(), u8> = Input::new("seed");
-    static BIG: Query<(), String> = Query::new("big", |graph, _| {
-        Ok(format!(
-            "{}{}",
-            graph.input(&SEED, &())?.unwrap_or_default(),
-            "b".repeat(200_000)
-        ))
+    /// Bytes that do not shrink when the file packs them.
+    static BIG: Query<(), Vec<u8>> = Query::new("big", |graph, _| {
+        let seed = graph.input(&SEED, &())?.map_or(0, |seed| *seed);
+        let mut state = u32::from(seed) + 1;
+        Ok((0..200_000)
+            .map(|_| {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                (state >> 24) as u8
+            })
+            .collect())
     });
 
     fn options() -> Options {
@@ -669,6 +673,29 @@ mod file_size {
         let small = std::fs::metadata(&path).expect("stat").len();
         assert_eq!(mode(&path), 2);
         assert!(full > 150_000 && small < 50_000, "{full} -> {small}");
+    }
+
+    static REPEATED: Query<(), String> =
+        Query::new(
+            "repeated",
+            |_, _| Ok("a value that repeats ".repeat(10_000)),
+        );
+
+    #[test]
+    fn a_value_that_repeats_takes_a_fraction_of_its_bytes_and_comes_back_whole() {
+        let dir = tempfile::tempdir().expect("dir");
+        let path = dir.path().join("graph.db");
+        let mut graph = Graph::open(&path, options()).expect("open");
+        let value = graph.query(&REPEATED, &()).expect("pull");
+        graph.commit().expect("commit");
+        lighthouse_graph::trim(&mut graph, 0).expect("trim");
+        drop(graph);
+
+        let size = std::fs::metadata(&path).expect("stat").len();
+        assert!(size < value.len() as u64 / 4, "{size} for {}", value.len());
+        let graph = Graph::open(&path, options()).expect("reopen");
+        assert_eq!(*graph.query(&REPEATED, &()).expect("pull"), *value);
+        assert!(graph.take_executed().is_empty(), "it was read, not run");
     }
 
     #[test]

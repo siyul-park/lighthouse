@@ -13,12 +13,13 @@ use rusqlite::{Connection, ErrorCode, OptionalExtension, params, params_from_ite
 use crate::{
     Durability, Error, blob,
     node::{Hash, Locked},
+    pack::{pack, unpack},
     retained::{self, Changes},
 };
 
 /// Bumped whenever a table or what a value means changes: a database of
 /// another version is replaced.
-const SCHEMA: i64 = 8;
+const SCHEMA: i64 = 9;
 
 /// `PRAGMA auto_vacuum` value of `INCREMENTAL`.
 const INCREMENTAL: i64 = 2;
@@ -252,9 +253,11 @@ impl Store {
         let mut statement = conn.prepare_cached(
             "SELECT value FROM blob WHERE hash = (SELECT hash FROM node WHERE kind = ?1 AND key = ?2)",
         )?;
-        Ok(statement
-            .query_row(params![kind, key], |row| row.get(0))
-            .optional()?)
+        statement
+            .query_row(params![kind, key], |row| row.get::<_, Vec<u8>>(0))
+            .optional()?
+            .map(|stored| unpack(&stored))
+            .transpose()
     }
 
     /// The retained states of a node, newest first, without their values.
@@ -271,7 +274,7 @@ impl Store {
                 found.push(StoredTrace {
                     row: row.get(0)?,
                     hash,
-                    deps: row.get(2)?,
+                    deps: unpack(&row.get::<_, Vec<u8>>(2)?)?,
                     durability: Durability::from_index(row.get(3)?),
                 });
             }
@@ -283,9 +286,11 @@ impl Store {
     pub(crate) fn blob(&self, hash: &Hash) -> Result<Option<Vec<u8>>, Error> {
         let conn = self.conn.locked();
         let mut statement = conn.prepare_cached("SELECT value FROM blob WHERE hash = ?1")?;
-        Ok(statement
-            .query_row([hash.as_slice()], |row| row.get(0))
-            .optional()?)
+        statement
+            .query_row([hash.as_slice()], |row| row.get::<_, Vec<u8>>(0))
+            .optional()?
+            .map(|stored| unpack(&stored))
+            .transpose()
     }
 
     /// Writes the nodes and the meta in one transaction and deletes the rows
@@ -388,7 +393,8 @@ fn read_row(row: &rusqlite::Row<'_>, at: usize) -> rusqlite::Result<Option<Row>>
     };
     Ok(Some(Row {
         hash,
-        deps: row.get(at + 1)?,
+        deps: unpack(&row.get::<_, Vec<u8>>(at + 1)?)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?,
         changed_at: row.get::<_, i64>(at + 2)? as u64,
         verified_at: row.get::<_, i64>(at + 3)? as u64,
         durability: Durability::from_index(row.get(at + 4)?),
@@ -420,7 +426,7 @@ fn put(tx: &rusqlite::Transaction<'_>, write: &Write, old: &mut Vec<Vec<u8>>) ->
         write.kind,
         write.key,
         row.hash.as_slice(),
-        row.deps,
+        pack(&row.deps),
         row.changed_at as i64,
         row.verified_at as i64,
         row.durability.index() as i64,

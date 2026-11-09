@@ -60,7 +60,7 @@ impl LanguageProvider for Files {
                                 let mut file = source.file.clone();
                                 let bulk = self.5.load(Ordering::SeqCst);
                                 if bulk > 0 {
-                                    file.facts.insert("bulk".to_owned(), "x".repeat(bulk));
+                                    file.facts.insert("bulk".to_owned(), noise(&file, bulk));
                                 }
                                 Fragment {
                                     files: vec![file],
@@ -620,6 +620,24 @@ fn a_run_the_graph_answers_still_brings_the_directory_under_its_limit() {
     assert_eq!(runs(&counted), (0, 0), "answered from the report");
     assert_eq!(found(&warm), found(&first));
     assert!(tree(&kept) < before, "{} -> {}", before, tree(&kept));
+}
+
+/// `len` characters that the file of the cache does not shrink by much, for
+/// the file `file`.
+fn noise(file: &lighthouse_model::ucm::File, len: usize) -> String {
+    let mut state = file
+        .path
+        .to_string_lossy()
+        .bytes()
+        .fold(7u32, |state, byte| {
+            state.wrapping_mul(31).wrapping_add(u32::from(byte))
+        });
+    (0..len)
+        .map(|_| {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            char::from(33 + ((state >> 24) % 94) as u8)
+        })
+        .collect()
 }
 
 #[test]

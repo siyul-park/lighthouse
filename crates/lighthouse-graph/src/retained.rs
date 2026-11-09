@@ -4,7 +4,7 @@
 
 use rusqlite::{OptionalExtension, Transaction, params};
 
-use crate::{Durability, Error, blob, node::Hash};
+use crate::{Durability, Error, blob, node::Hash, pack::pack};
 
 /// What a node's retained states change by at a commit.
 pub(crate) struct Changes {
@@ -49,7 +49,7 @@ pub(crate) fn put(
             kind,
             key,
             trace.hash.as_slice(),
-            trace.deps,
+            pack(&trace.deps),
             trace.durability.index() as i64,
         ])?;
     }

@@ -4,7 +4,7 @@
 
 use rusqlite::{OptionalExtension, Transaction, params};
 
-use crate::{Error, Graph, store::Write};
+use crate::{Error, Graph, pack::pack, store::Write};
 
 /// What a row of a node weighs besides its key and its dependencies, as far
 /// as the pages of the file are concerned.
@@ -26,7 +26,7 @@ pub(crate) fn put(tx: &Transaction<'_>, write: &Write) -> Result<Option<Vec<u8>>
 /// Stores a value under its hash, unless it is stored already.
 pub(crate) fn insert(tx: &Transaction<'_>, hash: &[u8], value: &[u8]) -> Result<(), Error> {
     tx.prepare_cached("INSERT OR IGNORE INTO blob(hash, value) VALUES (?1, ?2)")?
-        .execute(params![hash, value])?;
+        .execute(params![hash, pack(value)])?;
     Ok(())
 }
 

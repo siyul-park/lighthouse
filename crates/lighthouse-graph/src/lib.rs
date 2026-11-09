@@ -28,6 +28,7 @@ mod fan;
 mod frame;
 mod graph;
 mod node;
+mod pack;
 mod pull;
 mod query;
 mod reads;
