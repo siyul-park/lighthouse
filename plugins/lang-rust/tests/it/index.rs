@@ -518,3 +518,82 @@ fn a_package_that_reads_nothing_above_itself_reads_nothing() {
 
     assert!(result.reads.is_empty(), "{:?}", result.reads);
 }
+
+fn crate_files(root: &Path, prefixes: &[&str]) -> (Vec<String>, UnitRef) {
+    let root = root.canonicalize().unwrap();
+    let mut all = Vec::new();
+    collect(&root, &root, &mut all);
+    all.sort();
+    let files = all
+        .iter()
+        .filter(|path| prefixes.iter().any(|prefix| path.starts_with(prefix)))
+        .map(|path| FileRef {
+            path: path.clone(),
+            hash: format!("{:x}", Sha256::digest(fs::read(root.join(path)).unwrap())),
+            source_ast: false,
+        })
+        .collect();
+    let unit = UnitRef {
+        id: prefixes.join(","),
+        key: String::new(),
+        files,
+        regions: Vec::new(),
+        imports: Default::default(),
+    };
+    (all, unit)
+}
+
+#[test]
+fn a_unit_is_analyzed_with_the_crates_it_depends_on_and_no_others() {
+    let dir = project(&[
+        (
+            "app/Cargo.toml",
+            "[package]\nname = \"app\"\nversion = \"0.1.0\"\n[dependencies]\ncore = { path = \"../core\" }\n",
+        ),
+        (
+            "app/src/lib.rs",
+            "pub fn run() -> core::Model { core::build() }\n",
+        ),
+        ("app/src/orphan.rs", "pub fn lost() {}\n"),
+        (
+            "core/Cargo.toml",
+            "[package]\nname = \"core\"\nversion = \"0.1.0\"\n",
+        ),
+        (
+            "core/src/lib.rs",
+            "pub struct Model;\npub fn build() -> Model { Model }\n",
+        ),
+        (
+            "other/Cargo.toml",
+            "[package]\nname = \"other\"\nversion = \"0.1.0\"\n",
+        ),
+        ("other/src/lib.rs", "mod broken;\n"),
+        ("other/src/broken.rs", "fn ( {\n"),
+    ]);
+    let root = dir.path().canonicalize().unwrap();
+    let (all, narrow) = crate_files(&root, &["app/"]);
+    let narrow = exchange(&root, narrow, all.clone(), serde_json::json!({}));
+    let (all, whole) = crate_files(&root, &["app/", "core/", "other/"]);
+    let whole = exchange(&root, whole, all, serde_json::json!({}));
+
+    let in_app = |answer: &Answer| -> Vec<Fragment> {
+        answer
+            .fragments
+            .iter()
+            .filter(|fragment| fragment.file.path.starts_with("app/"))
+            .cloned()
+            .collect()
+    };
+    assert_eq!(in_app(&narrow), in_app(&whole));
+    assert_eq!(narrow.fragments.len(), 2);
+    // `other` is not read, so its broken file cannot make the orphan a gap.
+    assert!(narrow.incomplete.is_empty(), "{:?}", narrow.incomplete);
+    assert!(
+        narrow
+            .notices
+            .iter()
+            .any(|notice| notice.contains("app/src/orphan.rs")),
+        "{:?}",
+        narrow.notices
+    );
+}

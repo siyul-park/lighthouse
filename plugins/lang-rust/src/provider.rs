@@ -115,7 +115,14 @@ impl language::Provider for Provider {
         let all = &params.files;
         let has_files = params.units.iter().any(|unit| !unit.files.is_empty());
         let packages = packages(&root, if has_files { all } else { &[] });
-        let tree = module_tree(&root, &packages.list, &options, overlays(&params, &root));
+        let reached = reached(&packages, &params.units);
+        let tree = module_tree(
+            &root,
+            &packages.list,
+            &reached,
+            &options,
+            overlays(&params, &root),
+        );
         let idx = Index::build(&tree, &packages.list);
         let analysis = Analysis {
             root: &root,
@@ -505,18 +512,53 @@ fn packages(root: &Path, files: &[String]) -> Packages {
     Packages { list, of }
 }
 
+/// The module tree of the crate targets of the packages in `reached`.
 fn module_tree(
     root: &Path,
     packages: &[Package],
+    reached: &BTreeSet<usize>,
     options: &Options,
     overlays: HashMap<PathBuf, String>,
 ) -> Tree {
     let mut tree = Tree::new(root);
     tree.overlays = overlays;
     for r in roots(packages, options.unpublished) {
-        tree.add_crate(r);
+        if reached.contains(&r.package) {
+            tree.add_crate(r);
+        }
     }
     tree
+}
+
+/// The packages a fragment of the units can read: their own, and the packages
+/// they depend on, through the dependencies of those in turn. A path resolves
+/// through the crates it names and no others, so the rest of the project is
+/// not parsed.
+fn reached(found: &Packages, units: &[UnitRef]) -> BTreeSet<usize> {
+    let by_name: HashMap<&str, usize> = found
+        .list
+        .iter()
+        .enumerate()
+        .map(|(at, package)| (package.name.as_str(), at))
+        .collect();
+    let mut reached = BTreeSet::new();
+    let mut pending: Vec<usize> = units
+        .iter()
+        .flat_map(|unit| &unit.files)
+        .filter_map(|file| found.of.get(&file.path)?.as_ref().ok().copied())
+        .collect();
+    while let Some(at) = pending.pop() {
+        if !reached.insert(at) {
+            continue;
+        }
+        pending.extend(
+            found.list[at]
+                .deps
+                .values()
+                .filter_map(|name| by_name.get(name.as_str()).copied()),
+        );
+    }
+    reached
 }
 
 /// Packages another package of the project links into what it ships.
