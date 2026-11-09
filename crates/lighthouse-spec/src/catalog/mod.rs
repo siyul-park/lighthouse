@@ -6,6 +6,7 @@ use std::{
 
 use lighthouse_model::{Resource, SCHEMA_URL_BASE, Spec, header, to_yaml, write_atomic};
 use lighthouse_protocol::hash;
+use rayon::prelude::*;
 
 use crate::{
     Decision, DecisionSpec, Env, Error, Pack, ProjectSpec, Projects, Section, project,
@@ -89,8 +90,12 @@ impl Catalog {
         let mut catalog = Self::default();
         let mut packs = Vec::new();
         let mut decisions: Vec<(String, Decision)> = Vec::new();
-        for (path, text) in &files {
-            let loaded = read_documents(path, text)?;
+        let read: Vec<_> = files
+            .par_iter()
+            .map(|(path, text)| read_documents(path, text))
+            .collect();
+        for ((path, _), loaded) in files.iter().zip(read) {
+            let loaded = loaded?;
             packs.extend(loaded.packs.into_iter().map(|p| (path.clone(), p)));
             decisions.extend(
                 loaded

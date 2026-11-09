@@ -12,6 +12,7 @@ use lighthouse_protocol::{
     pointer_tokens, pointer_value,
 };
 use lighthouse_spec::InjectionSpec;
+use rayon::prelude::*;
 use serde_json::{Map, Value};
 
 use super::{Input, Run};
@@ -42,9 +43,20 @@ impl<'a> Injection<'a> {
     }
 }
 
+/// What selecting regions of one host file came to.
+enum Outcome {
+    /// No injection takes the file.
+    Unselected,
+    /// The injections (their ids) need a source tree the host provider did
+    /// not return.
+    Missing(String),
+    /// The gaps of injections that failed and the file with its regions.
+    Selected(Vec<Incomplete>, Option<EmbeddedFile>),
+}
+
 /// The id of the provider a language name stands for, when one that the run
 /// has enabled declares it.
-pub(super) type Named<'a> = &'a dyn Fn(&str) -> Option<String>;
+pub(super) type Named<'a> = &'a (dyn Fn(&str) -> Option<String> + Sync);
 
 pub(super) fn select(
     injections: &[InjectionSpec],
@@ -70,57 +82,68 @@ pub(super) fn select(
         .build()
         .expect("injection globs are validated by Config");
     let asts = accepted(sources, &files, run);
-    let mut output = Vec::new();
-    for (path, input) in files {
-        let matching: BTreeSet<_> = matcher
-            .matches(path)
-            .into_iter()
-            .map(|pattern| owners[pattern])
-            .collect();
-        if matching.is_empty() {
-            continue;
-        }
-
-        let Some(source_ast) = asts.get(path) else {
-            if !run
-                .incomplete
-                .iter()
-                .any(|gap| gap.path.as_deref() == Some(path))
-            {
-                run.incomplete.push(Incomplete {
-                    path: Some(path.to_path_buf()),
-                    provider: None,
-                    reason: format!(
-                        "injection(s) {} require a source AST, but the host provider returned none",
-                        matching
-                            .iter()
-                            .map(|index| rules[*index].spec.id.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ),
-                });
+    let hosts: Vec<_> = files.into_iter().collect();
+    let outcomes: Vec<Outcome> = hosts
+        .par_iter()
+        .map(|&(path, input)| {
+            let matching: BTreeSet<_> = matcher
+                .matches(path)
+                .into_iter()
+                .map(|pattern| owners[pattern])
+                .collect();
+            if matching.is_empty() {
+                return Outcome::Unselected;
             }
-            continue;
-        };
-
-        let mut selected = Vec::new();
-        for index in matching {
-            let rule = &rules[index];
-            match select_rule(rule, source_ast, named) {
-                Ok(regions) => selected.extend(regions),
-                Err(reason) => run.incomplete.push(Incomplete {
-                    path: Some(path.to_path_buf()),
-                    provider: None,
-                    reason: format!("injection {}: {reason}", rule.spec.id),
-                }),
+            let Some(source_ast) = asts.get(path) else {
+                let ids: Vec<_> = matching
+                    .iter()
+                    .map(|index| rules[*index].spec.id.as_str())
+                    .collect();
+                return Outcome::Missing(ids.join(", "));
+            };
+            let (mut selected, mut gaps) = (Vec::new(), Vec::new());
+            for index in matching {
+                let rule = &rules[index];
+                match select_rule(rule, source_ast, named) {
+                    Ok(regions) => selected.extend(regions),
+                    Err(reason) => gaps.push(Incomplete {
+                        path: Some(path.to_path_buf()),
+                        provider: None,
+                        reason: format!("injection {}: {reason}", rule.spec.id),
+                    }),
+                }
             }
-        }
-        if !selected.is_empty() {
-            output.push(EmbeddedFile {
+            let file = (!selected.is_empty()).then(|| EmbeddedFile {
                 file: input.file.clone(),
                 text: input.text.clone(),
                 regions: selected,
             });
+            Outcome::Selected(gaps, file)
+        })
+        .collect();
+    let mut output = Vec::new();
+    for (&(path, _), outcome) in hosts.iter().zip(outcomes) {
+        match outcome {
+            Outcome::Unselected => {}
+            Outcome::Missing(ids) => {
+                if !run
+                    .incomplete
+                    .iter()
+                    .any(|gap| gap.path.as_deref() == Some(path))
+                {
+                    run.incomplete.push(Incomplete {
+                        path: Some(path.to_path_buf()),
+                        provider: None,
+                        reason: format!(
+                            "injection(s) {ids} require a source AST, but the host provider returned none"
+                        ),
+                    });
+                }
+            }
+            Outcome::Selected(gaps, file) => {
+                run.incomplete.extend(gaps);
+                output.extend(file);
+            }
         }
     }
     output
@@ -137,9 +160,16 @@ fn accepted(
     let mut seen = BTreeSet::new();
     let mut duplicates = BTreeSet::new();
 
-    for source_ast in sources {
+    let checked: Vec<Option<Result<(), String>>> = sources
+        .par_iter()
+        .map(|source_ast| {
+            let input = files.get(Path::new(&source_ast.path))?;
+            Some(source_ast.validate(&input.text))
+        })
+        .collect();
+    for (source_ast, checked) in sources.into_iter().zip(checked) {
         let path = PathBuf::from(&source_ast.path);
-        let Some(input) = files.get(path.as_path()) else {
+        let Some(checked) = checked else {
             run.notices.insert(format!(
                 "{}: ignored source AST for an unrequested file",
                 path.display()
@@ -158,7 +188,7 @@ fn accepted(
             }
             continue;
         }
-        if let Err(reason) = source_ast.validate(&input.text) {
+        if let Err(reason) = checked {
             run.incomplete.push(Incomplete {
                 path: Some(path),
                 provider: None,

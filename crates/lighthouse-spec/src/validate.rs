@@ -1,6 +1,7 @@
 //! The rules a catalog holds its decisions to, beyond what each kind says of
 //! itself: ids, uids, supersession, options, examples, sources.
 
+use rayon::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
@@ -19,10 +20,16 @@ pub(crate) fn layer(catalog: &Catalog, cel: &Env) -> Result<(), Error> {
         }
     }
     unique(catalog)?;
-    catalog.decisions().try_for_each(|d| {
-        let source = d.options_from().and_then(|from| catalog.decision(from));
-        decision(d, source, cel)
-    })?;
+    // Side by side; the first error in catalog order is the one reported.
+    let decisions: Vec<_> = catalog.decisions().collect();
+    let judged: Vec<_> = decisions
+        .par_iter()
+        .map(|d| {
+            let source = d.options_from().and_then(|from| catalog.decision(from));
+            decision(d, source, cel)
+        })
+        .collect();
+    judged.into_iter().collect::<Result<(), _>>()?;
     option_sources(catalog)?;
     lifecycle(catalog, catalog.decisions())?;
     sources(catalog)

@@ -8,6 +8,7 @@ publish.workspace = true
 doctest = false
 
 [dependencies]
+rayon.workspace = true
 blake3.workspace = true
 cel.workspace = true
 lighthouse-graph.workspace = true

@@ -5,6 +5,7 @@ pub(crate) mod core_pack;
 
 use lighthouse_plugin::{Plugin, Registry};
 use lighthouse_spec::Catalog;
+use rayon::prelude::*;
 
 use crate::{Checks, Composition, Error, metrics::Metrics};
 
@@ -40,8 +41,13 @@ pub fn registry_of(
             "the bundled registry needs the composition from `compose()`",
         ));
     }
-    for pack in catalog.packs() {
-        let checks = Checks::new(comp, &pack.id, catalog)?;
+    let built: Vec<_> = catalog
+        .packs()
+        .par_iter()
+        .map(|pack| Checks::new(comp, &pack.id, catalog))
+        .collect();
+    for (pack, checks) in catalog.packs().iter().zip(built) {
+        let checks = checks?;
         register(&mut registry, &checks)?;
         if pack.id == CORE {
             register(&mut registry, &Metrics)?;

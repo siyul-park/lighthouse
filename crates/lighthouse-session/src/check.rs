@@ -333,6 +333,11 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
     let rules = Selector::new(&request.rules)?.expand(enabled)?;
     let mut run = analyze(&engine, &root, request, &rules, &mut messages)?;
     run.timings.setup = setup;
+    run.timings.session = session
+        .loading
+        .iter()
+        .map(|(part, spent)| ((*part).to_owned(), *spent))
+        .collect();
     messages.extend(notices.iter().chain(&run.notices).cloned());
     let started = Instant::now();
     let remembered = if request.store {

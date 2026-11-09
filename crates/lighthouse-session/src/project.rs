@@ -7,6 +7,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     sync::Arc,
+    time::{Duration, Instant},
 };
 
 use lighthouse_checks::{Checks, Composition};
@@ -61,6 +62,8 @@ pub struct Session {
     pub(crate) layers: Layers,
     /// The CEL environment every decision of the session is compiled in.
     pub comp: Composition,
+    /// Where loading the session took its time, part by part.
+    pub(crate) loading: Vec<(&'static str, Duration)>,
 }
 
 impl Session {
@@ -127,6 +130,14 @@ impl Session {
     /// and the decision files read here, once: what is parsed is what trust is
     /// judged on.
     fn assemble(path: &Path, text: &str, root: PathBuf) -> Result<Self> {
+        let mut loading = Vec::new();
+        let mut since = Instant::now();
+        let mut lap = |part: &'static str| {
+            loading.push((
+                part,
+                std::mem::replace(&mut since, Instant::now()).elapsed(),
+            ))
+        };
         let comp = crate::compose()?;
         let format = Format::of_path(path).unwrap_or(Format::Toml);
         let personal = environment::read(&root)?;
@@ -140,7 +151,9 @@ impl Session {
             .collect();
         let layers = personal.iter().map(|p| p.layer.clone()).collect();
         let (own, layers) = Layers::build(format, &path.display().to_string(), text, layers)?;
+        lap("config");
         let bundled = lighthouse_checks::ids(&comp, &crate::libraries()?)?;
+        lap("bundled catalog");
         if let Some(listed) = own.plugins().iter().find(|p| bundled.contains(&p.id)) {
             return Err(format!(
                 "plugin `{}` is bundled: remove it from `plugins`",
@@ -159,11 +172,13 @@ impl Session {
             .clone()
             .map(|files| Catalog::from_local(files, comp.cel()))
             .transpose()?;
+        lap("local decisions");
         let search = lighthouse_rpc::search_dirs(&root);
         let mut config = inheriting(&own, &layered(comp.bundled()?, local.as_ref())?);
         let commands = commands(&config, local.as_ref(), &root);
         let basis = Basis::of(&root, text, &texts, &files.unwrap_or_default(), &commands);
         let trusted = basis.trusted(&root);
+        lap("trust");
         // The plugins an extended project lists are plugins of this one, and
         // the catalogs they ship may hold projects that list more: go on
         // until the listing no longer grows.
@@ -179,9 +194,11 @@ impl Session {
             }
             config = next;
         };
+        lap("plugin catalogs");
         if withheld.is_empty() {
             environment::check_local(&root, &personal, &catalog)?;
         }
+        lap("environment");
         Ok(Self {
             config,
             store: root.clone(),
@@ -193,6 +210,7 @@ impl Session {
             basis,
             layers,
             comp,
+            loading,
         })
     }
 
@@ -212,6 +230,7 @@ impl Session {
             basis: Basis::default(),
             layers: Layers::default(),
             comp,
+            loading: Vec::new(),
         })
     }
 

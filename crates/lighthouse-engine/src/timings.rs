@@ -10,6 +10,9 @@ const TOP_RULES: usize = 5;
 /// it ran on, so it adds up to more than the wall clock of the rules phase.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Timings {
+    /// Loading the session before the run, part by part: the configuration,
+    /// the catalogs, the trust of the project; set by the session that ran it.
+    pub session: Vec<(String, Duration)>,
     /// Loading the configuration and starting the plugins, before the engine
     /// runs; set by the session that ran it.
     pub setup: Duration,
@@ -77,7 +80,12 @@ impl Timings {
     /// The lines of the breakdown. `report` is the time spent printing the
     /// findings and `total` the time of the whole run.
     pub fn lines(&self, report: Duration, total: Duration) -> Vec<String> {
-        let mut out = vec![line("setup", self.setup), line("read", self.read)];
+        let mut out: Vec<String> = self
+            .session
+            .iter()
+            .map(|(part, spent)| line(&format!("session {part}"), *spent))
+            .collect();
+        out.extend([line("setup", self.setup), line("read", self.read)]);
         out.push(format!(
             "files: {} stat, {} read, {} entries, tree {}, commit {:.1}ms",
             self.files.stat,
