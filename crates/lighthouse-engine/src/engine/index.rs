@@ -14,6 +14,7 @@ use lighthouse_graph::{Durability, Graph};
 use lighthouse_plugin::{Fragments, Indexed, Unit};
 use lighthouse_protocol::hash::Hasher;
 
+use super::injections::Injecting;
 use super::*;
 use crate::{
     Error as EngineError,
@@ -55,7 +56,8 @@ struct Pending<'a> {
 /// What a lane's units give the run besides the model of its files.
 #[derive(Default)]
 struct Taken {
-    sources: Vec<lighthouse_protocol::Source>,
+    /// The answers have source trees where the call hosts no regions.
+    unexpected_sources: bool,
     notices: Vec<String>,
     incomplete: Vec<Incomplete>,
     /// The gaps of the clean answers, which the key of their unit decides.
@@ -175,7 +177,7 @@ impl Engine {
         &self,
         ws: &Workspace,
         calls: BTreeMap<usize, Call<'_>>,
-        mut asts: Option<&mut Vec<lighthouse_protocol::Source>>,
+        mut injecting: Option<&mut Injecting<'_>>,
         run: &mut Run,
     ) {
         let mut guard = self.lock_graph();
@@ -203,7 +205,7 @@ impl Engine {
         }
         let started = std::time::Instant::now();
         for lane in &lanes {
-            let taken = self.fetch(graph, lane);
+            let taken = self.fetch(graph, lane, injecting.as_deref_mut(), run);
             run.notices.extend(taken.notices);
             run.keyed
                 .extend(taken.keyed.into_iter().map(|gap| Incomplete {
@@ -215,17 +217,18 @@ impl Engine {
                     provider: Some(lane.id.clone()),
                     ..gap
                 }));
-            match asts.as_deref_mut() {
-                Some(asts) => asts.extend(taken.sources),
-                None if !taken.sources.is_empty() => run.incomplete.push(Incomplete {
+            if taken.unexpected_sources {
+                run.incomplete.push(Incomplete {
                     path: None,
                     provider: Some(lane.id.clone()),
                     reason:
                         "provider unexpectedly returned source ASTs for files that host no regions"
                             .to_owned(),
-                }),
-                None => {}
+                });
             }
+        }
+        if let Some(injecting) = injecting {
+            injecting.settle(graph, run);
         }
         run.timings.fetch += started.elapsed();
         run.timings
@@ -559,7 +562,13 @@ impl Engine {
 
     /// What the lane's units say besides their fragments, under their current
     /// keys, from the graph: the notices, the gaps and the source trees.
-    fn fetch(&self, graph: &Graph, lane: &Lane<'_>) -> Taken {
+    fn fetch(
+        &self,
+        graph: &Graph,
+        lane: &Lane<'_>,
+        mut injecting: Option<&mut Injecting<'_>>,
+        run: &mut Run,
+    ) -> Taken {
         let mut taken = Taken::default();
         for id in lane.ids() {
             let Ok(key) = self.key_of(graph, lane, id) else {
@@ -581,14 +590,16 @@ impl Engine {
             if stored.clean {
                 taken.keyed.extend(gaps);
             }
-            if stored.sources {
-                let payload = graph.input(&PAYLOAD, &lane.at(id));
-                if let Ok(Some(payload)) = payload
-                    && let Ok(found) =
-                        serde_json::from_slice::<Vec<lighthouse_protocol::Source>>(&payload.sources)
-                {
-                    taken.sources.extend(found);
+            if !stored.sources {
+                continue;
+            }
+            let files = lane.call.units.iter().find(|unit| unit.id == id);
+            match (injecting.as_deref_mut(), files) {
+                (Some(injecting), Some(unit)) => {
+                    injecting.unit(graph, (&lane.at(id), &stored, &unit.files), run);
                 }
+                (None, _) => taken.unexpected_sources = true,
+                (Some(_), None) => {}
             }
         }
         taken

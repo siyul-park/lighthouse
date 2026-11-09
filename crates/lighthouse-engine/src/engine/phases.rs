@@ -187,8 +187,6 @@ impl Engine {
         let hosts = self.hosts();
         let (host_calls, mut file_calls) = self.plan_units(&inputs, hosts.as_ref(), run);
         let units = Units::of(&host_calls, &file_calls);
-        let mut sources = Vec::new();
-        self.index_calls(&ws, host_calls, Some(&mut sources), run);
         let named = |name: &str| {
             let id = self.registry.language_named(name)?;
             self.providers
@@ -196,7 +194,11 @@ impl Engine {
                 .any(|&index| self.provider(index).manifest().id == id)
                 .then(|| id.to_owned())
         };
-        let regions = injections::select(self.config.injections(), sources, &inputs, &named, run);
+        let languages = self.language_names();
+        let mut injecting =
+            injections::Injecting::new(self.config.injections(), &inputs, &named, &languages);
+        self.index_calls(&ws, host_calls, Some(&mut injecting), run);
+        let regions = injecting.finish(run);
         let target_files = self.route_embedded(regions, run);
         let views = self.view_regions(&target_files);
         for (target, files) in target_files {
@@ -236,6 +238,21 @@ impl Engine {
             .collect();
         run.incomplete.extend(gaps);
         Some((kept, stated))
+    }
+
+    /// The names the enabled languages answer to, which decide the language
+    /// of the regions an injection names.
+    fn language_names(&self) -> String {
+        let mut names: Vec<String> = self
+            .providers
+            .iter()
+            .map(|&index| {
+                let manifest = self.provider(index).manifest();
+                format!("{}={}", manifest.id, manifest.aliases.join(","))
+            })
+            .collect();
+        names.sort();
+        names.join("\n")
     }
 
     /// The files injections select, `None` when none does.

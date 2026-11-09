@@ -434,7 +434,19 @@ fn repository_regions(injections: &[InjectionSpec], asts: &[Source], root: &Path
         .collect();
     let named = |name: &str| Some(name.to_lowercase());
     let mut run = Run::default();
-    let selected = select(injections, asts.to_vec(), &inputs, &named, &mut run);
+    let mut injecting = Injecting::new(injections, &inputs, &named, "");
+    let unit = Pending {
+        at: (String::new(), String::new()),
+        key: String::new(),
+        files: inputs.iter().map(|input| input.file.path.clone()).collect(),
+        payload: Arc::new(Payload {
+            sources: serde_json::to_vec(asts).unwrap(),
+            ..Payload::default()
+        }),
+    };
+    let (made, hosts) = injecting.select_unit(&unit);
+    injecting.take(&made, hosts, &mut run);
+    let selected = injecting.finish(&mut run);
     assert!(run.incomplete.is_empty(), "{:?}", run.incomplete);
     let mut regions: Vec<Region> = selected
         .into_iter()
@@ -568,4 +580,81 @@ fn core_authoring_selects_the_regions_the_repository_had_before_it_shared_them()
     );
     assert_eq!(is.len(), was.len());
     assert!(is == was, "the regions differ");
+}
+
+#[test]
+fn the_regions_of_a_unit_are_kept_under_its_answer_and_not_selected_again() {
+    let host = Source {
+        path: "doc.yaml".to_owned(),
+        ast: serde_json::json!({"code": "x"}),
+        mapping: BTreeMap::from([
+            ("".to_owned(), entry([0, 8])),
+            ("/code".to_owned(), entry([6, 7])),
+        ]),
+    };
+    let spec = InjectionSpec {
+        id: "code".to_owned(),
+        files: vec!["*.yaml".to_owned()],
+        select: "$.code".to_owned(),
+        language: Some("go".to_owned()),
+        language_from: None,
+        syntax: None,
+        context: None,
+    };
+    let inputs = vec![Input {
+        file: lighthouse_model::ucm::File {
+            path: PathBuf::from("doc.yaml"),
+            lang: String::new(),
+            generated: false,
+            test: false,
+            facts: BTreeMap::new(),
+        },
+        text: crate::engine::Text::held("code: x\n".to_owned()),
+        sha256: String::new(),
+        language: 0,
+    }];
+    let named = |name: &str| Some(name.to_owned());
+    let at = ("yaml".to_owned(), "doc.yaml".to_owned());
+    let stored = |key: &str| Stored {
+        key: key.to_owned(),
+        sources: true,
+        ..Stored::default()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let open = || {
+        Graph::open(
+            &dir.path().join("graph.db"),
+            lighthouse_graph::Options::default(),
+        )
+        .unwrap()
+    };
+    let mut graph = open();
+    let payload = Payload {
+        sources: serde_json::to_vec(&[host]).unwrap(),
+        ..Payload::default()
+    };
+    graph
+        .set_input(&PAYLOAD, &at, payload, Durability::Volatile)
+        .unwrap();
+    let files: Vec<&Input> = inputs.iter().collect();
+    let mut run = Run::default();
+    let selected = |key: &str, graph: &mut Graph, run: &mut Run| {
+        let mut injecting = Injecting::new(std::slice::from_ref(&spec), &inputs, &named, "");
+        injecting.unit(graph, (&at, &stored(key), &files), run);
+        let pending = injecting.pending.len();
+        injecting.settle(graph, run);
+        (pending, injecting.finish(run))
+    };
+    let (pending, first) = selected("a", &mut graph, &mut run);
+    assert_eq!(pending, 1);
+    assert_eq!(first[0].regions.len(), 1);
+    graph.commit().unwrap();
+    drop(graph);
+    let mut graph = open();
+    let (pending, again) = selected("a", &mut graph, &mut run);
+    assert_eq!(pending, 0, "the key of its answer is the same");
+    assert_eq!(again, first);
+    let (pending, _) = selected("b", &mut graph, &mut run);
+    assert_eq!(pending, 1, "another answer is selected again");
+    assert!(run.incomplete.is_empty(), "{:?}", run.incomplete);
 }

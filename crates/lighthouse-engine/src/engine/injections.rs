@@ -1,21 +1,78 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
-use globset::{Glob, GlobSetBuilder};
-use lighthouse_model::Incomplete;
+use globset::{Glob, GlobSet, GlobSetBuilder};
+use lighthouse_graph::{Durability, Graph, Input as Kept};
+use lighthouse_model::{
+    Incomplete,
+    ucm::{PAYLOAD, Payload},
+};
 use lighthouse_plugin::{EmbeddedFile, EmbeddedRegion};
-use lighthouse_protocol::Source;
 use lighthouse_protocol::{
     Selector, SelectorComparison, SelectorFilter, SelectorMember, SelectorPart, pointer_child,
     pointer_tokens, pointer_value,
 };
+use lighthouse_protocol::{Source, hash::Hasher};
 use lighthouse_spec::InjectionSpec;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use super::{Input, Run};
+use crate::graph::Stored;
+
+/// What the regions of a host unit were selected from, kept under the key of
+/// its answer. Persisted: a run that finds the key as it was selects nothing.
+pub(crate) static INJECTED: Kept<(String, String), Injected> = Kept::new("injected").persisted();
+
+/// The injections of a run, and what they select of the host files.
+///
+/// What a host unit's source trees select is a function of the unit's answer,
+/// the injections and the languages they name, so it is kept under that key
+/// ([`INJECTED`]): a warm run takes the regions and neither loads nor
+/// validates a source tree.
+pub(super) struct Injecting<'a> {
+    rules: Vec<Injection<'a>>,
+    matcher: GlobSet,
+    owners: Vec<usize>,
+    named: Named<'a>,
+    /// What the injections and the languages they name come to, hashed.
+    identity: String,
+    files: BTreeMap<&'a Path, &'a Input>,
+    /// The hosts the units answered for, by path: their selected regions.
+    chosen: BTreeMap<PathBuf, Vec<EmbeddedRegion>>,
+    /// The units whose regions are not kept, with their answers.
+    pending: Vec<Pending>,
+}
+
+/// A host unit to select the regions of.
+struct Pending {
+    at: (String, String),
+    key: String,
+    files: Vec<PathBuf>,
+    payload: Arc<Payload>,
+}
+
+/// What the source trees of a host unit select, under the key it was made for.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Injected {
+    key: String,
+    notices: BTreeSet<String>,
+    gaps: Vec<Incomplete>,
+    /// The hosts with a source tree, with the regions selected of each, as
+    /// JSON: the regions hold values the store cannot decode.
+    hosts: Vec<u8>,
+}
+
+/// The hosts of a unit with a source tree, with the regions selected of each.
+type Hosts = Vec<(PathBuf, Vec<EmbeddedRegion>)>;
+
+/// The id of the provider a language name stands for, when one that the run
+/// has enabled declares it.
+pub(super) type Named<'a> = &'a (dyn Fn(&str) -> Option<String> + Sync);
 
 #[derive(Clone)]
 struct Selected<'a> {
@@ -43,118 +100,215 @@ impl<'a> Injection<'a> {
     }
 }
 
-/// What selecting regions of one host file came to.
-enum Outcome {
-    /// No injection takes the file.
-    Unselected,
-    /// The injections (their ids) need a source tree the host provider did
-    /// not return.
-    Missing(String),
-    /// The gaps of injections that failed and the file with its regions.
-    Selected(Vec<Incomplete>, Option<EmbeddedFile>),
-}
-
-/// The id of the provider a language name stands for, when one that the run
-/// has enabled declares it.
-pub(super) type Named<'a> = &'a (dyn Fn(&str) -> Option<String> + Sync);
-
-pub(super) fn select(
-    injections: &[InjectionSpec],
-    sources: Vec<Source>,
-    inputs: &[Input],
-    named: Named<'_>,
-    run: &mut Run,
-) -> Vec<EmbeddedFile> {
-    let files: BTreeMap<_, _> = inputs
-        .iter()
-        .map(|input| (input.file.path.as_path(), input))
-        .collect();
-    let rules: Vec<_> = injections.iter().map(Injection::new).collect();
-    let mut matcher = GlobSetBuilder::new();
-    let mut owners = Vec::new();
-    for (index, rule) in rules.iter().enumerate() {
-        for pattern in &rule.spec.files {
-            matcher.add(Glob::new(pattern).expect("injection globs are validated by Config"));
-            owners.push(index);
+impl<'a> Injecting<'a> {
+    /// The injections of `injections`, over `inputs`. `languages` says which
+    /// languages the names they select resolve to.
+    pub(super) fn new(
+        injections: &'a [InjectionSpec],
+        inputs: &'a [Input],
+        named: Named<'a>,
+        languages: &str,
+    ) -> Self {
+        let rules: Vec<_> = injections.iter().map(Injection::new).collect();
+        let mut matcher = GlobSetBuilder::new();
+        let mut owners = Vec::new();
+        for (index, rule) in rules.iter().enumerate() {
+            for pattern in &rule.spec.files {
+                matcher.add(Glob::new(pattern).expect("injection globs are validated by Config"));
+                owners.push(index);
+            }
+        }
+        let mut hasher = Hasher::new();
+        for part in [
+            crate::cache::build_identity(),
+            serde_json::to_string(injections).unwrap_or_default(),
+            languages.to_owned(),
+        ] {
+            hasher.update((part.len() as u64).to_le_bytes());
+            hasher.update(part);
+        }
+        Self {
+            rules,
+            matcher: matcher
+                .build()
+                .expect("injection globs are validated by Config"),
+            owners,
+            named,
+            identity: hasher.hex(),
+            files: inputs
+                .iter()
+                .map(|input| (input.file.path.as_path(), input))
+                .collect(),
+            chosen: BTreeMap::new(),
+            pending: Vec::new(),
         }
     }
-    let matcher = matcher
-        .build()
-        .expect("injection globs are validated by Config");
-    let asts = accepted(sources, &files, run);
-    let hosts: Vec<_> = files.into_iter().collect();
-    let outcomes: Vec<Outcome> = hosts
-        .par_iter()
-        .map(|&(path, input)| {
-            let matching: BTreeSet<_> = matcher
-                .matches(path)
-                .into_iter()
-                .map(|pattern| owners[pattern])
-                .collect();
-            if matching.is_empty() {
-                return Outcome::Unselected;
+
+    /// Takes the regions of the host unit `at`, whose answer is `stored`: from
+    /// the graph when it has them for this answer, else once `settle` has
+    /// selected them.
+    pub(super) fn unit(
+        &mut self,
+        graph: &Graph,
+        (at, stored, files): (&(String, String), &Stored, &[&Input]),
+        run: &mut Run,
+    ) {
+        let mut hasher = Hasher::new();
+        for part in [
+            stored.key.as_bytes(),
+            &stored.payload[..],
+            self.identity.as_bytes(),
+        ] {
+            hasher.update((part.len() as u64).to_le_bytes());
+            hasher.update(part);
+        }
+        let key = hasher.hex();
+        if let Ok(Some(kept)) = graph.input(&INJECTED, at)
+            && kept.key == key
+            && let Ok(hosts) = serde_json::from_slice(&kept.hosts)
+        {
+            self.take(&kept, hosts, run);
+            return;
+        }
+        let Ok(Some(payload)) = graph.input(&PAYLOAD, at) else {
+            return;
+        };
+        self.pending.push(Pending {
+            at: at.clone(),
+            key,
+            files: files.iter().map(|input| input.file.path.clone()).collect(),
+            payload,
+        });
+    }
+
+    /// Selects the regions of the units that were not kept, side by side,
+    /// and keeps them.
+    pub(super) fn settle(&mut self, graph: &mut Graph, run: &mut Run) {
+        let pending = std::mem::take(&mut self.pending);
+        let made: Vec<(Injected, Hosts)> = pending
+            .par_iter()
+            .map(|unit| self.select_unit(unit))
+            .collect();
+        for (unit, (made, hosts)) in pending.into_iter().zip(made) {
+            self.take(&made, hosts, run);
+            if let Err(e) = graph.set_input(&INJECTED, &unit.at, made, Durability::Volatile) {
+                run.notices
+                    .insert(format!("the injected regions are not kept: {e}"));
             }
-            let Some(source_ast) = asts.get(path) else {
-                let ids: Vec<_> = matching
-                    .iter()
-                    .map(|index| rules[*index].spec.id.as_str())
-                    .collect();
-                return Outcome::Missing(ids.join(", "));
-            };
-            let (mut selected, mut gaps) = (Vec::new(), Vec::new());
-            for index in matching {
-                let rule = &rules[index];
-                match select_rule(rule, source_ast, named) {
-                    Ok(regions) => selected.extend(regions),
-                    Err(reason) => gaps.push(Incomplete {
-                        path: Some(path.to_path_buf()),
-                        provider: None,
-                        reason: format!("injection {}: {reason}", rule.spec.id),
-                    }),
+        }
+    }
+
+    fn take(&mut self, made: &Injected, hosts: Hosts, run: &mut Run) {
+        run.notices.extend(made.notices.iter().cloned());
+        run.incomplete.extend(made.gaps.iter().cloned());
+        self.chosen.extend(hosts);
+    }
+
+    /// The regions of the hosts among the files of one unit.
+    fn select_unit(&self, unit: &Pending) -> (Injected, Hosts) {
+        let mut hosts = Hosts::new();
+        let mut made = Injected {
+            key: unit.key.clone(),
+            ..Injected::default()
+        };
+        let sources: Vec<Source> = match serde_json::from_slice(&unit.payload.sources) {
+            Ok(sources) => sources,
+            Err(e) => {
+                made.gaps.push(Incomplete {
+                    path: None,
+                    provider: None,
+                    reason: format!("the source trees of {} cannot be read: {e}", unit.at.1),
+                });
+                return (made, hosts);
+            }
+        };
+        let asts = accepted(sources, &unit.files, &self.files, &mut made);
+        let asts: Vec<_> = asts.into_iter().collect();
+        let outcomes: Vec<(PathBuf, Vec<EmbeddedRegion>, Vec<Incomplete>)> = asts
+            .par_iter()
+            .map(|(path, source_ast)| {
+                let (mut selected, mut gaps) = (Vec::new(), Vec::new());
+                for index in self.matching(path) {
+                    let rule = &self.rules[index];
+                    match select_rule(rule, source_ast, self.named) {
+                        Ok(regions) => selected.extend(regions),
+                        Err(reason) => gaps.push(Incomplete {
+                            path: Some(path.clone()),
+                            provider: None,
+                            reason: format!("injection {}: {reason}", rule.spec.id),
+                        }),
+                    }
                 }
+                (path.clone(), selected, gaps)
+            })
+            .collect();
+        for (path, regions, gaps) in outcomes {
+            made.gaps.extend(gaps);
+            hosts.push((path, regions));
+        }
+        made.hosts = serde_json::to_vec(&hosts).unwrap_or_default();
+        (made, hosts)
+    }
+
+    /// The injections that take the file.
+    fn matching(&self, path: &Path) -> BTreeSet<usize> {
+        self.matcher
+            .matches(path)
+            .into_iter()
+            .map(|pattern| self.owners[pattern])
+            .collect()
+    }
+
+    /// The hosts with their regions, in path order. A host no unit gave a
+    /// source tree for is incomplete, unless a gap says why already.
+    pub(super) fn finish(self, run: &mut Run) -> Vec<EmbeddedFile> {
+        let mut output = Vec::new();
+        for (&path, &input) in &self.files {
+            let matching = self.matching(path);
+            if matching.is_empty() {
+                continue;
             }
-            let file = (!selected.is_empty()).then(|| EmbeddedFile {
-                file: input.file.clone(),
-                text: input.text.clone(),
-                regions: selected,
-            });
-            Outcome::Selected(gaps, file)
-        })
-        .collect();
-    let mut output = Vec::new();
-    for (&(path, _), outcome) in hosts.iter().zip(outcomes) {
-        match outcome {
-            Outcome::Unselected => {}
-            Outcome::Missing(ids) => {
-                if !run
-                    .incomplete
-                    .iter()
-                    .any(|gap| gap.path.as_deref() == Some(path))
-                {
+            match self.chosen.get(path) {
+                Some(regions) if !regions.is_empty() => output.push(EmbeddedFile {
+                    file: input.file.clone(),
+                    text: input.text.clone(),
+                    regions: regions.clone(),
+                }),
+                Some(_) => {}
+                None => {
+                    if run
+                        .incomplete
+                        .iter()
+                        .any(|gap| gap.path.as_deref() == Some(path))
+                    {
+                        continue;
+                    }
+                    let ids: Vec<_> = matching
+                        .iter()
+                        .map(|index| self.rules[*index].spec.id.as_str())
+                        .collect();
                     run.incomplete.push(Incomplete {
                         path: Some(path.to_path_buf()),
                         provider: None,
                         reason: format!(
-                            "injection(s) {ids} require a source AST, but the host provider returned none"
+                            "injection(s) {} require a source AST, but the host provider returned none",
+                            ids.join(", ")
                         ),
                     });
                 }
             }
-            Outcome::Selected(gaps, file) => {
-                run.incomplete.extend(gaps);
-                output.extend(file);
-            }
         }
+        output
     }
-    output
 }
 
-/// The source ASTs the host providers returned that can be used: for a
-/// requested file, once, and valid against its text.
+/// The source ASTs a unit returned that can be used: for a file of the unit,
+/// once, and valid against its text. What is not is said in `made`.
 fn accepted(
     sources: Vec<Source>,
+    unit: &[PathBuf],
     files: &BTreeMap<&Path, &Input>,
-    run: &mut Run,
+    made: &mut Injected,
 ) -> BTreeMap<PathBuf, Source> {
     let mut asts = BTreeMap::new();
     let mut seen = BTreeSet::new();
@@ -163,14 +317,15 @@ fn accepted(
     let checked: Vec<Option<Result<(), String>>> = sources
         .par_iter()
         .map(|source_ast| {
-            let input = files.get(Path::new(&source_ast.path))?;
+            let path = Path::new(&source_ast.path);
+            let input = files.get(path).filter(|_| unit.iter().any(|p| p == path))?;
             Some(source_ast.validate(&input.text))
         })
         .collect();
     for (source_ast, checked) in sources.into_iter().zip(checked) {
         let path = PathBuf::from(&source_ast.path);
         let Some(checked) = checked else {
-            run.notices.insert(format!(
+            made.notices.insert(format!(
                 "{}: ignored source AST for an unrequested file",
                 path.display()
             ));
@@ -179,7 +334,7 @@ fn accepted(
         if !seen.insert(path.clone()) {
             asts.remove(&path);
             if duplicates.insert(path.clone()) {
-                run.incomplete.push(Incomplete {
+                made.gaps.push(Incomplete {
                     path: Some(path.clone()),
                     provider: None,
                     reason: "provider returned duplicate source AST records for one physical file"
@@ -189,7 +344,7 @@ fn accepted(
             continue;
         }
         if let Err(reason) = checked {
-            run.incomplete.push(Incomplete {
+            made.gaps.push(Incomplete {
                 path: Some(path),
                 provider: None,
                 reason: format!("invalid source AST: {reason}"),
