@@ -1,6 +1,7 @@
 //! The budget of the cache directory: the databases and what plugins keep
 //! together stay under one limit, whatever writes there. A run under the limit
-//! pays one pass over the directory's sizes; one over it gives back, in this
+//! pays one pass over the directory's sizes, and one whose log of the graph is
+//! all that is over it, the emptying of that log; one over it gives back, in this
 //! order, the free pages of the databases, what plugins left that no run reads,
 //! the states and values of the graph (retained states first, then the values
 //! of lower durability first, the most bytes for the time first), and last the
@@ -40,6 +41,14 @@ pub(crate) fn fit(settings: Option<&CacheSettings>, graph: Option<&mut Graph>) -
 fn squeeze(dir: &Path, limit: u64, graph: Option<&mut Graph>) -> Result<(), Error> {
     if size(dir) <= limit {
         return Ok(());
+    }
+    // The log of a commit of many values counts here until it is emptied,
+    // and a cache that is under its limit without it needs no trim.
+    if let Some(graph) = graph.as_deref() {
+        unless_busy(lighthouse_graph::checkpoint(graph).map_err(Error::from))?;
+        if size(dir) <= limit {
+            return Ok(());
+        }
     }
     let target = (limit as f64 * TARGET) as u64;
     let over = || size(dir).saturating_sub(target);

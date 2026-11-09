@@ -315,6 +315,15 @@ impl Store {
         Ok(())
     }
 
+    /// Moves the log into the file and empties it: the file the log of a big
+    /// commit grew is as small as what it holds, and no page is rewritten
+    /// that the log did not hold.
+    pub(crate) fn checkpoint(&self) -> Result<(), Error> {
+        let conn = self.conn.locked();
+        conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
+        Ok(())
+    }
+
     /// Frees at least `bytes` of stored values, fewer when there are not so
     /// many: the states nodes retain, oldest first, then the values of nodes,
     /// those of lower durability first and the most bytes for the time first.
@@ -397,7 +406,8 @@ fn put(tx: &rusqlite::Transaction<'_>, write: &Write, old: &mut Vec<Vec<u8>>) ->
         retained::put(tx, &write.kind, &write.key, changes, old)?;
     }
     if write.with_value {
-        old.extend(blob::put(tx, write)?);
+        // The value a node keeps under the same hash has an owner still.
+        old.extend(blob::put(tx, write)?.filter(|before| before.as_slice() != write.row.hash));
     }
     let row = &write.row;
     tx.prepare_cached(

@@ -37,7 +37,7 @@ mod settle;
 mod shared;
 mod store;
 
-pub use blob::trim;
+pub use blob::{checkpoint, trim};
 pub use error::Error;
 pub use explain::{Explanation, Reason, Step};
 pub use graph::{DEFAULT_RETAIN, Graph, Options, VERSION, holds};

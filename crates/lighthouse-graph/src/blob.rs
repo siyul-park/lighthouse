@@ -64,6 +64,13 @@ pub fn trim(graph: &mut Graph, bytes: u64) -> Result<(), Error> {
     Ok(())
 }
 
+/// Empties the log of `graph.db`, which a commit of many values grows to the
+/// size of what it wrote and leaves there: the file is no bigger than what it
+/// holds, and nothing is deleted.
+pub fn checkpoint(graph: &Graph) -> Result<(), Error> {
+    graph.shared.store.checkpoint()
+}
+
 /// Frees at least `bytes` of values: those of retained states that no node
 /// has as current, oldest first, then those of nodes (and the states they
 /// retained), those of lower durability first and the most bytes for the time first.

@@ -136,6 +136,26 @@ fn trimming_drops_values_and_keeps_results() {
     assert!(graph.take_executed().is_empty());
 }
 
+#[test]
+fn a_checkpoint_empties_the_log_and_keeps_results() {
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().join("graph.db");
+    let sim = Sim::new();
+    let mut graph = open(Some(&path), &sim.project);
+    apply(&mut graph, &sim.project, &sim.known);
+    let first = pull(&graph);
+    graph.commit().expect("commit");
+    let log = dir.path().join("graph.db-wal");
+    assert!(log.metadata().expect("log").len() > 0);
+
+    lighthouse_graph::checkpoint(&graph).expect("checkpoint");
+
+    assert_eq!(log.metadata().expect("log").len(), 0);
+    graph.take_executed();
+    assert_eq!(pull(&graph), first);
+    assert!(graph.take_executed().is_empty());
+}
+
 mod eviction_order {
     use lighthouse_graph::{Durability, Error, Graph, Input, Options, Query, VERSION};
 
