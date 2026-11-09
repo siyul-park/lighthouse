@@ -349,3 +349,44 @@ fn a_finding_starts_where_its_locator_says_and_at_zero_without_a_span() {
     let nowhere = store.finding("f2").unwrap();
     assert_eq!((nowhere.line(), nowhere.col()), (0, 0));
 }
+
+#[test]
+fn a_finding_seen_as_it_was_is_seen_again_and_one_that_changed_is_written() {
+    let mut store = Store::open_in_memory().unwrap();
+    let kept = observed("kept", "design/a", "a.go");
+    let mut moved = observed("moved", "design/a", "b.go");
+    let absent = observed("absent", "design/a", "c.go");
+    store
+        .record(&run(vec![kept.clone(), moved.clone(), absent]))
+        .unwrap();
+    let before = store.finding("kept").unwrap();
+    thread::sleep(std::time::Duration::from_millis(5));
+
+    moved.message = "another".to_owned();
+    let partial = Run {
+        reported: vec!["a.go".to_owned(), "b.go".to_owned()],
+        commit: Some("def456".to_owned()),
+        dirty: false,
+        ..run(vec![kept, moved])
+    };
+    let summary = store.record(&partial).unwrap();
+    assert_eq!(summary, RunSummary::default());
+
+    let seen = store.finding("kept").unwrap();
+    assert_eq!(seen.first_seen, before.first_seen);
+    assert!(seen.last_seen > before.last_seen);
+    assert_eq!(seen.commit.as_deref(), Some("def456"));
+    assert_eq!(seen.dirty, Some(false));
+    assert_eq!(store.finding("moved").unwrap().message, "another");
+    let unseen = store.finding("absent").unwrap();
+    assert_eq!(unseen.last_seen, before.last_seen, "the run did not see it");
+    assert_eq!(unseen.commit.as_deref(), Some("abc123"));
+}
+
+#[test]
+fn a_finding_listed_twice_by_a_run_is_opened_once() {
+    let mut store = Store::open_in_memory().unwrap();
+    let finding = observed("twice", "design/a", "a.go");
+    let summary = store.record(&run(vec![finding.clone(), finding])).unwrap();
+    assert_eq!(summary.opened, 1);
+}

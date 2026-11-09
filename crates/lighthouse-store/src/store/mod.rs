@@ -122,13 +122,29 @@ impl Store {
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let now = lighthouse_model::now();
         let mut summary = RunSummary::default();
+        let kept = remembered(&tx)?;
+        let (mut unchanged, mut written) = (BTreeSet::new(), BTreeSet::new());
         for observed in &run.observed {
-            match upsert(&tx, observed, run, &now)? {
+            let digest = observation(observed, run);
+            match kept.get(observed.fingerprint.as_str()) {
+                Some(Kept::Open(was)) if *was == digest => {
+                    unchanged.insert(observed.fingerprint.as_str());
+                    continue;
+                }
+                _ => {}
+            }
+            let seen = upsert(&tx, (observed, &digest), run, &now)?;
+            // A finding the run lists twice is opened or reopened once.
+            if !written.insert(observed.fingerprint.as_str()) {
+                continue;
+            }
+            match seen {
                 Seen::New => summary.opened += 1,
                 Seen::Reopened => summary.reopened += 1,
                 Seen::Open => {}
             }
         }
+        see_again(&tx, &kept, &unchanged, run, &now)?;
         summary.resolved = resolve_absent(&tx, run, &now)?;
         summary.deactivated = reconcile_inactive(&tx, run, &now)?;
         tx.commit()?;
@@ -328,6 +344,14 @@ enum Seen {
     Open,
 }
 
+/// What the store holds of a finding, as far as telling it from what a run saw.
+enum Kept {
+    /// Open and active, as an observation with this digest.
+    Open(String),
+    /// Resolved or inactive: seeing it again changes that.
+    Closed,
+}
+
 fn retry_busy<T>(mut attempt: impl FnMut() -> Result<T, Error>) -> Result<T, Error> {
     let mut tries = 0;
     loop {
@@ -364,7 +388,103 @@ fn diagnose(error: Error, path: &Path) -> Error {
     }
 }
 
-fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result<Seen, Error> {
+/// The findings the store holds, by fingerprint.
+fn remembered(tx: &Transaction) -> Result<BTreeMap<String, Kept>, Error> {
+    let mut stmt = tx.prepare(
+        "SELECT fingerprint, resolved_at IS NULL AND inactive_at IS NULL, observation FROM findings",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let open: bool = row.get(1)?;
+        let digest: Option<String> = row.get(2)?;
+        Ok((
+            row.get::<_, String>(0)?,
+            match digest {
+                Some(digest) if open => Kept::Open(digest),
+                _ => Kept::Closed,
+            },
+        ))
+    })?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// What a run says of a finding besides when it saw it: the digest of the
+/// columns an observation sets, which a sighting of it again leaves as they are.
+fn observation(observed: &Observed, run: &Run) -> String {
+    let mut hasher = blake3::Hasher::new();
+    let mut part = |text: &str| {
+        hasher.update(&(text.len() as u64).to_le_bytes());
+        hasher.update(text.as_bytes());
+    };
+    part(&observed.fingerprint);
+    part(&observed.decision);
+    part(observed.decision_uid.as_deref().unwrap_or_default());
+    part(&observed.path);
+    part(observed.symbol.as_deref().unwrap_or_default());
+    part(&observed.message);
+    part(observed.meaning_version.as_deref().unwrap_or_default());
+    part(observed.check_revision.as_deref().unwrap_or_default());
+    part(observed.model_version.as_deref().unwrap_or_default());
+    part(observed.decision_hash.as_deref().unwrap_or_default());
+    part(&run.lighthouse_version);
+    part(run.catalog_version.as_deref().unwrap_or_default());
+    part(&observed.severity.to_string());
+    part(&observed.authored_severity.to_string());
+    for value in [
+        &observed.locator,
+        &observed.evidence,
+        &observed.facts,
+        &observed.options,
+    ] {
+        // Hashing never fails: the writer is the hasher.
+        let _ = serde_json::to_writer(&mut hasher, value);
+        hasher.update(&[0]);
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+/// Records that the findings a run saw as they were were seen now: when, at
+/// which commit and whether the tree was dirty. The open findings the run did
+/// not see keep their sighting.
+fn see_again(
+    tx: &Transaction,
+    kept: &BTreeMap<String, Kept>,
+    unchanged: &BTreeSet<&str>,
+    run: &Run,
+    now: &str,
+) -> Result<(), Error> {
+    if unchanged.is_empty() {
+        return Ok(());
+    }
+    let unseen: Vec<&str> = kept
+        .iter()
+        .filter(|(fingerprint, was)| {
+            matches!(was, Kept::Open(_)) && !unchanged.contains(fingerprint.as_str())
+        })
+        .map(|(fingerprint, _)| fingerprint.as_str())
+        .collect();
+    tx.execute_batch(
+        "CREATE TEMP TABLE IF NOT EXISTS unseen (fingerprint TEXT PRIMARY KEY); DELETE FROM unseen",
+    )?;
+    let mut put = tx.prepare_cached("INSERT OR IGNORE INTO unseen VALUES (?1)")?;
+    for fingerprint in unseen {
+        put.execute(params![fingerprint])?;
+    }
+    tx.execute(
+        "UPDATE findings SET last_seen = ?1, last_commit = ?2, last_dirty = ?3 \
+         WHERE resolved_at IS NULL AND inactive_at IS NULL \
+           AND observation IS NOT NULL \
+           AND fingerprint NOT IN (SELECT fingerprint FROM unseen)",
+        params![now, run.commit, run.dirty],
+    )?;
+    Ok(())
+}
+
+fn upsert(
+    tx: &Transaction,
+    (observed, digest): (&Observed, &str),
+    run: &Run,
+    now: &str,
+) -> Result<Seen, Error> {
     let was_resolved: Option<bool> = tx
         .prepare_cached("SELECT resolved_at IS NOT NULL FROM findings WHERE fingerprint = ?1")?
         .query_row(params![observed.fingerprint], |row| row.get(0))
@@ -378,10 +498,10 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
         "INSERT INTO findings (fingerprint, decision, decision_uid, severity, authored_severity, path, locator, symbol, \
              first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
              last_commit, last_dirty, lighthouse_version, catalog_version, meaning_version, \
-             check_revision, model_version, decision_hash, evidence_digest) \
+             check_revision, model_version, decision_hash, evidence_digest, observation) \
          VALUES (:fingerprint, :decision, :decision_uid, :severity, :authored, :path, :locator, :symbol, :now, :now, \
              :message, :evidence, :facts, :options, :commit, :dirty, :version, :catalog, \
-             :meaning_version, :check_revision, :model_version, :decision_hash, :digest) \
+             :meaning_version, :check_revision, :model_version, :decision_hash, :digest, :observation) \
          ON CONFLICT (fingerprint) DO UPDATE SET \
              decision = excluded.decision, \
              decision_uid = COALESCE(excluded.decision_uid, decision_uid), \
@@ -395,7 +515,8 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
              last_dirty = excluded.last_dirty, lighthouse_version = excluded.lighthouse_version, \
              catalog_version = excluded.catalog_version, meaning_version = excluded.meaning_version, \
              check_revision = excluded.check_revision, model_version = excluded.model_version, \
-             decision_hash = excluded.decision_hash, evidence_digest = excluded.evidence_digest",
+             decision_hash = excluded.decision_hash, evidence_digest = excluded.evidence_digest, \
+             observation = excluded.observation",
     )?
     .execute(
         named_params! {
@@ -421,6 +542,7 @@ fn upsert(tx: &Transaction, observed: &Observed, run: &Run, now: &str) -> Result
             ":model_version": observed.model_version,
             ":decision_hash": observed.decision_hash,
             ":digest": observed.evidence_digest(),
+            ":observation": digest,
         },
     )?;
     Ok(seen)

@@ -2142,6 +2142,7 @@ dependencies = [
 name = "lighthouse-store"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "lighthouse-model",
  "lighthouse-protocol",
  "rusqlite",
