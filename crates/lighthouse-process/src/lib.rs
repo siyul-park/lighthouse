@@ -43,7 +43,7 @@ use std::{
 /// How often a running program is looked at.
 const POLL: Duration = Duration::from_millis(10);
 /// How long the output of a program that has exited is waited for.
-const DRAIN: Duration = Duration::from_millis(500);
+const DRAIN: Duration = GRACE;
 
 /// What a program may print on each of stdout and stderr.
 pub const MAX_OUTPUT: usize = 1 << 20;

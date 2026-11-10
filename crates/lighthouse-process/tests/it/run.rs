@@ -221,15 +221,18 @@ fn a_timeout_kills_the_group_when_the_leader_exits_within_the_grace_period() {
     let dir = tempfile::tempdir().unwrap();
     let pid = dir.path().join("pid");
     let script = format!(
-        "trap 'exit 0' TERM; (trap '' TERM; exec sh -c 'echo $$ > {}; exec sleep 30') & wait",
+        "trap 'exit 0' TERM; (trap '' TERM; exec sleep 30) & echo $! > {}; wait",
         pid.display()
     );
     let line = argv(&["sh", "-c", &script]);
 
-    let error = run(&spec(&line, Duration::from_millis(500))).unwrap_err();
+    let error = run(&spec(&line, Duration::from_secs(2))).unwrap_err();
 
     assert!(error.contains("timed out"), "{error}");
-    let pid = std::fs::read_to_string(&pid).unwrap().trim().to_owned();
+    let pid = std::fs::read_to_string(&pid)
+        .expect("the leader writes the grandchild pid before the limit")
+        .trim()
+        .to_owned();
     let gone = (0..40).any(|_| {
         std::thread::sleep(Duration::from_millis(50));
         !alive(&pid)
