@@ -36,5 +36,10 @@ Options:
           [default: auto]
           [possible values: auto, always, never]
 
+      --no-serve
+          Run the hook in this process even when a `lighthouse serve` is running for the project
+          
+          [env: LIGHTHOUSE_NO_SERVE=]
+
   -h, --help
           Print help (see a summary with '-h')

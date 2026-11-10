@@ -408,8 +408,7 @@ pub(crate) fn check_with(
 /// The size limit of the cache in bytes: `LIGHTHOUSE_CACHE_LIMIT_MB`, else
 /// 256 MB.
 pub(crate) fn cache_limit() -> u64 {
-    std::env::var(CACHE_LIMIT_VAR)
-        .ok()
+    lighthouse_model::var(CACHE_LIMIT_VAR)
         .and_then(|mb| mb.trim().parse::<u64>().ok())
         .map_or(cache::DEFAULT_LIMIT, |mb| mb.saturating_mul(1 << 20))
 }

@@ -4,11 +4,15 @@
 use std::{
     env,
     ffi::OsString,
-    io::{self, Write},
+    io,
     process::ExitCode,
+    sync::{Arc, Mutex},
 };
 
 use clap::{CommandFactory, FromArgMatches};
+
+use streams::Io;
+
 use command::{Agent, CacheCommand, Cli, Command, DocsCommand, InternalCommand, SpecCommand};
 
 use lighthouse_cli::surface::{
@@ -17,16 +21,30 @@ use lighthouse_cli::surface::{
 };
 
 mod color;
+
 mod command;
+
 mod docs;
+
 mod hook;
+
 mod paste;
+
 mod project;
+
 mod reference;
+
+mod serve;
+
 mod setup;
+
 mod spec;
 
+mod streams;
+
 use lighthouse_model::Result;
+
+use lighthouse_session::Warm;
 
 /// Parses the command line and runs it; the exit code of the process.
 pub fn main() -> ExitCode {
@@ -39,21 +57,43 @@ pub fn main() -> ExitCode {
         Err(e) => e.exit(),
     };
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
-    match run(&cli) {
-        Ok(code) => ExitCode::from(code),
+    let stdin = payload(&cli);
+    if let Some(code) = serve::forward(&cli, &args, stdin.as_deref()) {
+        return ExitCode::from(code);
+    }
+    let (mut out, mut err) = (io::stdout(), io::stderr());
+    let mut io = Io::new(&mut out, &mut err, stdin);
+    ExitCode::from(execute(&cli, &mut io, None))
+}
+
+/// What a hook reads on its standard input; nothing for any other command.
+fn payload(cli: &Cli) -> Option<String> {
+    matches!(cli.command, Command::Hook { .. })
+        .then(|| io::read_to_string(io::stdin()).ok())
+        .flatten()
+}
+
+/// Runs the command; its exit code. A failure is told on stderr and exits 2.
+pub fn execute(cli: &Cli, io: &mut Io<'_>, warm: Option<&Arc<Mutex<Warm>>>) -> u8 {
+    match run(cli, io, warm) {
+        Ok(code) => code,
         Err(e) => {
-            eprintln!("lighthouse: {e}");
-            ExitCode::from(USAGE)
+            let _ = writeln!(io.err, "lighthouse: {e}");
+            USAGE
         }
     }
 }
 
-fn run(cli: &Cli) -> Result<u8> {
+fn run(cli: &Cli, io: &mut Io<'_>, warm: Option<&Arc<Mutex<Warm>>>) -> Result<u8> {
     let config = cli.config.as_deref();
     match &cli.command {
         Command::Surface(action) => {
             let ctx = Context::person(cli.config.clone());
-            Ok(emit(&lighthouse_cli::surface::run(&ctx, action)?))
+            let ctx = match warm {
+                Some(warm) => ctx.warmed(Arc::clone(warm)),
+                None => ctx,
+            };
+            Ok(emit(&lighthouse_cli::surface::run(&ctx, action)?, io))
         }
         Command::Cache {
             command: CacheCommand::Clean,
@@ -84,25 +124,41 @@ fn run(cli: &Cli) -> Result<u8> {
             lighthouse_cli::mcp::serve()?;
             Ok(0)
         }
+        Command::Serve { idle, command } => {
+            serve::command(config, (*idle, command.as_ref()), execute)
+        }
         Command::Hook {
             agent: Agent::ClaudeCode,
             event,
             allow_incomplete,
-        } => Ok(hook::run(*event, *allow_incomplete)),
+            no_serve,
+        } => {
+            let payload = io.stdin.take().unwrap_or_default();
+            let own = Arc::new(Mutex::new(Warm::new()));
+            let mut hook = hook::Hook {
+                warm: warm.unwrap_or(&own),
+                out: &mut *io.out,
+                err: &mut *io.err,
+            };
+            let code = hook::run(*event, *allow_incomplete, &payload, &mut hook);
+            if !no_serve {
+                serve::keep_warm(*event, &payload);
+            }
+            Ok(code)
+        }
     }
 }
 
 /// Data to stdout, notes to stderr; the exit code of the reply. A closed pipe
 /// ends the output quietly, like any filter.
-fn emit(reply: &Reply) -> u8 {
+fn emit(reply: &Reply, io: &mut Io<'_>) -> u8 {
     for note in &reply.notes {
-        eprintln!("{note}");
+        let _ = writeln!(io.err, "{note}");
     }
-    let mut out = io::stdout().lock();
     let _ = match &reply.body {
-        Body::Text(text) => out.write_all(text.as_bytes()),
-        Body::Json(value) => writeln!(out, "{value}"),
+        Body::Text(text) => io.out.write_all(text.as_bytes()),
+        Body::Json(value) => writeln!(io.out, "{value}"),
     };
-    let _ = out.flush();
+    let _ = io.out.flush();
     reply.code
 }

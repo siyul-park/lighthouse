@@ -20,6 +20,7 @@ Commands:
   init         Write a default lighthouse.toml in the current directory
   trust        Trust this project to run the commands it names
   mcp          Serve the Model Context Protocol on stdio, for coding agents
+  serve        Keep the project loaded in a process that `check` and the hooks run in
   hook         Entry points for agent hooks. Reads the hook payload on stdin
   help         Print this message or the help of the given subcommand(s)
 

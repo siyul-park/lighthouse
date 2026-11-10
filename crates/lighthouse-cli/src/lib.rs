@@ -2,4 +2,5 @@
 //! the binary adds the terminal.
 
 pub mod mcp;
+pub mod serve;
 pub mod surface;

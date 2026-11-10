@@ -2,12 +2,14 @@
 //! `lighthouse_cli::surface`, and the commands only a terminal needs (setup,
 //! housekeeping, build).
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use lighthouse_cli::surface::Action;
 
 use crate::terminal::hook;
-use clap::{ColorChoice, Parser, Subcommand, ValueEnum};
+
+use clap::{ArgAction, ColorChoice, Parser, Subcommand, ValueEnum, builder::BoolishValueParser};
+
 use clap_complete::Shell;
 
 /// What `--version` prints: the release workflow sets `LIGHTHOUSE_VERSION` at
@@ -121,6 +123,22 @@ pub enum Command {
     /// `SoftwareAgent` (the id is $LIGHTHOUSE_ATTRIBUTED_TO, else the client's
     /// name).
     Mcp,
+    /// Keep the project loaded in a process that `check` and the hooks run in.
+    ///
+    /// The server listens on a socket of the project that only you can use.
+    /// `check` and the agent hooks run their command there when it answers and
+    /// in their own process when it does not, with the same output and exit
+    /// code. It ends after `--idle` without a command; the first
+    /// SessionStart hook of a session starts one. `--no-serve` runs one in its
+    /// own process.
+    Serve {
+        /// How long without a command ends the server: a number with `ms`,
+        /// `s`, `m` or `h`.
+        #[arg(long, value_parser = duration, default_value = "30m")]
+        idle: Duration,
+        #[command(subcommand)]
+        command: Option<ServeCommand>,
+    },
     /// What the sandbox starts inside its namespace; not for people.
     #[command(hide = true)]
     Internal {
@@ -138,6 +156,15 @@ pub enum Command {
         /// Say that the analysis was incomplete but do not block on it.
         #[arg(long)]
         allow_incomplete: bool,
+        /// Run the hook in this process even when a `lighthouse serve` is
+        /// running for the project.
+        #[arg(
+            long,
+            env = "LIGHTHOUSE_NO_SERVE",
+            value_parser = BoolishValueParser::new(),
+            action = ArgAction::SetTrue
+        )]
+        no_serve: bool,
     },
 }
 
@@ -177,6 +204,14 @@ pub enum InternalCommand {
         #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
         command: Vec<String>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ServeCommand {
+    /// End the server of the project.
+    Stop,
+    /// Say whether a server answers for the project.
+    Status,
 }
 
 #[derive(Debug, Subcommand)]
@@ -221,4 +256,27 @@ pub enum DocsCommand {
         #[arg(long, default_value = SKILL_PATH)]
         skill: PathBuf,
     },
+}
+
+/// A span of time as `30m` writes it.
+fn duration(text: &str) -> Result<Duration, String> {
+    let split = text
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(text.len());
+    let (number, unit) = text.split_at(split);
+    let number: u64 = number
+        .parse()
+        .map_err(|_| format!("`{text}` is not a number with a unit (ms, s, m, h)"))?;
+    let millis = match unit {
+        "ms" => 1,
+        "s" => 1000,
+        "m" => 60_000,
+        "h" => 3_600_000,
+        _ => {
+            return Err(format!(
+                "`{text}` is not a number with a unit (ms, s, m, h)"
+            ));
+        }
+    };
+    Ok(Duration::from_millis(number.saturating_mul(millis)))
 }

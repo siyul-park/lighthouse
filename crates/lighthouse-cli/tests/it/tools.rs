@@ -10,13 +10,14 @@ use lighthouse_cli::surface::{
 };
 use serde_json::Value;
 
-/// Flags a tool does not take: they choose how the CLI prints or what it
-/// touches, while a tool always returns the JSON output.
-const CLI_ONLY: [&str; 12] = [
+/// Flags a tool does not take: they choose how the CLI prints, what it
+/// touches or where it runs, while a tool always returns the JSON output.
+const CLI_ONLY: [&str; 13] = [
     "help",
     "version",
     "format",
     "timings",
+    "no-serve",
     "fix",
     "fixer",
     "fingerprint",

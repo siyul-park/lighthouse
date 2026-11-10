@@ -76,14 +76,8 @@ pub struct CheckCommand {
     /// `text`, `json` (findings grouped by decision) or `sarif`.
     #[arg(long, value_enum, default_value_t)]
     pub format: CheckFormat,
-    /// Print where the time went to stderr, phase by phase: reading, each
-    /// language provider, merging, analyzers, the slowest rules, identity,
-    /// the store and the report. With --fix it also reports the fix loop first:
-    /// rounds, the checks of each round, proposing, applying, settling,
-    /// rolling back, command fixes and writing. Findings and exit code do not
-    /// change.
-    #[arg(long)]
-    pub timings: bool,
+    #[command(flatten)]
+    pub process: Process,
     /// Fix what the catalog's fixers can fix, then report what is left. Only
     /// safe fixes are written, whatever makes them (a rule, a command, a
     /// plugin); unsafe ones, which every fix by a model is, are shown as
@@ -101,6 +95,28 @@ pub struct CheckCommand {
     pub fingerprint: Vec<String>,
     #[command(flatten)]
     pub options: FixOptions,
+}
+
+/// How a `check` runs, besides what it checks.
+#[derive(Debug, Default, Args)]
+pub struct Process {
+    /// Print where the time went to stderr, phase by phase: reading, each
+    /// language provider, merging, analyzers, the slowest rules, identity,
+    /// the store and the report. With --fix it also reports the fix loop first:
+    /// rounds, the checks of each round, proposing, applying, settling,
+    /// rolling back, command fixes and writing. Findings and exit code do not
+    /// change.
+    #[arg(long)]
+    pub timings: bool,
+    /// Run the check in this process even when a `lighthouse serve` is running
+    /// for the project.
+    #[arg(
+        long,
+        env = "LIGHTHOUSE_NO_SERVE",
+        value_parser = clap::builder::BoolishValueParser::new(),
+        action = clap::ArgAction::SetTrue
+    )]
+    pub no_serve: bool,
 }
 
 /// `decision <verb>`.

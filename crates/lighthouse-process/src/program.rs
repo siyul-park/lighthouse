@@ -13,9 +13,9 @@ use std::{
 use crate::{GRACE, Invocation, Lines, MAX_OUTPUT, Policy, Profile, Ran, run, run_lines};
 
 /// What a program inherits from its caller, besides what it declares.
-const INHERITED: [&str; 4] = ["PATH", "USER", "LOGNAME", "LANG"];
+pub const INHERITED: [&str; 4] = ["PATH", "USER", "LOGNAME", "LANG"];
 /// What it inherits unless it has a home of its own.
-const PERSONAL: [&str; 2] = ["HOME", "TMPDIR"];
+pub const PERSONAL: [&str; 2] = ["HOME", "TMPDIR"];
 /// The version of the contract between Lighthouse and its programs.
 const API_VERSION: &str = "1";
 /// How much of stderr an error carries.

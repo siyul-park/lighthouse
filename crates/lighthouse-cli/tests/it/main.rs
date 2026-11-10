@@ -51,6 +51,7 @@ mod run;
 mod rust_edition;
 mod sandbox;
 mod sarif_places;
+mod serve;
 mod skill;
 mod spec;
 mod surface;

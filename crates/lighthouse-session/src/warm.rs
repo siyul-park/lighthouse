@@ -85,6 +85,14 @@ impl Warm {
         Ok(loaded.session.clone())
     }
 
+    /// The project that `dir` or a directory above it configures with a
+    /// `lighthouse.toml`, as [`Session::find_in`] reads it; `None` when there
+    /// is none.
+    pub fn find(&mut self, dir: &Path) -> Result<Option<Session>> {
+        let loaded = self.refresh(dir, None)?;
+        Ok(loaded.configured.then(|| loaded.session.clone()))
+    }
+
     /// Checks the project that `dir` belongs to: `request` says what, once it
     /// is given the session. A request that keeps no cache is run as
     /// [`check`](crate::check) runs it.

@@ -22,15 +22,16 @@
 
 use std::{
     env,
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
+    sync::{Mutex, MutexGuard, PoisonError},
 };
 
 use clap::ValueEnum;
 use lighthouse_model::{AgentKind, Attribution};
 use lighthouse_report::Format;
 use lighthouse_session::{
-    AGENT_LOOP, CheckRequest, Checked, ModelOptions, RunStatus, Session, baseline, signal,
+    AGENT_LOOP, CheckRequest, Checked, ModelOptions, RunStatus, Session, Warm, baseline, signal,
 };
 use serde_json::{Value, json};
 
@@ -93,21 +94,30 @@ impl Event {
     }
 }
 
+/// What a hook is given besides its payload: the project kept loaded, and
+/// where it says what it has to say.
+pub struct Hook<'a> {
+    pub warm: &'a Mutex<Warm>,
+    pub out: &'a mut dyn Write,
+    pub err: &'a mut dyn Write,
+}
+
+impl Hook<'_> {
+    fn kept(&self) -> MutexGuard<'_, Warm> {
+        self.warm.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
 /// Runs the hook; a failure is reported on stderr and exits 1 (non-blocking).
-pub fn run(event: Event, allow_incomplete: bool) -> u8 {
-    let mut payload = String::new();
-    let answered = std::io::stdin()
-        .read_to_string(&mut payload)
-        .map_err(Into::into)
-        .and_then(|_| reply(event, allow_incomplete, &payload));
-    match answered {
+pub fn run(event: Event, allow_incomplete: bool, payload: &str, hook: &mut Hook<'_>) -> u8 {
+    match reply(event, allow_incomplete, payload, hook) {
         Ok(Some(reply)) => {
-            let _ = writeln!(std::io::stdout(), "{reply}");
+            let _ = writeln!(hook.out, "{reply}");
             0
         }
         Ok(None) => 0,
         Err(e) => {
-            eprintln!("lighthouse hook: {e}");
+            let _ = writeln!(hook.err, "lighthouse hook: {e}");
             1
         }
     }
@@ -116,11 +126,16 @@ pub fn run(event: Event, allow_incomplete: bool) -> u8 {
 /// The JSON to print for `payload`, or `None` to stay silent. Only a payload
 /// that is not JSON is an error (nothing can be said to the agent about it);
 /// whatever else goes wrong is told to the agent, never swallowed.
-fn reply(event: Event, allow_incomplete: bool, payload: &str) -> Result<Option<Value>> {
+fn reply(
+    event: Event,
+    allow_incomplete: bool,
+    payload: &str,
+    hook: &mut Hook<'_>,
+) -> Result<Option<Value>> {
     let payload: Value =
         serde_json::from_str(payload).map_err(|e| format!("the hook payload is not JSON: {e}"))?;
     let active = payload["stop_hook_active"].as_bool().unwrap_or(false);
-    match answer_event(event, allow_incomplete, active, &payload) {
+    match answer_event(event, allow_incomplete, active, &payload, hook) {
         Err(e) => unchecked(event, active, &e.to_string()).map(Some).ok_or(e),
         reply => reply,
     }
@@ -134,18 +149,15 @@ fn answer_event(
     allow_incomplete: bool,
     stop_hook_active: bool,
     payload: &Value,
+    hook: &mut Hook<'_>,
 ) -> Result<Option<Value>> {
-    let here = match payload["cwd"].as_str() {
-        Some(cwd) => PathBuf::from(cwd),
-        None => env::current_dir()?,
-    };
-    let Some(session) = Session::find_in(&here)? else {
+    let Some((here, session)) = found(hook, payload)? else {
         return Ok(None);
     };
     let root = session.root.canonicalize()?;
     let id = baseline::session_id(payload["session_id"].as_str());
     if let Some(why) = untrusted_for(event, &session) {
-        return untrusted_notice(event, &session, id, stop_hook_active, &why);
+        return untrusted_notice(event, &session, id, stop_hook_active, &why, hook.err);
     }
     match event {
         Event::UserPromptSubmit => {
@@ -174,7 +186,7 @@ fn answer_event(
                 return Ok(None);
             }
             let found = if root.join(&file).exists() {
-                lighthouse_session::check(&session, &request(vec![root.join(&file)], false))?
+                checked(hook, &here, request(vec![root.join(&file)], false))?
                     .run
                     .diagnostics
             } else {
@@ -188,8 +200,7 @@ fn answer_event(
             else {
                 return Ok(None);
             };
-            let mut checked =
-                lighthouse_session::check(&session, &request(vec![root.join(&file)], true))?;
+            let mut checked = checked(hook, &here, request(vec![root.join(&file)], true))?;
             let before = id.and_then(|id| baseline::load(&root, id, &file));
             let now = checked.run.diagnostics.clone();
             if let Some(before) = &before {
@@ -199,7 +210,7 @@ fn answer_event(
                 .as_ref()
                 .map(|b| baseline::gone(std::slice::from_ref(b), &now))
                 .unwrap_or_default();
-            record_findings(&session, id, event, &checked, &gone);
+            record_findings(&session, id, event, &checked, &gone, hook.err);
             Ok(after_edit(&checked, allow_incomplete, before.is_none()))
         }
         Event::Stop => {
@@ -213,16 +224,43 @@ fn answer_event(
                 .collect();
             let mut stopped = None;
             if !files.is_empty() {
-                let mut checked = lighthouse_session::check(&session, &request(files, true))?;
+                let mut checked = checked(hook, &here, request(files, true))?;
                 let now = checked.run.diagnostics.clone();
                 baseline::introduced(&mut checked.run.diagnostics, &before);
                 let gone = baseline::gone(&before, &now);
-                record_findings(&session, id, event, &checked, &gone);
+                record_findings(&session, id, event, &checked, &gone, hook.err);
                 stopped = at_stop(&checked, allow_incomplete, stop_hook_active);
             }
-            Ok(with_open_signals(&session, id, stop_hook_active, stopped))
+            Ok(with_open_signals(
+                &session,
+                id,
+                stop_hook_active,
+                stopped,
+                hook.err,
+            ))
         }
     }
+}
+
+/// The directory the payload is about: its `cwd`, else the current one.
+pub fn hook_dir(payload: &Value) -> Result<PathBuf> {
+    match payload["cwd"].as_str() {
+        Some(cwd) => Ok(PathBuf::from(cwd)),
+        None => Ok(env::current_dir()?),
+    }
+}
+
+/// The directory the payload is about and the project it belongs to, when it
+/// belongs to one.
+fn found(hook: &Hook<'_>, payload: &Value) -> Result<Option<(PathBuf, Session)>> {
+    let here = hook_dir(payload)?;
+    Ok(hook.kept().find(&here)?.map(|session| (here, session)))
+}
+
+/// A check of the project that `here` belongs to, over the project the hook
+/// keeps loaded.
+fn checked(hook: &Hook<'_>, here: &Path, request: CheckRequest) -> Result<Checked> {
+    hook.kept().check((here, None), |_| Ok(request))
 }
 
 /// Why `session` cannot be checked for `event` until the user trusts the
@@ -244,13 +282,14 @@ fn untrusted_notice(
     id: Option<&str>,
     stop_hook_active: bool,
     why: &str,
+    err: &mut dyn Write,
 ) -> Result<Option<Value>> {
     let first = baseline::first_telling(&session.root, id.unwrap_or(NO_SESSION), UNTRUSTED)?;
     if first {
         return Ok(Some(context(event, format!("{NOT_CHECKING} {why}"))));
     }
     match event {
-        Event::Stop => Ok(with_open_signals(session, id, stop_hook_active, None)),
+        Event::Stop => Ok(with_open_signals(session, id, stop_hook_active, None, err)),
         _ => Ok(None),
     }
 }
@@ -265,6 +304,7 @@ fn record_findings(
     event: Event,
     checked: &Checked,
     gone: &[String],
+    err: &mut dyn Write,
 ) {
     let resolved = if checked.summary().status == RunStatus::Incomplete {
         &[]
@@ -279,7 +319,7 @@ fn record_findings(
         resolved,
         &Attribution::new(AgentKind::SoftwareAgent, Some("claude-code".to_owned())),
     ) {
-        eprintln!("lighthouse hook: signals: {e}");
+        let _ = writeln!(err, "lighthouse hook: signals: {e}");
     }
 }
 
@@ -298,6 +338,7 @@ fn with_open_signals(
     id: Option<&str>,
     stop_hook_active: bool,
     stopped: Option<Value>,
+    err: &mut dyn Write,
 ) -> Option<Value> {
     if !session.surfaces() || stop_hook_active {
         return stopped;
@@ -306,12 +347,12 @@ fn with_open_signals(
         Ok(open) if !open.is_empty() => open,
         Ok(_) => return stopped,
         Err(e) => {
-            eprintln!("lighthouse hook: signals: {e}");
+            let _ = writeln!(err, "lighthouse hook: signals: {e}");
             return stopped;
         }
     };
     if let Err(e) = signal::mark_asked(&session.root, &open) {
-        eprintln!("lighthouse hook: signals: {e}");
+        let _ = writeln!(err, "lighthouse hook: signals: {e}");
     }
     let text = signal::stop_context(&open);
     let mut reply = stopped.unwrap_or_else(|| json!({}));

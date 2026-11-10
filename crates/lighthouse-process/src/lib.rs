@@ -13,7 +13,10 @@ mod program;
 mod sandbox;
 
 pub use copy::{clone_file, copy_project};
-pub use program::{Environment, Home, Job, context, expand, expand_value, referenced, variables};
+pub use program::{
+    Environment, Home, INHERITED, Job, PERSONAL, context, expand, expand_value, referenced,
+    variables,
+};
 /// Whether sandboxed programs can run on this machine, and if not, why.
 pub use sandbox::available as sandbox_available;
 pub use sandbox::{

@@ -25,6 +25,7 @@ Commands:
   init         Write a default lighthouse.toml in the current directory
   trust        Trust this project to run the commands it names
   mcp          Serve the Model Context Protocol on stdio, for coding agents
+  serve        Keep the project loaded in a process that `check` and the hooks run in
   hook         Entry points for agent hooks. Reads the hook payload on stdin
   help         Print this message or the help of the given subcommand(s)
 
@@ -123,6 +124,11 @@ Options:
 
       --timings
           Print where the time went to stderr, phase by phase: reading, each language provider, merging, analyzers, the slowest rules, identity, the store and the report. With --fix it also reports the fix loop first: rounds, the checks of each round, proposing, applying, settling, rolling back, command fixes and writing. Findings and exit code do not change
+
+      --no-serve
+          Run the check in this process even when a `lighthouse serve` is running for the project
+          
+          [env: LIGHTHOUSE_NO_SERVE=]
 
       --fix
           Fix what the catalog's fixers can fix, then report what is left. Only safe fixes are written, whatever makes them (a rule, a command, a plugin); unsafe ones, which every fix by a model is, are shown as previews with how to apply them. Each fix is verified (re-checked, with the safe fixes of what it introduced) and a file that gets worse is rolled back. PATHS and --decision select which findings are fixed
@@ -1125,6 +1131,54 @@ Options:
           Print help (see a summary with '-h')
 ```
 
+## `lighthouse serve`
+
+```text
+Keep the project loaded in a process that `check` and the hooks run in.
+
+The server listens on a socket of the project that only you can use. `check` and the agent hooks run their command there when it answers and in their own process when it does not, with the same output and exit code. It ends after `--idle` without a command; the first SessionStart hook of a session starts one. `--no-serve` runs one in its own process.
+
+Usage: lighthouse serve [OPTIONS] [COMMAND]
+
+Commands:
+  stop    End the server of the project
+  status  Say whether a server answers for the project
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+      --idle <IDLE>
+          How long without a command ends the server: a number with `ms`, `s`, `m` or `h`
+          
+          [default: 30m]
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+## `lighthouse serve stop`
+
+```text
+End the server of the project
+
+Usage: lighthouse serve stop
+
+Options:
+  -h, --help
+          Print help
+```
+
+## `lighthouse serve status`
+
+```text
+Say whether a server answers for the project
+
+Usage: lighthouse serve status
+
+Options:
+  -h, --help
+          Print help
+```
+
 ## `lighthouse hook`
 
 ```text
@@ -1149,6 +1203,11 @@ Arguments:
 Options:
       --allow-incomplete
           Say that the analysis was incomplete but do not block on it
+
+      --no-serve
+          Run the hook in this process even when a `lighthouse serve` is running for the project
+          
+          [env: LIGHTHOUSE_NO_SERVE=]
 
   -h, --help
           Print help (see a summary with '-h')

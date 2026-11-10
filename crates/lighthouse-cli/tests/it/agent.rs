@@ -16,6 +16,7 @@ pub(crate) fn lighthouse(dir: &Path) -> Command {
     let mut cmd = Command::cargo_bin("lighthouse").unwrap();
     cmd.current_dir(dir)
         .envs(home(dir))
+        .env("LIGHTHOUSE_NO_SERVE", "1")
         .env_remove("LIGHTHOUSE_TRUST");
     cmd
 }

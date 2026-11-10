@@ -38,7 +38,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
             options: command.options.clone(),
         };
         let done = apply(ctx, &selection, !args.no_store, !args.no_cache)?;
-        if command.timings {
+        if command.process.timings {
             fix_timings = done.timings.lines(done.rounds);
         }
         messages = done.lines();
@@ -60,7 +60,7 @@ pub fn check(ctx: &Context, command: &CheckCommand) -> Result<Reply> {
         CheckFormat::Text => Reply::text(checked.render(Format::Text, args.limit)),
     }
     .with_messages(&checked.messages);
-    if command.timings {
+    if command.process.timings {
         reply.notes.extend(fix_timings);
         reply.notes.extend(
             checked
