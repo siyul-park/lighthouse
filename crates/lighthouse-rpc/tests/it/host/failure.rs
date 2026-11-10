@@ -121,11 +121,9 @@ fn the_engine_turns_a_plugin_crash_into_exit_code_3() {
     fs::write(project.path().join("a.fake"), "x").unwrap();
     let outcome = engine_with(&fake, project.path()).check(&[], &[]).unwrap();
     assert_eq!(outcome.incomplete.len(), 1);
-    assert!(
-        outcome.incomplete[0]
-            .reason
-            .contains("language `fake` failed")
-            || outcome.incomplete[0].reason.contains("exit status: 7")
+    assert_eq!(
+        outcome.incomplete[0].reason,
+        "plugin `fake` closed its output (exit status: 7); 1 file(s) not analyzed"
     );
     assert!(outcome.notices.iter().any(|n| n.contains("stderr: boom")));
     assert_eq!(outcome.exit_code(false, false), EXIT_INCOMPLETE);

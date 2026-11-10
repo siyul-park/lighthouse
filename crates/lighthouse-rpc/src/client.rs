@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::{Child, Command, ExitStatus, Stdio},
     sync::{
         Arc, Condvar, Mutex,
         mpsc::{self, Receiver, RecvTimeoutError, Sender},
@@ -284,14 +284,9 @@ impl Client {
     }
 
     fn exit_note(&self, session: &mut Session) -> String {
-        let deadline = Instant::now() + Duration::from_millis(200);
-        loop {
-            match session.child.try_wait() {
-                Ok(Some(status)) => return format!(" ({status})"),
-                Ok(None) if Instant::now() < deadline => thread::sleep(POLL),
-                _ => return String::new(),
-            }
-        }
+        wait_exit(&mut session.child, EXIT_GRACE)
+            .map(|status| format!(" ({status})"))
+            .unwrap_or_default()
     }
 
     /// Waits until a plugin that is gone has closed its stderr, so that the
@@ -348,10 +343,7 @@ impl Drop for Client {
                 let _ = session.writer.send(frame);
             }
         }
-        let deadline = Instant::now() + EXIT_GRACE;
-        while matches!(session.child.try_wait(), Ok(None)) && Instant::now() < deadline {
-            thread::sleep(POLL);
-        }
+        wait_exit(&mut session.child, EXIT_GRACE);
         lighthouse_process::reap(&mut session.child);
     }
 }
@@ -371,6 +363,19 @@ struct Session {
 enum Event {
     Response(Message),
     Closed(String),
+}
+
+/// The exit status of `child`, waiting up to `grace` for it to exit; `None`
+/// when it is still running then or cannot be asked.
+fn wait_exit(child: &mut Child, grace: Duration) -> Option<ExitStatus> {
+    let deadline = Instant::now() + grace;
+    loop {
+        match child.try_wait() {
+            Ok(None) if Instant::now() < deadline => thread::sleep(POLL),
+            Ok(status) => return status,
+            Err(_) => return None,
+        }
+    }
 }
 
 /// Starts the process of the plugin `found` in `cwd`, with threads that feed
