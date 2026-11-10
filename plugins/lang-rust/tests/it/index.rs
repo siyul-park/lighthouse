@@ -544,7 +544,7 @@ fn crate_files(root: &Path, prefixes: &[&str]) -> (Vec<String>, UnitRef) {
 }
 
 #[test]
-fn a_unit_is_analyzed_with_the_crates_it_depends_on_and_no_others() {
+fn a_unit_is_analyzed_with_the_libraries_it_depends_on_and_no_other_crate() {
     let dir = project(&[
         (
             "app/Cargo.toml",
@@ -586,7 +586,8 @@ fn a_unit_is_analyzed_with_the_crates_it_depends_on_and_no_others() {
     };
     assert_eq!(in_app(&narrow), in_app(&whole));
     assert_eq!(narrow.fragments.len(), 2);
-    // `other` is not read, so its broken file cannot make the orphan a gap.
+    // `other` and the tests of `core` are not read, so their broken files cannot
+    // make the orphan a gap.
     assert!(narrow.incomplete.is_empty(), "{:?}", narrow.incomplete);
     assert!(
         narrow

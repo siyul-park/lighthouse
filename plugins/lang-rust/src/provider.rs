@@ -115,7 +115,7 @@ impl language::Provider for Provider {
         let all = &params.files;
         let has_files = params.units.iter().any(|unit| !unit.files.is_empty());
         let packages = packages(&root, if has_files { all } else { &[] });
-        let reached = reached(&packages, &params.units);
+        let reached = Reached::of(&packages, &params.units);
         let tree = module_tree(
             &root,
             &packages.list,
@@ -312,6 +312,55 @@ pub(crate) struct Found {
     pub incomplete: Vec<Incomplete>,
     /// The files outside the unit the answer depends on.
     pub reads: Vec<String>,
+}
+
+/// The packages a request reads: what a fragment of its units can name.
+struct Reached {
+    /// The packages of the units, with every target and every dependency.
+    whole: BTreeSet<usize>,
+    /// The packages they depend on, through the dependencies those ship: a
+    /// path names their library and nothing else.
+    libraries: BTreeSet<usize>,
+}
+
+impl Reached {
+    fn of(found: &Packages, units: &[UnitRef]) -> Self {
+        let by_name: HashMap<&str, usize> = found
+            .list
+            .iter()
+            .enumerate()
+            .map(|(at, package)| (package.name.as_str(), at))
+            .collect();
+        let whole: BTreeSet<usize> = units
+            .iter()
+            .flat_map(|unit| &unit.files)
+            .filter_map(|file| found.of.get(&file.path)?.as_ref().ok().copied())
+            .collect();
+        let mut libraries = BTreeSet::new();
+        let mut pending: Vec<usize> = whole
+            .iter()
+            .flat_map(|&at| found.list[at].deps.values())
+            .filter_map(|name| by_name.get(name.as_str()).copied())
+            .collect();
+        while let Some(at) = pending.pop() {
+            if whole.contains(&at) || !libraries.insert(at) {
+                continue;
+            }
+            pending.extend(
+                found.list[at]
+                    .runtime
+                    .iter()
+                    .filter_map(|name| by_name.get(name.as_str()).copied()),
+            );
+        }
+        Self { whole, libraries }
+    }
+
+    /// Whether the crate target `root` is read.
+    fn reads(&self, root: &Root) -> bool {
+        self.whole.contains(&root.package)
+            || (self.libraries.contains(&root.package) && root.kind == TargetKind::Lib)
+    }
 }
 
 /// Collapses `.` and `..` so one file has one path however it was reached.
@@ -512,53 +561,22 @@ fn packages(root: &Path, files: &[String]) -> Packages {
     Packages { list, of }
 }
 
-/// The module tree of the crate targets of the packages in `reached`.
+/// The module tree of the crate targets `reached` reads.
 fn module_tree(
     root: &Path,
     packages: &[Package],
-    reached: &BTreeSet<usize>,
+    reached: &Reached,
     options: &Options,
     overlays: HashMap<PathBuf, String>,
 ) -> Tree {
     let mut tree = Tree::new(root);
     tree.overlays = overlays;
     for r in roots(packages, options.unpublished) {
-        if reached.contains(&r.package) {
+        if reached.reads(&r) {
             tree.add_crate(r);
         }
     }
     tree
-}
-
-/// The packages a fragment of the units can read: their own, and the packages
-/// they depend on, through the dependencies of those in turn. A path resolves
-/// through the crates it names and no others, so the rest of the project is
-/// not parsed.
-fn reached(found: &Packages, units: &[UnitRef]) -> BTreeSet<usize> {
-    let by_name: HashMap<&str, usize> = found
-        .list
-        .iter()
-        .enumerate()
-        .map(|(at, package)| (package.name.as_str(), at))
-        .collect();
-    let mut reached = BTreeSet::new();
-    let mut pending: Vec<usize> = units
-        .iter()
-        .flat_map(|unit| &unit.files)
-        .filter_map(|file| found.of.get(&file.path)?.as_ref().ok().copied())
-        .collect();
-    while let Some(at) = pending.pop() {
-        if !reached.insert(at) {
-            continue;
-        }
-        pending.extend(
-            found.list[at]
-                .deps
-                .values()
-                .filter_map(|name| by_name.get(name.as_str()).copied()),
-        );
-    }
-    reached
 }
 
 /// Packages another package of the project links into what it ships.
