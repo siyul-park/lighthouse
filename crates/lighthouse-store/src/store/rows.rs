@@ -16,6 +16,10 @@ use crate::{
 
 use super::{JUDGMENT_COLUMNS, MAX_CANDIDATES, SNAPSHOT_VERSION};
 
+/// The columns of a finding with its last sighting, and the tables they come from.
+pub(super) const FINDING_COLUMNS: &str = "f.*, s.last_seen, s.last_commit, s.last_dirty \
+     FROM findings f JOIN sightings s ON s.fingerprint = f.fingerprint";
+
 /// The full fingerprint that `prefix` names, among findings and judgments: a
 /// whole fingerprint, or a unique prefix of at least [`Fingerprint::MIN_PREFIX`] characters.
 pub(super) fn expand(conn: &Connection, prefix: &str) -> Result<String, Error> {
@@ -58,7 +62,7 @@ pub(super) fn load_finding(conn: &Connection, prefix: &str) -> Result<FindingRec
     let full = expand(conn, prefix)?;
     let standings = standings(conn)?;
     conn.query_row(
-        "SELECT * FROM findings WHERE fingerprint = ?1",
+        &format!("SELECT {FINDING_COLUMNS} WHERE f.fingerprint = ?1"),
         params![full],
         |row| finding_record(row, &standings),
     )

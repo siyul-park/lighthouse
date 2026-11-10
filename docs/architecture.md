@@ -449,15 +449,22 @@ evidence, facts and options are JSON, so nothing in it is specific to code.
 ### Findings
 
 `findings` has one row per fingerprint: rule, last severity and authored severity, path, locator,
-owner symbol, `first_seen`, `last_seen`, `resolved_at`, `inactive_at`, how often it came
+owner symbol, `first_seen`, `resolved_at`, `inactive_at`, how often it came
 back (`reopened`), and the last sighting: message, evidence, facts, the options the rule
-ran with, the commit and whether the tracked files were dirty, the Lighthouse and
-catalog versions, the meaning version of the decision and a digest of the evidence. The
+ran with, the Lighthouse and catalog versions, the meaning version of the decision and a digest of the evidence. The
 facts are what the analysis knew about the subject: language; for a symbol its kind,
 visibility, owner, callers (split into same-module and other-module), callees, function
 summary and the measures analyzers took (cognitive, cyclomatic, fan-in and fan-out,
 size); for any other finding the file's size and the measures taken of the file. They are
 kept per finding so a judgment can snapshot them without re-analyzing.
+
+`sightings` has one narrow row per fingerprint: `last_seen`, and the commit and whether the
+tracked files were dirty at that sighting. It is apart from `findings` because a run that
+saw a finding again rewrites only this small row, not the finding with its evidence and
+facts. `meta` keeps the digest of the last recorded run and its time. A run whose digest
+equals it (the same findings, scope, decisions that ran and are enabled, and what it could
+not check) reads and writes no finding: it moves the sightings of the findings that run
+saw. A schema change clears both with the rest of the cache.
 
 A run updates `findings` like this:
 

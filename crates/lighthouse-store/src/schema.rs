@@ -6,7 +6,7 @@ use crate::Error;
 /// is a cache of the decision log and of what runs saw, so it has no migration
 /// chain: one with another version is dropped and built again, and the
 /// judgments come back from `decisions.jsonl`.
-pub(crate) const VERSION: i64 = 13;
+pub(crate) const VERSION: i64 = 14;
 
 /// Findings with the judgments and suppressions on them. Locators, evidence and
 /// facts are JSON text, so nothing here assumes the artifact is code.
@@ -27,7 +27,6 @@ CREATE TABLE findings (
     locator           TEXT NOT NULL,
     symbol            TEXT,
     first_seen        TEXT NOT NULL,
-    last_seen         TEXT NOT NULL,
     resolved_at       TEXT,
     inactive_at       TEXT,
     reopened          INTEGER NOT NULL DEFAULT 0,
@@ -35,8 +34,6 @@ CREATE TABLE findings (
     last_evidence     TEXT NOT NULL,
     last_facts        TEXT NOT NULL,
     last_options      TEXT NOT NULL DEFAULT '{}',
-    last_commit       TEXT,
-    last_dirty        INTEGER,
     lighthouse_version TEXT,
     catalog_version   TEXT,
     meaning_version   TEXT,
@@ -48,6 +45,22 @@ CREATE TABLE findings (
 );
 CREATE INDEX findings_decision ON findings (decision);
 CREATE INDEX findings_path ON findings (path);
+
+-- When and where a finding was last seen, apart from the finding so that a
+-- run that saw it again rewrites a small row, not the finding.
+CREATE TABLE sightings (
+    fingerprint TEXT PRIMARY KEY,
+    last_seen   TEXT NOT NULL,
+    last_commit TEXT,
+    last_dirty  INTEGER
+) WITHOUT ROWID;
+
+-- What the last recorded run was: its digest and when it ran, so a run that
+-- equals it only refreshes the sightings it made.
+CREATE TABLE meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 
 CREATE TABLE judgments (
     judgment_id        TEXT PRIMARY KEY,

@@ -21,9 +21,11 @@ use crate::{
 mod lexical;
 mod rows;
 mod signals;
+mod skip;
 
 pub use lexical::Ranked;
 use rows::*;
+use skip::{LastRun, run_digest};
 
 /// File name of the database inside the store directory.
 const FILE: &str = "lighthouse.db";
@@ -143,13 +145,20 @@ impl Store {
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let now = lighthouse_model::now();
         let mut summary = RunSummary::default();
-        let kept = remembered(&tx)?;
         let (mut unchanged, mut written) = (BTreeSet::new(), BTreeSet::new());
         let digests: Vec<String> = run
             .observed
             .par_iter()
             .map(|observed| observation(observed, run))
             .collect();
+        let digest = run_digest(run, &digests);
+        let last = LastRun::read(&tx)?;
+        if last.digest.as_deref() == Some(digest.as_str()) {
+            last.see_again(&tx, run, &now)?;
+            tx.commit()?;
+            return Ok(summary);
+        }
+        let kept = remembered(&tx)?;
         for (observed, digest) in run.observed.iter().zip(digests) {
             match kept.get(observed.fingerprint.as_str()) {
                 Some(Kept::Open(was)) if *was == digest => {
@@ -169,9 +178,12 @@ impl Store {
                 Seen::Open => {}
             }
         }
-        see_again(&tx, &kept, &unchanged, run, &now)?;
+        for fingerprint in &unchanged {
+            sight(&tx, fingerprint, run, &now)?;
+        }
         summary.resolved = resolve_absent(&tx, run, &now)?;
         summary.deactivated = reconcile_inactive(&tx, run, &now)?;
+        LastRun::write(&tx, &digest, &now)?;
         tx.commit()?;
         Ok(summary)
     }
@@ -192,10 +204,10 @@ impl Store {
 
     /// The findings matching `filter`, by path and first sighting.
     pub fn list(&self, filter: &Filter) -> Result<Vec<FindingRecord>, Error> {
-        let mut stmt = self.conn.prepare(
-            "SELECT * FROM findings WHERE (?1 IS NULL OR decision = ?1) \
-             ORDER BY path, first_seen, fingerprint",
-        )?;
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {FINDING_COLUMNS} WHERE (?1 IS NULL OR f.decision = ?1) \
+             ORDER BY f.path, f.first_seen, f.fingerprint"
+        ))?;
         let standings = standings(&self.conn)?;
         let rows = stmt.query_map(params![filter.decision], |row| {
             finding_record(row, &standings)
@@ -295,7 +307,16 @@ impl Store {
              AND NOT EXISTS (SELECT 1 FROM judgments j WHERE j.fingerprint = findings.fingerprint) \
              {age}"
         );
-        Ok(self.conn.execute(&sql, [])?)
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let deleted = tx.execute(&sql, [])?;
+        tx.execute(
+            "DELETE FROM sightings WHERE fingerprint NOT IN (SELECT fingerprint FROM findings)",
+            [],
+        )?;
+        tx.commit()?;
+        Ok(deleted)
     }
 
     /// Makes the cache hold exactly what the decision log holds, the only source
@@ -506,40 +527,16 @@ fn observation(observed: &Observed, run: &Run) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
-/// Records that the findings a run saw as they were were seen now: when, at
-/// which commit and whether the tree was dirty. The open findings the run did
-/// not see keep their sighting.
-fn see_again(
-    tx: &Transaction,
-    kept: &BTreeMap<String, Kept>,
-    unchanged: &BTreeSet<&str>,
-    run: &Run,
-    now: &str,
-) -> Result<(), Error> {
-    if unchanged.is_empty() {
-        return Ok(());
-    }
-    let unseen: Vec<&str> = kept
-        .iter()
-        .filter(|(fingerprint, was)| {
-            matches!(was, Kept::Open(_)) && !unchanged.contains(fingerprint.as_str())
-        })
-        .map(|(fingerprint, _)| fingerprint.as_str())
-        .collect();
-    tx.execute_batch(
-        "CREATE TEMP TABLE IF NOT EXISTS unseen (fingerprint TEXT PRIMARY KEY); DELETE FROM unseen",
-    )?;
-    let mut put = tx.prepare_cached("INSERT OR IGNORE INTO unseen VALUES (?1)")?;
-    for fingerprint in unseen {
-        put.execute(params![fingerprint])?;
-    }
-    tx.execute(
-        "UPDATE findings SET last_seen = ?1, last_commit = ?2, last_dirty = ?3 \
-         WHERE resolved_at IS NULL AND inactive_at IS NULL \
-           AND observation IS NOT NULL \
-           AND fingerprint NOT IN (SELECT fingerprint FROM unseen)",
-        params![now, run.commit, run.dirty],
-    )?;
+/// Records that a finding was seen now: when, at which commit and whether the
+/// tree was dirty. The open findings the run did not see keep their sighting.
+fn sight(tx: &Transaction, fingerprint: &str, run: &Run, now: &str) -> Result<(), Error> {
+    tx.prepare_cached(
+        "INSERT INTO sightings (fingerprint, last_seen, last_commit, last_dirty) \
+         VALUES (?1, ?2, ?3, ?4) \
+         ON CONFLICT (fingerprint) DO UPDATE SET last_seen = excluded.last_seen, \
+             last_commit = excluded.last_commit, last_dirty = excluded.last_dirty",
+    )?
+    .execute(params![fingerprint, now, run.commit, run.dirty])?;
     Ok(())
 }
 
@@ -560,23 +557,23 @@ fn upsert(
     };
     tx.prepare_cached(
         "INSERT INTO findings (fingerprint, decision, decision_uid, severity, authored_severity, path, locator, symbol, \
-             first_seen, last_seen, last_message, last_evidence, last_facts, last_options, \
-             last_commit, last_dirty, lighthouse_version, catalog_version, meaning_version, \
+             first_seen, last_message, last_evidence, last_facts, last_options, \
+             lighthouse_version, catalog_version, meaning_version, \
              check_revision, model_version, decision_hash, evidence_digest, observation) \
-         VALUES (:fingerprint, :decision, :decision_uid, :severity, :authored, :path, :locator, :symbol, :now, :now, \
-             :message, :evidence, :facts, :options, :commit, :dirty, :version, :catalog, \
+         VALUES (:fingerprint, :decision, :decision_uid, :severity, :authored, :path, :locator, :symbol, :now, \
+             :message, :evidence, :facts, :options, :version, :catalog, \
              :meaning_version, :check_revision, :model_version, :decision_hash, :digest, :observation) \
          ON CONFLICT (fingerprint) DO UPDATE SET \
              decision = excluded.decision, \
              decision_uid = COALESCE(excluded.decision_uid, decision_uid), \
              severity = excluded.severity, \
              authored_severity = excluded.authored_severity, path = excluded.path, locator = excluded.locator, \
-             symbol = excluded.symbol, last_seen = excluded.last_seen, \
+             symbol = excluded.symbol, \
              reopened = reopened + (resolved_at IS NOT NULL), resolved_at = NULL, \
              inactive_at = NULL, last_message = excluded.last_message, \
              last_evidence = excluded.last_evidence, last_facts = excluded.last_facts, \
-             last_options = excluded.last_options, last_commit = excluded.last_commit, \
-             last_dirty = excluded.last_dirty, lighthouse_version = excluded.lighthouse_version, \
+             last_options = excluded.last_options, \
+             lighthouse_version = excluded.lighthouse_version, \
              catalog_version = excluded.catalog_version, meaning_version = excluded.meaning_version, \
              check_revision = excluded.check_revision, model_version = excluded.model_version, \
              decision_hash = excluded.decision_hash, evidence_digest = excluded.evidence_digest, \
@@ -597,8 +594,6 @@ fn upsert(
             ":evidence": observed.evidence.to_string(),
             ":facts": observed.facts.to_string(),
             ":options": observed.options.to_string(),
-            ":commit": run.commit,
-            ":dirty": run.dirty,
             ":version": run.lighthouse_version,
             ":catalog": run.catalog_version,
             ":meaning_version": observed.meaning_version,
@@ -609,6 +604,7 @@ fn upsert(
             ":observation": digest,
         },
     )?;
+    sight(tx, &observed.fingerprint, run, now)?;
     Ok(seen)
 }
 

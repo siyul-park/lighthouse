@@ -15,14 +15,14 @@ fn store_opens_a_cache_and_builds_one_of_another_version_again_from_the_log() {
     assert!(Store::open_existing(dir.path()).unwrap().is_none());
 
     let mut first = Store::open(dir.path()).unwrap();
-    assert_eq!(first.schema_version().unwrap(), 13);
+    assert_eq!(first.schema_version().unwrap(), 14);
     first
         .record(&run(vec![observed("f1", "design/a", "a.go")]))
         .unwrap();
     judge(&mut first, "f1", Judgment::Pass);
     drop(first);
     let again = Store::open_existing(dir.path()).unwrap().unwrap();
-    assert_eq!(again.schema_version().unwrap(), 13);
+    assert_eq!(again.schema_version().unwrap(), 14);
     assert_eq!(again.finding("f1").unwrap().judgment, Some(Judgment::Pass));
     drop(again);
 
@@ -32,7 +32,7 @@ fn store_opens_a_cache_and_builds_one_of_another_version_again_from_the_log() {
             .pragma_update(None, "user_version", version)
             .unwrap();
         let rebuilt = Store::open(dir.path()).unwrap();
-        assert_eq!(rebuilt.schema_version().unwrap(), 13, "from {version}");
+        assert_eq!(rebuilt.schema_version().unwrap(), 14, "from {version}");
         assert!(
             matches!(rebuilt.finding("f1"), Err(Error::UnknownFinding(_))),
             "the sightings of a cache of another version are gone"
@@ -74,7 +74,7 @@ fn processes_opening_a_fresh_cache_together_all_succeed() {
         })
         .collect();
     for handle in handles {
-        assert_eq!(handle.join().unwrap(), 13);
+        assert_eq!(handle.join().unwrap(), 14);
     }
 }
 
@@ -128,7 +128,7 @@ fn a_cache_with_tables_and_no_version_is_built_again_from_the_log() {
 
     let rebuilt = Store::open(dir.path()).unwrap();
 
-    assert_eq!(rebuilt.schema_version().unwrap(), 13);
+    assert_eq!(rebuilt.schema_version().unwrap(), 14);
     assert_eq!(rebuilt.history("f1").unwrap().len(), 1, "from the log");
     assert!(rebuilt.list(&all()).unwrap().is_empty());
 }
