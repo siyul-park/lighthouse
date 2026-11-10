@@ -9,7 +9,7 @@ use lighthouse_engine::{
 };
 use lighthouse_model::{AgentKind, Attribution, Severity};
 use lighthouse_plugin::FixDecision;
-use lighthouse_report::{Aim, FixInfo};
+use lighthouse_report::{Aim, Detail, FixInfo};
 use lighthouse_spec::{Catalog, Decision, FixKind, FixScope};
 use lighthouse_store::{Filter, State, Store, Versions};
 use schemars::JsonSchema;
@@ -18,8 +18,11 @@ use serde_json::Value;
 
 use crate::{
     Fixing, Result, Selector, Session, git::user_name, project::catalog_at, selector::long_enough,
+    why,
 };
 
+pub use crate::why::{Hiding, Precedent, Precedents};
+pub use lighthouse_spec::{Stage, Step};
 pub use lighthouse_store::{
     FindingRecord, JudgmentEvent, NewJudgment, Standing, StatusFilter, SuppressionEvent,
 };
@@ -77,6 +80,19 @@ pub struct Shown {
     /// absent when the decision has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fix: Option<FixInfo>,
+    /// How the severity of the finding was reached, layer by layer: the
+    /// decision's own, then what each project layer that set the level of its
+    /// rule here said; the last is the effective one. At full detail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precedence: Option<Vec<Step>>,
+    /// The judgment that hides the finding or does not, and why. A finding an
+    /// in-source directive hides is not remembered, so none is told here. At
+    /// full detail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suppressions: Option<Vec<Hiding>>,
+    /// The judgments on the other findings of its decision. At full detail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precedents: Option<Precedents>,
 }
 
 /// Who a record is attributed to (PROV `wasAttributedTo`): `spec` is
@@ -145,29 +161,22 @@ pub fn show(root: &Path, fingerprint: &str) -> Result<FindingRecord> {
 
 /// The finding whose fingerprint starts with `fingerprint`, with how its fix
 /// runs and its brief when `session` (the project, if it can be read) knows
-/// its decision.
-pub fn show_with_brief(root: &Path, session: Option<&Session>, fingerprint: &str) -> Result<Shown> {
+/// its decision; at [`Detail::Full`], also why it is as it is.
+pub fn show_with_brief(
+    root: &Path,
+    session: Option<&Session>,
+    fingerprint: &str,
+    detail: Detail,
+) -> Result<Shown> {
     let finding = show(root, fingerprint)?;
-    let Some((session, decision)) =
-        session.and_then(|s| Some((s, s.catalog.decision(&finding.decision)?)))
-    else {
-        return Ok(Shown {
-            finding,
-            brief: None,
-            fix: None,
-        });
-    };
-    let fingerprints = [finding.fingerprint.as_str()];
-    let described = Fixing::of(session)?.describe(decision, Aim::Findings(&fingerprints));
-    let brief = match &described {
-        Some(descriptor) if descriptor.brief => Some(brief_of(session, decision, &finding)?),
-        _ => None,
-    };
-    Ok(Shown {
-        finding,
-        brief,
-        fix: described.and_then(|descriptor| descriptor.fix),
-    })
+    let mut shown = fixed(session, finding)?;
+    if detail == Detail::Full {
+        let store = existing_store(root)?;
+        shown.precedence = Some(why::precedence(session, &shown.finding)?);
+        shown.suppressions = Some(why::hiding(&store, &shown.finding)?);
+        shown.precedents = Some(why::precedents(&store, &shown.finding)?);
+    }
+    Ok(shown)
 }
 
 /// Every judgment recorded on a finding, oldest first.
@@ -213,6 +222,36 @@ pub fn resolve_all(root: &Path, reviews: &[NewJudgment]) -> Result<Vec<Result<Re
         .iter()
         .map(|review| record(&mut store, review))
         .collect())
+}
+
+/// `finding` with how its fix runs and its brief.
+fn fixed(session: Option<&Session>, finding: FindingRecord) -> Result<Shown> {
+    let Some((session, decision)) =
+        session.and_then(|s| Some((s, s.catalog.decision(&finding.decision)?)))
+    else {
+        return Ok(Shown {
+            finding,
+            brief: None,
+            fix: None,
+            precedence: None,
+            suppressions: None,
+            precedents: None,
+        });
+    };
+    let fingerprints = [finding.fingerprint.as_str()];
+    let described = Fixing::of(session)?.describe(decision, Aim::Findings(&fingerprints));
+    let brief = match &described {
+        Some(descriptor) if descriptor.brief => Some(brief_of(session, decision, &finding)?),
+        _ => None,
+    };
+    Ok(Shown {
+        finding,
+        brief,
+        fix: described.and_then(|descriptor| descriptor.fix),
+        precedence: None,
+        suppressions: None,
+        precedents: None,
+    })
 }
 
 /// The brief for fixing `finding` by `decision`.

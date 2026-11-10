@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 use lighthouse_model::{Format, Metadata, Resource, Safety, Severity};
 use lighthouse_spec::{
     Config, Error, Level, PluginRef, ProjectSpec, Projects, RuleConfig, RuleSetting, Rules, Stage,
-    Trace, glob_set,
+    Step, Trace, glob_set,
 };
 use serde_json::json;
 
@@ -726,6 +726,41 @@ fn trace() {
         "text",
     );
     assert_eq!(got, [at(0, "files a/**", Level::Off)]);
+}
+
+#[test]
+fn step() {
+    let plain = Step {
+        stage: Stage::Project,
+        source: "lighthouse.toml".to_owned(),
+        matched: None,
+        level: Level::Warn,
+    };
+    assert_eq!(plain.to_string(), "project warn (lighthouse.toml)");
+    let matched = Step {
+        stage: Stage::Override,
+        matched: Some("overrides[0]: files src/**".to_owned()),
+        level: Level::Off,
+        ..plain
+    };
+    assert_eq!(
+        matched.to_string(),
+        "override off (lighthouse.toml, overrides[0]: files src/**)"
+    );
+}
+
+#[test]
+fn stage() {
+    let words: Vec<String> = [
+        Stage::Authored,
+        Stage::Extends,
+        Stage::Project,
+        Stage::Override,
+    ]
+    .iter()
+    .map(Stage::to_string)
+    .collect();
+    assert_eq!(words, ["authored", "extends", "project", "override"]);
 }
 
 #[test]

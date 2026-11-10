@@ -178,7 +178,7 @@ pub fn apply_judgments(
 }
 
 /// Why a judged finding is reported anyway; `None` when nothing needs saying.
-fn note(ruling: &Ruling) -> Option<String> {
+pub(crate) fn note(ruling: &Ruling) -> Option<String> {
     match ruling.standing {
         Standing::Suppressed | Standing::Judged => None,
         Standing::RuleChanged => Some("judgment expired: decision changed".to_owned()),

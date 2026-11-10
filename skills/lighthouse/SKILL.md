@@ -51,7 +51,9 @@ judged is remembered with its reason and is not raised again.
    (the `seen` evidence of a review task) so a judgment is refused if the
    finding changed under you. A fingerprint prefix as shown names the finding;
    an ambiguous or shorter than 7 characters one is refused. `review_show`
-   reads one finding in full.
+   reads one finding in full; with `detail: "full"` it also says why it is as
+   it is: the layers its severity went through, the judgment that hides it or
+   not, and the judgments on other findings of its decision.
 
 ## Rules of conduct
 

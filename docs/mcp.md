@@ -215,12 +215,15 @@ Result: [ReviewList](../schema/review-list.schema.json).
 
 ## review_show
 
-Show one finding: where it is, its evidence and its latest review
+Show one finding: where it is, its evidence and its latest review.
+
+With --detail full, also why it is as it is: how its severity was reached layer by layer (the decision's own, the projects it extends, the project's `rules`, the `[[overrides]]` that matched), the judgment that hides it or does not, and the judgments on other findings of its decision. A finding that an in-source directive hides is not remembered and is not shown.
 
 Result: [Finding](../schema/finding.schema.json).
 
 | Argument | Type | Default | Description |
 | --- | --- | --- | --- |
+| `detail` | compact \| full | `"compact"` | Compact is the finding with its fix and brief; full adds `precedence` (how its severity was reached, layer by layer), `suppressions` (the judgment that hides it or does not, and why) and `precedents` (the judgments on other findings of its decision). |
 | `fingerprint` (required) | string |  | A fingerprint, or the start of one (at least 7 characters). |
 
 ## review_resolve

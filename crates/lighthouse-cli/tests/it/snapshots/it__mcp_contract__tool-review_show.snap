@@ -9,11 +9,27 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": true
   },
-  "description": "Show one finding: where it is, its evidence and its latest review",
+  "description": "Show one finding: where it is, its evidence and its latest review.\n\nWith --detail full, also why it is as it is: how its severity was reached layer by layer (the decision's own, the projects it extends, the project's `rules`, the `[[overrides]]` that matched), the judgment that hides it or does not, and the judgments on other findings of its decision. A finding that an in-source directive hides is not remembered and is not shown.",
   "inputSchema": {
     "additionalProperties": false,
-    "description": "`review show` and `review history`.",
+    "description": "`review show`.",
     "properties": {
+      "detail": {
+        "default": "compact",
+        "description": "Compact is the finding with its fix and brief; full adds `precedence`\n(how its severity was reached, layer by layer), `suppressions` (the\njudgment that hides it or does not, and why) and `precedents` (the\njudgments on other findings of its decision).",
+        "oneOf": [
+          {
+            "const": "compact",
+            "description": "Grouped by decision, a decision's text said once.",
+            "type": "string"
+          },
+          {
+            "const": "full",
+            "description": "One self-contained record per item.",
+            "type": "string"
+          }
+        ]
+      },
       "fingerprint": {
         "description": "A fingerprint, or the start of one (at least 7 characters).",
         "type": "string"
@@ -290,6 +306,150 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
         "description": "The artifact, project-relative with `/` separators.",
         "type": "string"
       },
+      "precedence": {
+        "description": "How the severity of the finding was reached, layer by layer: the\ndecision's own, then what each project layer that set the level of its\nrule here said; the last is the effective one. At full detail.",
+        "items": {
+          "description": "One layer that set a rule's level.",
+          "properties": {
+            "level": {
+              "description": "A level a project can set: a severity, or `off`, which only\nconfiguration has.",
+              "enum": [
+                "error",
+                "warn",
+                "info",
+                "off"
+              ],
+              "type": "string"
+            },
+            "matched": {
+              "description": "For an override, which one and what it selects: `overrides[1]: files\ninternal/**`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "description": "The file the project was read from, or its name when it is shared.",
+              "type": "string"
+            },
+            "stage": {
+              "description": "Where a layer of a project's rules comes from.",
+              "oneOf": [
+                {
+                  "const": "authored",
+                  "description": "The severity the decision itself authors: the first layer of a\nfinding's precedence, before any project says otherwise.",
+                  "type": "string"
+                },
+                {
+                  "const": "extends",
+                  "description": "A project the resolved one extends (a pack's `recommended`, a shared\nproject).",
+                  "type": "string"
+                },
+                {
+                  "const": "project",
+                  "description": "The `rules` of the resolved project.",
+                  "type": "string"
+                },
+                {
+                  "const": "override",
+                  "description": "An `[[overrides]]` entry the file matched.",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "stage",
+            "source",
+            "level"
+          ],
+          "type": "object"
+        },
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "precedents": {
+        "description": "The judgments on the other findings of its decision. At full detail.",
+        "properties": {
+          "fail": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "notApplicable": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "pass": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "recent": {
+            "description": "The most recent that gave a reason, newest first.",
+            "items": {
+              "description": "A judgment on another finding of the decision.",
+              "properties": {
+                "at": {
+                  "type": "string"
+                },
+                "fingerprint": {
+                  "description": "The first characters of the finding's fingerprint.",
+                  "type": "string"
+                },
+                "judgment": {
+                  "description": "A recorded label on one subject, as SARIF's `result.kind` says it: not\nground truth. `pass` and `fail` label the check's conformance part;\n`notApplicable` labels its applicability part (the decision should not\napply here).",
+                  "oneOf": [
+                    {
+                      "const": "pass",
+                      "description": "The subject conforms: a finding about it was a false positive.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "fail",
+                      "description": "The subject violates the decision: a finding about it is right.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "notApplicable",
+                      "description": "The decision does not apply to the subject.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "path": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fingerprint",
+                "path",
+                "judgment",
+                "reason",
+                "at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "pass",
+          "fail",
+          "notApplicable",
+          "recent"
+        ],
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "reopened": {
         "description": "How many times it came back after being resolved.",
         "format": "uint32",
@@ -370,6 +530,148 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
           "suppressed"
         ],
         "type": "string"
+      },
+      "suppressions": {
+        "description": "The judgment that hides the finding or does not, and why. A finding an\nin-source directive hides is not remembered, so none is told here. At\nfull detail.",
+        "items": {
+          "description": "The latest judgment on a finding, and what it does to the finding now.",
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "by": {
+              "description": "`prov:wasAttributedTo`: who a record is attributed to, with the role the\nagent had (`prov:hadRole`).",
+              "properties": {
+                "hadRole": {
+                  "anyOf": [
+                    {
+                      "description": "The role a software agent had in a record, PROV's `hadRole`.",
+                      "oneOf": [
+                        {
+                          "const": "agent",
+                          "description": "A coding agent that reviewed the finding.",
+                          "type": "string"
+                        },
+                        {
+                          "const": "model",
+                          "description": "A model that classified the subject.",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "description": "What kind of agent a record is attributed to, a W3C PROV class.",
+                  "oneOf": [
+                    {
+                      "const": "Person",
+                      "description": "A human.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "SoftwareAgent",
+                      "description": "A program, such as a coding agent or a model.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            "judgment": {
+              "description": "A recorded label on one subject, as SARIF's `result.kind` says it: not\nground truth. `pass` and `fail` label the check's conformance part;\n`notApplicable` labels its applicability part (the decision should not\napply here).",
+              "oneOf": [
+                {
+                  "const": "pass",
+                  "description": "The subject conforms: a finding about it was a false positive.",
+                  "type": "string"
+                },
+                {
+                  "const": "fail",
+                  "description": "The subject violates the decision: a finding about it is right.",
+                  "type": "string"
+                },
+                {
+                  "const": "notApplicable",
+                  "description": "The decision does not apply to the subject.",
+                  "type": "string"
+                }
+              ]
+            },
+            "note": {
+              "description": "Why the judgment hides the finding or does not.",
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "standing": {
+              "description": "What the latest judgment does to a finding now.",
+              "oneOf": [
+                {
+                  "const": "suppressed",
+                  "description": "The finding stays out of reports.",
+                  "type": "string"
+                },
+                {
+                  "const": "judged",
+                  "description": "The finding is judged and stays in the report (`fail` with no\nsuppression).",
+                  "type": "string"
+                },
+                {
+                  "const": "rule-changed",
+                  "description": "The decision's meaning changed since the judgment: ask again.",
+                  "type": "string"
+                },
+                {
+                  "const": "evidence-changed",
+                  "description": "The finding's evidence changed since the judgment: ask again.",
+                  "type": "string"
+                },
+                {
+                  "const": "unsuppressible",
+                  "description": "Errors are definitive: no judgment hides them, whatever level they\nare configured at.",
+                  "type": "string"
+                }
+              ]
+            },
+            "suppression": {
+              "description": "The justification of the `external` suppression that goes with a `fail`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "judgment",
+            "by",
+            "at",
+            "standing",
+            "note"
+          ],
+          "type": "object"
+        },
+        "type": [
+          "array",
+          "null"
+        ]
       },
       "symbol": {
         "type": [

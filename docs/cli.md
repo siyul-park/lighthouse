@@ -539,7 +539,9 @@ Options:
 ## `lighthouse review show`
 
 ```text
-Show one finding: where it is, its evidence and its latest review
+Show one finding: where it is, its evidence and its latest review.
+
+With --detail full, also why it is as it is: how its severity was reached layer by layer (the decision's own, the projects it extends, the project's `rules`, the `[[overrides]]` that matched), the judgment that hides it or does not, and the judgments on other findings of its decision. A finding that an in-source directive hides is not remembered and is not shown.
 
 Usage: lighthouse review show [OPTIONS] <FP>
 
@@ -548,6 +550,15 @@ Arguments:
           A fingerprint, or the start of one (at least 7 characters)
 
 Options:
+      --detail <DETAIL>
+          Compact is the finding with its fix and brief; full adds `precedence` (how its severity was reached, layer by layer), `suppressions` (the judgment that hides it or does not, and why) and `precedents` (the judgments on other findings of its decision)
+
+          Possible values:
+          - compact: Grouped by decision, a decision's text said once
+          - full:    One self-contained record per item
+          
+          [default: compact]
+
       --format <FORMAT>
           `text` for people, `json` for programs (its schema: `lighthouse schema`)
 

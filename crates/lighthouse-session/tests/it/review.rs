@@ -2,12 +2,14 @@
 
 use std::path::Path;
 
+use lighthouse_report::Detail;
 use lighthouse_session::{
     AgentKind, Attribution, CheckRequest, Judgment, Session,
-    review::{self, NewJudgment, Query, StatusFilter},
+    review::{self, NewJudgment, Query, Stage, Standing, StatusFilter},
 };
+use lighthouse_spec::Level;
 
-use crate::fixture::{LONG, project, repo, session, trusted, write};
+use crate::fixture::{LONG, project, project_with, repo, session, trusted, write};
 
 fn remember(session: &Session) -> Vec<String> {
     let checked = lighthouse_session::check(
@@ -163,7 +165,9 @@ fn show_with_brief() {
     // The fix does not run in a project the user has not trusted: the finding
     // comes with the brief for fixing it by hand.
     let untrusted = session(dir.path());
-    let shown = review::show_with_brief(dir.path(), Some(&untrusted), &fingerprint).unwrap();
+    let shown =
+        review::show_with_brief(dir.path(), Some(&untrusted), &fingerprint, Detail::Compact)
+            .unwrap();
     assert_eq!(shown.finding.fingerprint, fingerprint);
     assert!(
         shown
@@ -175,11 +179,12 @@ fn show_with_brief() {
 
     // A fix that is `unsafe` also asks for a brief; without a session there
     // is neither.
-    let bare = review::show_with_brief(dir.path(), None, &fingerprint).unwrap();
+    let bare = review::show_with_brief(dir.path(), None, &fingerprint, Detail::Compact).unwrap();
     assert!(bare.brief.is_none() && bare.fix.is_none());
 
     let trusted = trusted(dir.path());
-    let shown = review::show_with_brief(dir.path(), Some(&trusted), &fingerprint).unwrap();
+    let shown =
+        review::show_with_brief(dir.path(), Some(&trusted), &fingerprint, Detail::Compact).unwrap();
     assert!(shown.fix.is_some_and(|fix| fix.runs));
 }
 
@@ -268,4 +273,150 @@ fn resolve_all() {
     );
     assert!(done[2].is_ok());
     assert_eq!(waiting(dir.path()), 0, "both judged findings stand");
+}
+
+/// Shows the finding in full, as `review show --detail full` does.
+fn in_full(dir: &Path, fingerprint: &str) -> review::Shown {
+    review::show_with_brief(dir, Some(&session(dir)), fingerprint, Detail::Full).unwrap()
+}
+
+#[test]
+fn compact_detail_tells_nothing_of_why() {
+    let dir = project("warn");
+    let fingerprint = remember(&session(dir.path())).remove(0);
+    let shown = review::show_with_brief(
+        dir.path(),
+        Some(&session(dir.path())),
+        &fingerprint,
+        Detail::Compact,
+    )
+    .unwrap();
+    assert!(
+        shown.precedence.is_none() && shown.suppressions.is_none() && shown.precedents.is_none()
+    );
+}
+
+#[test]
+fn precedence_names_each_layer_that_set_the_level() {
+    let dir = project_with(
+        "info",
+        "[[overrides]]\nfiles = [\"a.*\"]\nrules = { \"local/short\" = \"warn\" }\n",
+    );
+    let fingerprint = remember(&session(dir.path())).remove(0);
+    let shown = in_full(dir.path(), &fingerprint);
+    assert_eq!(shown.finding.severity.to_string(), "warn");
+
+    let steps = shown.precedence.unwrap();
+    let layers: Vec<_> = steps
+        .iter()
+        .map(|s| (s.stage.clone(), s.level, s.matched.as_deref()))
+        .collect();
+    assert_eq!(
+        layers,
+        [
+            (Stage::Authored, Level::Info, None),
+            (Stage::Project, Level::Info, None),
+            (
+                Stage::Override,
+                Level::Warn,
+                Some("overrides[0]: files a.*")
+            ),
+        ]
+    );
+    assert_eq!(steps[0].source, "local/short");
+    assert!(steps[1].source.ends_with("lighthouse.toml"));
+    assert_eq!(steps[1].source, steps[2].source);
+}
+
+#[test]
+fn an_override_that_does_not_match_leaves_no_layer() {
+    let dir = project_with(
+        "warn",
+        "[[overrides]]\nfiles = [\"docs/**\"]\nrules = { \"local/short\" = \"error\" }\n",
+    );
+    let fingerprint = remember(&session(dir.path())).remove(0);
+    let steps = in_full(dir.path(), &fingerprint).precedence.unwrap();
+    let stages: Vec<_> = steps.iter().map(|s| s.stage.clone()).collect();
+    assert_eq!(stages, [Stage::Authored, Stage::Project]);
+}
+
+#[test]
+fn a_judgment_that_hides_the_finding_is_told_with_who_and_why() {
+    let dir = project("warn");
+    let fingerprint = remember(&session(dir.path())).remove(0);
+    let alone = in_full(dir.path(), &fingerprint);
+    assert_eq!(alone.suppressions.unwrap(), []);
+
+    review::resolve(dir.path(), &judgment(&fingerprint, Judgment::Pass)).unwrap();
+    let shown = in_full(dir.path(), &fingerprint);
+    let hidden = &shown.suppressions.unwrap()[0];
+    assert_eq!(hidden.judgment, Judgment::Pass);
+    assert_eq!(hidden.by, kim());
+    assert_eq!(hidden.reason.as_deref(), Some("checked by hand"));
+    assert_eq!(hidden.standing, Standing::Suppressed);
+    assert!(hidden.note.starts_with("hidden"), "{}", hidden.note);
+
+    let mut kept = judgment(&fingerprint, Judgment::Fail);
+    kept.suppress = Some("on purpose".to_owned());
+    review::resolve(dir.path(), &kept).unwrap();
+    let hidden = &in_full(dir.path(), &fingerprint).suppressions.unwrap()[0];
+    assert_eq!(hidden.suppression.as_deref(), Some("on purpose"));
+    assert_eq!(hidden.standing, Standing::Suppressed);
+
+    // A `fail` that suppresses nothing hides nothing, and says so.
+    review::resolve(dir.path(), &judgment(&fingerprint, Judgment::Fail)).unwrap();
+    let hidden = &in_full(dir.path(), &fingerprint).suppressions.unwrap()[0];
+    assert_eq!(hidden.standing, Standing::Judged);
+    assert!(hidden.note.starts_with("reported"), "{}", hidden.note);
+}
+
+#[test]
+fn an_error_is_never_hidden_and_the_judgment_says_why() {
+    let dir = project("error");
+    let fingerprint = remember(&session(dir.path())).remove(0);
+    review::resolve(dir.path(), &judgment(&fingerprint, Judgment::Pass)).unwrap();
+    let hidden = &in_full(dir.path(), &fingerprint).suppressions.unwrap()[0];
+    assert_eq!(hidden.standing, Standing::Unsuppressible);
+    assert!(hidden.note.contains("definitive"), "{}", hidden.note);
+}
+
+#[test]
+fn a_resolved_finding_still_tells_its_precedence() {
+    let dir = project("warn");
+    let fingerprint = remember(&session(dir.path())).remove(0);
+    write(dir.path(), "a.txt", "a\n");
+    remember(&session(dir.path()));
+    let shown = in_full(dir.path(), &fingerprint);
+    assert_eq!(shown.finding.state.to_string(), "resolved");
+    assert_eq!(shown.precedence.unwrap().len(), 2);
+}
+
+#[test]
+fn precedents_count_the_judgments_on_other_findings_of_the_decision() {
+    let dir = project("warn");
+    write(dir.path(), "b.txt", LONG);
+    write(dir.path(), "c.txt", LONG);
+    let found = remember(&session(dir.path()));
+    assert_eq!(found.len(), 3);
+    let mut said = judgment(&found[0], Judgment::Pass);
+    said.reason = Some("generated file".to_owned());
+    review::resolve(dir.path(), &said).unwrap();
+    review::resolve(dir.path(), &judgment(&found[1], Judgment::Fail)).unwrap();
+
+    let precedents = in_full(dir.path(), &found[2]).precedents.unwrap();
+    assert_eq!(
+        (precedents.pass, precedents.fail, precedents.not_applicable),
+        (1, 1, 0)
+    );
+    let reasons: Vec<_> = precedents
+        .recent
+        .iter()
+        .map(|p| p.reason.as_str())
+        .collect();
+    assert!(reasons.contains(&"generated file"), "{reasons:?}");
+    assert!(precedents.recent.iter().all(|p| p.fingerprint.len() == 7));
+
+    // The finding itself is no precedent for itself.
+    let own = in_full(dir.path(), &found[0]).precedents.unwrap();
+    assert_eq!((own.pass, own.fail), (0, 1));
 }

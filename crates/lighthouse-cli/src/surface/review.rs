@@ -7,7 +7,7 @@ use lighthouse_model::Fingerprint;
 use lighthouse_report::{Entry, GroupOptions, Grouped, Groups};
 use lighthouse_session::{
     Fixing, catalog_at,
-    review::{self, FindingRecord, JudgmentEvent, Query, Recorded, Shown, Standing},
+    review::{self, FindingRecord, JudgmentEvent, Query, Recorded, Shown, Standing, Step},
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -15,7 +15,7 @@ use serde_json::{Map, json};
 
 use crate::surface::{
     Result,
-    args::{Detail, FingerprintArgs, ReviewListArgs, ReviewResolveArgs},
+    args::{Detail, FingerprintArgs, ReviewListArgs, ReviewResolveArgs, ReviewShowArgs},
     list::{omitted_line, page},
     reply::{Context, Format, Reply},
 };
@@ -138,9 +138,14 @@ pub fn list(ctx: &Context, args: &ReviewListArgs, format: Format) -> Result<Repl
 }
 
 /// `review show`.
-pub fn show(ctx: &Context, args: &FingerprintArgs, format: Format) -> Result<Reply> {
+pub fn show(ctx: &Context, args: &ReviewShowArgs, format: Format) -> Result<Reply> {
     let session = ctx.session()?;
-    let shown = review::show_with_brief(&ctx.root()?, Some(&session), &args.fingerprint)?;
+    let shown = review::show_with_brief(
+        &ctx.root()?,
+        Some(&session),
+        &args.finding.fingerprint,
+        args.detail.into(),
+    )?;
     Reply::data(format, &shown, || detail(&shown))
 }
 
@@ -321,10 +326,51 @@ fn detail(shown: &Shown) -> String {
     if finding.judgment.is_some() {
         field("judgment:", review_text(finding));
     }
+    why_text(shown, &mut field);
     if let Some(brief) = &shown.brief {
         let _ = write!(out, "\nbrief:\n{brief}");
     }
     out
+}
+
+/// The lines of a finding shown in full that say why it is as it is.
+fn why_text(shown: &Shown, field: &mut impl FnMut(&str, String)) {
+    if let Some(steps) = &shown.precedence {
+        let chain: Vec<String> = steps.iter().map(Step::to_string).collect();
+        field("precedence:", chain.join(" -> "));
+    }
+    for hiding in shown.suppressions.iter().flatten() {
+        let who = hiding.by.id.as_deref().unwrap_or("-");
+        let said = hiding.reason.as_deref().unwrap_or("-");
+        let kept = hiding.suppression.as_deref().unwrap_or("-");
+        field(
+            "judged:",
+            format!(
+                "{} by {who} at {}: {said} (suppression: {kept})",
+                hiding.judgment, hiding.at
+            ),
+        );
+        field(
+            "standing:",
+            format!("{}: {}", hiding.standing.as_str(), hiding.note),
+        );
+    }
+    if let Some(p) = &shown.precedents {
+        let counts = format!(
+            "{} pass, {} fail, {} notApplicable",
+            p.pass, p.fail, p.not_applicable
+        );
+        field(
+            "precedents:",
+            format!("{counts} on other findings of {}", shown.finding.decision),
+        );
+        for r in &p.recent {
+            field(
+                "",
+                format!("{} {} {}: {}", r.fingerprint, r.judgment, r.path, r.reason),
+            );
+        }
+    }
 }
 
 fn event_row(event: &JudgmentEvent, id: &str) -> String {

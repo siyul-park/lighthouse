@@ -12,7 +12,7 @@ use crate::surface::{
         CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
         DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs, FixOptions,
         ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelRebuildArgs, ModelTrainArgs,
-        ReviewListArgs, ReviewResolveArgs, SignalDismissArgs,
+        ReviewListArgs, ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
     },
     check, config, decision, model,
     reply::{CheckFormat, Context, FormatArg, Reply},
@@ -258,9 +258,16 @@ pub enum ReviewCommand {
         output: FormatArg,
     },
     /// Show one finding: where it is, its evidence and its latest review.
+    ///
+    /// With --detail full, also why it is as it is: how its severity was
+    /// reached layer by layer (the decision's own, the projects it extends,
+    /// the project's `rules`, the `[[overrides]]` that matched), the judgment
+    /// that hides it or does not, and the judgments on other findings of its
+    /// decision. A finding that an in-source directive hides is not remembered
+    /// and is not shown.
     Show {
         #[command(flatten)]
-        args: FingerprintArgs,
+        args: ReviewShowArgs,
         #[command(flatten)]
         output: FormatArg,
     },

@@ -24,7 +24,7 @@ use crate::surface::{
         CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
         DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs, FixArgs,
         ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelTrainArgs, ReviewListArgs,
-        ReviewResolveArgs, SignalDismissArgs,
+        ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
     },
     check,
     commands::{self, CheckCommand},
@@ -129,7 +129,7 @@ pub const TOOLS: [Tool; 19] = [
         Hints::READ,
         |ctx, args| review::list(ctx, &parse(args)?, Format::Json),
     ),
-    Tool::new::<FingerprintArgs, Shown>(
+    Tool::new::<ReviewShowArgs, Shown>(
         "review_show",
         &["review", "show"],
         "Finding",

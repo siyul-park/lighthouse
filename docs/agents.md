@@ -63,7 +63,7 @@ output as `structuredContent` (validated by the tool's `outputSchema`, the schem
 | `decision_test` | `decision test` | `TestReport` |
 | `decision_eval` | `decision eval` | `EvalReport` |
 | `review_list` | `review list` | `ReviewList` |
-| `review_show` | `review show` | `Finding`: one finding in full |
+| `review_show` | `review show` | `Finding`: one finding in full; `detail: "full"` adds why it is as it is: `precedence` (the layers its severity went through), `suppressions` (the judgment that hides it or not) and `precedents` (judgments on other findings of its decision) |
 | `review_resolve` | `review resolve` | `ResolveReport` |
 | `review_history` | `review history` | `JudgmentHistory` |
 | `model_list`, `model_train` | `model list`, `model train` | `ModelList`, `TrainReport` |

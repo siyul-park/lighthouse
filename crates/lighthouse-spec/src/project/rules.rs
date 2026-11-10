@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
 use lighthouse_model::{Options, Safety, Severity};
 use schemars::JsonSchema;
@@ -65,6 +65,9 @@ pub struct Step {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Stage {
+    /// The severity the decision itself authors: the first layer of a
+    /// finding's precedence, before any project says otherwise.
+    Authored,
     /// A project the resolved one extends (a pack's `recommended`, a shared
     /// project).
     Extends,
@@ -167,6 +170,28 @@ pub struct RuleDetail {
     pub evaluation: Option<Evaluation>,
 }
 
+impl fmt::Display for Stage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Authored => "authored",
+            Self::Extends => "extends",
+            Self::Project => "project",
+            Self::Override => "override",
+        })
+    }
+}
+
+impl fmt::Display for Step {
+    /// `override error (lighthouse.toml, overrides[0]: files src/**)`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {} ({}", self.stage, self.level, self.source)?;
+        if let Some(matched) = &self.matched {
+            write!(f, ", {matched}")?;
+        }
+        f.write_str(")")
+    }
+}
+
 /// A level a project can set: a severity, or `off`, which only
 /// configuration has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -197,6 +222,17 @@ impl From<Option<Severity>> for Level {
             Some(Severity::Info) => Self::Info,
             None => Self::Off,
         }
+    }
+}
+
+impl fmt::Display for Level {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Error => "error",
+            Self::Warn => "warn",
+            Self::Info => "info",
+            Self::Off => "off",
+        })
     }
 }
 

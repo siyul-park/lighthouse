@@ -453,6 +453,22 @@ pub struct FingerprintArgs {
     pub fingerprint: String,
 }
 
+/// `review show`.
+#[derive(Debug, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewShowArgs {
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub finding: FingerprintArgs,
+    /// Compact is the finding with its fix and brief; full adds `precedence`
+    /// (how its severity was reached, layer by layer), `suppressions` (the
+    /// judgment that hides it or does not, and why) and `precedents` (the
+    /// judgments on other findings of its decision).
+    #[arg(long, value_enum, default_value_t)]
+    #[serde(default)]
+    pub detail: Detail,
+}
+
 /// A judgment, spelled as SARIF and the rule pipeline spell it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, JsonSchema)]
 pub enum JudgmentArg {

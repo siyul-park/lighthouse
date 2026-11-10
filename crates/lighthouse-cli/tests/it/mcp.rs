@@ -399,6 +399,33 @@ fn a_judgment_recorded_through_mcp_is_attributed_to_the_agent_and_later_checks_h
     assert_eq!(done["recorded"]["fingerprint"], fingerprint);
     assert_eq!(done["standing"], "suppressed");
 
+    let why = client
+        .tool(
+            "review_show",
+            json!({ "fingerprint": prefix, "detail": "full" }),
+        )
+        .unwrap();
+    let steps = why["precedence"].as_array().unwrap();
+    assert_eq!(steps[0]["stage"], "authored");
+    let last = steps.last().unwrap();
+    assert_eq!(last["stage"], "extends");
+    assert!(
+        last["source"].as_str().unwrap().starts_with("design/"),
+        "{last}"
+    );
+    assert_eq!(last["level"], why["severity"]);
+    assert_eq!(why["suppressions"][0]["judgment"], "fail");
+    assert_eq!(
+        why["suppressions"][0]["suppression"],
+        "intentional-exception"
+    );
+    assert_eq!(why["suppressions"][0]["standing"], "suppressed");
+    assert_eq!(why["precedents"]["fail"], 0);
+    let plain = client
+        .tool("review_show", json!({ "fingerprint": prefix }))
+        .unwrap();
+    assert!(plain.get("precedence").is_none() && plain.get("precedents").is_none());
+
     let history = client
         .tool("review_history", json!({ "fingerprint": prefix }))
         .unwrap();

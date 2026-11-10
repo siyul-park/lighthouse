@@ -10,6 +10,8 @@ use tempfile::TempDir;
 use crate::checks::{home, trust};
 
 pub(crate) const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
+/// A type with more public methods than a type may have.
+const CROWDED: &str = "pub struct Big {\n    n: u8,\n}\nimpl Big {\n    pub fn a(&self) -> u8 {\n        self.n\n    }\n    pub fn b(&self) -> u8 {\n        self.n\n    }\n    pub fn c(&self) -> u8 {\n        self.n\n    }\n    pub fn d(&self) -> u8 {\n        self.n\n    }\n    pub fn e(&self) -> u8 {\n        self.n\n    }\n    pub fn f(&self) -> u8 {\n        self.n\n    }\n    pub fn g(&self) -> u8 {\n        self.n\n    }\n    pub fn h(&self) -> u8 {\n        self.n\n    }\n    pub fn i(&self) -> u8 {\n        self.n\n    }\n    pub fn j(&self) -> u8 {\n        self.n\n    }\n    pub fn k(&self) -> u8 {\n        self.n\n    }\n}\n";
 const LONG_NAME: &str = "/// Runs.\npub fn run_the_whole_thing_now() {}\n";
 const DOCUMENTED: &str = "/// Runs.\npub fn run(x: u8) -> u8 {\n    x + 1\n}\n";
 
@@ -789,4 +791,67 @@ fn source_annotations_allow_findings_and_are_counted() {
     write(&dir, "src/lib.rs", stale);
     let text = stdout(lighthouse(dir.path()).arg("check"));
     assert!(text.contains("warn core/no-unused-allow"), "{text}");
+}
+
+#[test]
+fn show_in_full_tells_how_the_severity_was_reached_and_compact_does_not() {
+    let dir = rust_project(&[("src/lib.rs", HELPER)]);
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&dir, "design/no-panic");
+
+    let compact = shown(&dir, &fingerprint);
+    assert!(compact.get("precedence").is_none() && compact.get("precedents").is_none());
+
+    let args = ["review", "show", &fingerprint, "--detail", "full"];
+    let record = records(&stdout(
+        lighthouse(dir.path()).args(args).args(["--format", "json"]),
+    ))
+    .remove(0);
+    let steps = record["precedence"].as_array().unwrap();
+    assert_eq!(steps[0]["stage"], "authored");
+    let last = steps.last().unwrap();
+    assert_eq!(
+        (last["stage"].as_str(), last["level"].as_str()),
+        (Some("project"), Some("info"))
+    );
+    assert_eq!(record["severity"], "info");
+    assert_eq!(record["suppressions"], serde_json::json!([]));
+    assert_eq!(record["precedents"]["fail"], 0);
+
+    let text = stdout(lighthouse(dir.path()).args(args));
+    assert!(
+        text.contains("precedence:") && text.contains("-> project info ("),
+        "{text}"
+    );
+    assert!(text.contains("precedents:"), "{text}");
+}
+
+#[test]
+fn a_decision_judged_over_the_project_is_resolved_at_no_path() {
+    let dir = rust_project(&[("src/lib.rs", CROWDED)]);
+    let plugin = lighthouse_test_support::lang_rust();
+    fs::write(
+        dir.path().join("lighthouse.toml"),
+        lighthouse_test_support::project(&format!(
+            "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\nextends = [\"design/recommended\", \"design/strict\"]\n[[overrides]]\nfiles = [\"src/**\"]\nrules = {{ \"design/single-responsibility\" = \"error\" }}\n",
+            plugin.to_str().unwrap()
+        )),
+    )
+    .unwrap();
+    trust(dir.path());
+    lighthouse(dir.path()).arg("check").assert().success();
+    let fingerprint = fingerprint_of(&dir, "design/single-responsibility");
+
+    let args = ["review", "show", &fingerprint, "--detail", "full"];
+    let record = records(&stdout(
+        lighthouse(dir.path()).args(args).args(["--format", "json"]),
+    ))
+    .remove(0);
+    let stages: Vec<_> = record["precedence"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|step| step["stage"].as_str().unwrap())
+        .collect();
+    assert!(!stages.contains(&"override"), "{stages:?}");
 }
