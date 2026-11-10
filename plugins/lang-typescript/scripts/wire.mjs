@@ -1,5 +1,5 @@
 // Generates src/sdk/wire.ts (not checked in) from the protocol schema.
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { compile } from "json-schema-to-typescript";
 
@@ -16,4 +16,14 @@ const generated = await compile(schema, "Methods", {
   strictIndexSignatures: true,
 });
 
-writeFileSync(outPath, generated);
+// Skip an equal file, and replace a different one whole, so a reader of the
+// tree never sees a half-written file.
+let current = null;
+try {
+  current = readFileSync(outPath, "utf8");
+} catch {}
+if (current !== generated) {
+  const temp = `${outPath}.${process.pid}.tmp`;
+  writeFileSync(temp, generated);
+  renameSync(temp, outPath);
+}

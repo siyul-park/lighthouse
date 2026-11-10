@@ -322,9 +322,14 @@ fn build_lang_typescript() -> Option<PathBuf> {
         eprintln!("skipping: no Node {MIN_NODE} or newer for plugins/lang-typescript");
         return None;
     }
-    install_node_modules(&source);
     let out = workspace().join("target/plugins-test/lang-typescript");
     fs::create_dir_all(&out).expect("create plugin dir");
+    // One test process at a time installs, generates and compiles in the
+    // shared tree and installs the result; the lock is released when the
+    // function ends.
+    let lock = fs::File::create(out.with_extension("lock")).expect("create lock file");
+    lock.lock().expect("lock the TypeScript build");
+    install_node_modules(&source);
     let built = out.join(format!("build.{}.tmp", std::process::id()));
     let status = Command::new("node")
         .arg("scripts/wire.mjs")
