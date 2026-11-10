@@ -22,7 +22,7 @@ use lighthouse_plugin::{Context, Error as PluginError, PATHS, RuleManifest};
 use lighthouse_process::{Environment, Home, Job, Ran, context, copy_project, expand};
 use lighthouse_protocol::hash::Hasher;
 use lighthouse_spec::{
-    Batching, GlobSet, Output, Point, Program, Programs, Stdin, file_fact, glob_set,
+    Batching, Cwd, GlobSet, Output, Point, Program, Programs, Stdin, file_fact, glob_set,
 };
 use serde_json::{Map, Value, json};
 use tempfile::TempDir;
@@ -111,7 +111,7 @@ impl CommandRule {
                     }
                 }
                 Batching::Once => {
-                    found.extend(run.collect(&run.invoke(&run.arguments(&[])?, &[])?, None)?);
+                    found.extend(run.collect(&run.invoke(&run.arguments(&[])?, &[], None)?, None)?);
                 }
             }
         }
@@ -275,7 +275,7 @@ impl Invocation<'_> {
             Stdin::None => Vec::new(),
             Stdin::File => text.unwrap_or_default().as_bytes().to_vec(),
         };
-        let printed = self.invoke(&command, &stdin)?;
+        let printed = self.invoke(&command, &stdin, Some(file))?;
         self.collect(&printed, Some(file))
     }
 
@@ -286,7 +286,7 @@ impl Invocation<'_> {
         for group in self.grouped(files)? {
             for chunk in chunks(&self.program.command, &group) {
                 let command = self.arguments(chunk)?;
-                let printed = self.invoke(&command, &[])?;
+                let printed = self.invoke(&command, &[], None)?;
                 found.extend(self.collect(&printed, None)?);
             }
         }
@@ -318,6 +318,7 @@ impl Invocation<'_> {
             .program
             .command
             .iter()
+            .chain(&self.program.batch)
             .filter_map(|arg| file_fact(arg))
             .collect();
         facts.sort_unstable();
@@ -345,6 +346,15 @@ impl Invocation<'_> {
     /// The command line: `{file}`, `{files}`, `{file.<fact>}` (the value the
     /// files of the run share) and `{decision}` fill whole arguments.
     fn arguments(&self, files: &[PathBuf]) -> Result<Vec<String>, PluginError> {
+        self.arguments_of(&self.program.command, files)
+    }
+
+    /// `command` with its placeholders filled for `files`.
+    fn arguments_of(
+        &self,
+        command: &[String],
+        files: &[PathBuf],
+    ) -> Result<Vec<String>, PluginError> {
         let facts: BTreeMap<&str, String> = match files.first() {
             Some(first) => self
                 .facts()
@@ -353,7 +363,15 @@ impl Invocation<'_> {
                 .collect::<Result<_, PluginError>>()?,
             None => BTreeMap::new(),
         };
-        expand(&self.program.command, &self.root, |arg| match arg {
+        expand(command, &self.root, |arg| match arg {
+            // Under `cwd: file` the file is named from its own directory.
+            "{file}" if self.program.cwd == Cwd::File => Some(
+                files
+                    .iter()
+                    .filter_map(|f| f.file_name())
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .collect(),
+            ),
             "{file}" | "{files}" => Some(files.iter().map(|f| slashed(f)).collect()),
             "{decision}" => Some(vec![self.meta.id.clone()]),
             _ => file_fact(arg)
@@ -364,16 +382,28 @@ impl Invocation<'_> {
     }
 
     /// Runs the command and reads what it printed as the program says.
-    fn invoke(&self, command: &[String], stdin: &[u8]) -> Result<Printed, PluginError> {
+    fn invoke(
+        &self,
+        command: &[String],
+        stdin: &[u8],
+        file: Option<&Path>,
+    ) -> Result<Printed, PluginError> {
         let shown = command.join(" ");
         let incomplete = |what: String| PluginError::Incomplete(format!("`{shown}` {what}"));
         let program = &self.program;
         let root = &self.root;
+        let dir = match (program.cwd, file) {
+            (Cwd::File, Some(file)) => root.join(file.parent().unwrap_or(Path::new(""))),
+            _ => root.clone(),
+        };
+        // A file at a path whose directory is not on disk yet (an unsaved
+        // buffer) is judged from the root.
+        let dir = if dir.is_dir() { dir } else { root.clone() };
         let policy = program.policy(&self.ctx.workspace.sandbox);
         let profile = policy.profile(root, root).caching();
         let ran = Job {
             command,
-            dir: root,
+            dir: &dir,
             stdin,
             environment: &self.environment,
             timeout: program.timeout(Point::Check),
@@ -476,12 +506,16 @@ impl Invocation<'_> {
     /// command was run for, or to the project.
     fn findings(&self, lines: &[String], file: Option<&Path>) -> Vec<Diagnostic> {
         let mut named = BTreeSet::new();
+        // Under `cwd: file` a relative path is the file's directory's.
+        let from = file
+            .filter(|_| self.program.cwd == Cwd::File)
+            .and_then(Path::parent);
         lines
             .iter()
             .flat_map(|line| {
-                let (path, position, message) = match self.located(line) {
+                let (path, position, message) = match self.located(line, from) {
                     Some(placed) => placed,
-                    None => match self.named(line) {
+                    None => match self.named(line, file, from) {
                         // A file is named once, though a tool that follows
                         // `mod` declarations (rustfmt) lists it once for each
                         // way it reached it.
@@ -516,7 +550,11 @@ impl Invocation<'_> {
         )]
     }
 
-    fn located<'l>(&self, line: &'l str) -> Option<(PathBuf, (u32, u32), &'l str)> {
+    fn located<'l>(
+        &self,
+        line: &'l str,
+        from: Option<&Path>,
+    ) -> Option<(PathBuf, (u32, u32), &'l str)> {
         let (path, rest) = line.split_once(':')?;
         let (number, rest) = rest.split_once(':')?;
         let row: u32 = number.trim().parse().ok().filter(|n| *n > 0)?;
@@ -527,22 +565,33 @@ impl Invocation<'_> {
             },
             None => (1, rest),
         };
-        let path = self.project_path(path)?;
+        let path = self.project_path(path, from)?;
         Some((path, (row, col), message.trim()))
     }
 
     /// A line that is only the path of a file of the project, as `gofmt -l`,
     /// `rustfmt -l` and `prettier --list-different` print.
-    fn named(&self, line: &str) -> Option<(PathBuf, (u32, u32), &str)> {
-        let path = self.project_path(line.trim())?;
+    fn named(
+        &self,
+        line: &str,
+        file: Option<&Path>,
+        from: Option<&Path>,
+    ) -> Option<(PathBuf, (u32, u32), &str)> {
+        if line.trim() == "<stdin>" {
+            return Some((file?.to_owned(), (1, 1), self.title));
+        }
+        let path = self.project_path(line.trim(), from)?;
         Some((path, (1, 1), self.title))
     }
 
     /// `path` as a file of the project: relative to the root, or absolute
     /// inside it, by the name the root is given or by the one the file system
     /// resolves it to (rustfmt prints the latter for the files of a `mod`).
-    fn project_path(&self, path: &str) -> Option<PathBuf> {
-        let candidate = Path::new(path);
+    fn project_path(&self, path: &str, from: Option<&Path>) -> Option<PathBuf> {
+        let joined = from
+            .filter(|_| Path::new(path).is_relative())
+            .map(|dir| dir.join(path));
+        let candidate = joined.as_deref().unwrap_or(Path::new(path));
         let roots = [&self.root, &self.ctx.workspace.root];
         let named = roots.iter().map(|root| Some((*root).clone()));
         let resolved = roots.iter().map(|root| root.canonicalize().ok());
@@ -552,8 +601,14 @@ impl Invocation<'_> {
             .find_map(|root| candidate.strip_prefix(root).ok())
             .unwrap_or(candidate)
             .components()
-            .filter(|c| !matches!(c, std::path::Component::CurDir))
-            .collect::<PathBuf>();
+            .fold(PathBuf::new(), |mut kept, part| {
+                match part {
+                    std::path::Component::CurDir => {}
+                    std::path::Component::ParentDir if kept.pop() => {}
+                    other => kept.push(other),
+                }
+                kept
+            });
         known(self.ctx.model, &relative).then_some(relative)
     }
 }

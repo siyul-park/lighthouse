@@ -9,7 +9,7 @@ use lighthouse_model::Diagnostic;
 use lighthouse_plugin::Workspace;
 use lighthouse_process::{Environment, Home, Job, Ran, context, expand};
 use lighthouse_protocol::hash;
-use lighthouse_spec::{Output, Point, Program, Stdin, file_fact};
+use lighthouse_spec::{Cwd, Output, Point, Program, Stdin, file_fact};
 use serde_json::json;
 
 use super::{
@@ -104,6 +104,13 @@ pub(super) fn run(
         )));
     }
     let command = expand(&program.command, dir, |arg| match arg {
+        "{file}" if program.cwd == Cwd::File => Some(vec![
+            finding
+                .file
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        ]),
         "{file}" => Some(vec![finding.file.to_string_lossy().replace('\\', "/")]),
         "{line}" => Some(vec![finding.span.start.line.to_string()]),
         "{symbol}" => Some(vec![finding.symbol.clone().unwrap_or_default()]),
@@ -136,9 +143,14 @@ pub(super) fn run(
         Stdin::None => &[][..],
         Stdin::File => launch.text.as_bytes(),
     };
+    let at = match program.cwd {
+        Cwd::File => dir.join(finding.file.parent().unwrap_or(Path::new(""))),
+        Cwd::Root => dir.to_owned(),
+    };
+    let at = if at.is_dir() { at } else { dir.to_owned() };
     let job = Job {
         command: &command,
-        dir,
+        dir: &at,
         stdin,
         environment: &environment,
         timeout: program.timeout(Point::Fix),

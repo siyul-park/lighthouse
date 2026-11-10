@@ -111,7 +111,7 @@ impl CommandModel {
                     .iter()
                     .map(|a| a.replace("{model}", model))
                     .collect(),
-                ..program.clone()
+                ..Program::clone(program)
             },
             pointer: pointer.clone(),
             events: events

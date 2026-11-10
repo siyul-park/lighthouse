@@ -31,10 +31,10 @@ fn provider_of(text: &str, name: &str, stream: &Path) -> ModelProvider {
     assert!(events.is_some(), "{name} declares no events");
     ModelProvider::Command {
         protocol,
-        program: Program {
+        program: Box::new(Program {
             command: vec!["cat".to_owned(), stream.display().to_string()],
-            ..program
-        },
+            ..*program
+        }),
         pointer,
         events,
         cost,

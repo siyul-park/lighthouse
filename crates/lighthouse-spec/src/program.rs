@@ -28,11 +28,13 @@ const RETIRED: [&str; 3] = ["rule", "path", "root"];
 
 /// The keys a program table may have, for the loaders that read it beside
 /// others.
-pub(crate) const FIELDS: [&str; 10] = [
+pub(crate) const FIELDS: [&str; 12] = [
     "command",
+    "batch",
     "env",
     "timeout",
     "stdin",
+    "cwd",
     "output",
     "success",
     "independent",
@@ -126,6 +128,16 @@ pub struct Program {
     /// `languages.<id>`.
     #[serde(default)]
     pub command: Vec<String>,
+    /// The command that tells many files at once, for a check whose `command`
+    /// takes the text of one file on stdin (`stdin: file`): a run over `{files}`
+    /// that names the files it finds something in. A bundled check uses it
+    /// for the files of a run that have no stored findings, and `command` for
+    /// the one file an edit changed. Only bundled, and only with `independent`
+    /// findings. What it names outside the files it was given is left out, and a
+    /// file it names is run alone with `command`: only the files it does not
+    /// name are answered from it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub batch: Vec<String>,
     /// Variables the program is given besides the one allowlist. A value may
     /// hold `${NAME}`, the user's variable `NAME`, which is never written
     /// into a command line, a note, a log or a cache key; a variable that is
@@ -139,6 +151,13 @@ pub struct Program {
     /// What it reads on stdin: nothing, or the text of `{file}`.
     #[serde(default, skip_serializing_if = "Stdin::is_none")]
     pub stdin: Stdin,
+    /// Where it runs: the project's root, or the directory of `{file}`, which
+    /// a tool that looks for its configuration from where it runs needs
+    /// (`rustfmt` on stdin). `file` needs `stdin: file`. `{file}` is then the
+    /// file's name from that directory, and a relative path the program prints
+    /// is relative to it. A directory not on disk runs at the root.
+    #[serde(default, skip_serializing_if = "Cwd::is_root")]
+    pub cwd: Cwd,
     /// What it prints, which decides the result. Default: `lines` for a
     /// check, `files` for a fix, `status` for a `[fix] verify` program.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -180,9 +199,11 @@ impl Program {
     pub fn of(command: Vec<String>) -> Self {
         Self {
             command,
+            batch: Vec::new(),
             env: BTreeMap::new(),
             timeout: None,
             stdin: Stdin::None,
+            cwd: Cwd::Root,
             output: None,
             success: None,
             independent: false,
@@ -221,10 +242,18 @@ impl Program {
         let uses = |placeholder: &str| self.command.iter().any(|arg| arg == placeholder);
         if uses("{files}") {
             Batching::Files
-        } else if uses("{file}") {
+        } else if uses("{file}") || self.stdin == Stdin::File {
             Batching::File
         } else {
             Batching::Once
+        }
+    }
+
+    /// The command that runs over many files at once: `batch`, else `command`.
+    pub fn together(&self) -> &[String] {
+        match self.batch.is_empty() {
+            true => &self.command,
+            false => &self.batch,
         }
     }
 
@@ -253,11 +282,37 @@ impl Program {
         }
         self.command
             .iter()
+            .chain(&self.batch)
             .find_map(|arg| refused(arg, point))
+            .or_else(|| self.batch_problem(point))
             .or_else(|| self.fact_problem(point))
             .or_else(|| self.output_problem(point))
             .or_else(|| self.env_problem())
             .or_else(|| self.sandbox_problem())
+    }
+
+    /// `batch` is a check's, tells files from `{files}`, and goes with a
+    /// `command` that reads one file; `cwd: file` too.
+    fn batch_problem(&self, point: Point) -> Option<String> {
+        if !self.batch.is_empty() {
+            if point != Point::Check {
+                return Some("`batch` is for a check".to_owned());
+            }
+            if self.stdin != Stdin::File {
+                return Some(
+                    "`batch` needs `stdin: file`: it tells many files what `command` tells one"
+                        .to_owned(),
+                );
+            }
+            if !self.independent {
+                return Some("`batch` needs `independent`: its answer for a file is what `command` finds in that file alone".to_owned());
+            }
+            if !self.batch.contains(&"{files}".to_owned()) {
+                return Some("`batch` needs `{files}`".to_owned());
+            }
+        }
+        (self.cwd == Cwd::File && self.stdin != Stdin::File)
+            .then(|| "`cwd: file` needs `stdin: file`".to_owned())
     }
 
     /// A check reads a fact of a file for the files of a run, so the run must
@@ -268,11 +323,14 @@ impl Program {
             return None;
         }
         let fact = self.command.iter().find(|arg| file_fact(arg).is_some())?;
-        let has_files = self
-            .command
-            .iter()
-            .any(|arg| arg == "{file}" || arg == "{files}");
-        (!has_files).then(|| format!("`{fact}` needs `{{file}}` or `{{files}}` in the command"))
+        let has_files = self.stdin == Stdin::File
+            || self
+                .command
+                .iter()
+                .any(|arg| arg == "{file}" || arg == "{files}");
+        (!has_files).then(|| {
+            format!("`{fact}` needs `{{file}}`, `{{files}}` or `stdin: file` in the command")
+        })
     }
 
     fn output_problem(&self, point: Point) -> Option<String> {
@@ -379,6 +437,23 @@ pub enum Stdin {
 impl Stdin {
     fn is_none(&self) -> bool {
         *self == Self::None
+    }
+}
+
+/// Where a program runs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Cwd {
+    /// The root of the project.
+    #[default]
+    Root,
+    /// The directory of `{file}`.
+    File,
+}
+
+impl Cwd {
+    fn is_root(&self) -> bool {
+        *self == Self::Root
     }
 }
 

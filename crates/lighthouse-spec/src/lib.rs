@@ -58,7 +58,7 @@ pub use options::{LIMIT_ROLES, OptionSchema, OptionType, OptionsSchema, Shape, l
 pub use pack::{Pack, Section};
 pub(crate) use pack::{PackSpec, SectionSpec};
 pub use program::{
-    Batching, DEFAULT_TIMEOUT, LONG_TIMEOUT, Output, Point, Program, ProgramSpec, Programs,
+    Batching, Cwd, DEFAULT_TIMEOUT, LONG_TIMEOUT, Output, Point, Program, ProgramSpec, Programs,
     Sandbox, Sarif, SarifColumns, Stdin, file_fact,
 };
 pub use project::{

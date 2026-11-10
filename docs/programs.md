@@ -11,6 +11,7 @@ command = ["golangci-lint", "run", "--output.sarif.path", "/dev/stdout", "{files
 env     = { GOFLAGS = "-mod=mod", NVIDIA_API_KEY = "${NVIDIA_API_KEY}" }
 timeout = "2m"
 stdin   = "none"      # none | file
+cwd     = "root"      # root | file
 output  = "sarif"     # lines | sarif | status | files | stdout
 success = [0, 1]
 sarif   = { rules = ["errcheck", "govet:*"], levels = ["error", "warning"], columns = "utf16CodeUnits" }
@@ -23,9 +24,11 @@ sandbox = { network = ["proxy.golang.org"], write = ["~/.cache/golangci-lint"] }
 | `env` | Variables besides the one allowlist ([environment](#the-environment)). A value may hold `${NAME}`: the user's variable ([credentials](#credentials)). | none |
 | `timeout` | How long it may run. SIGTERM, a grace period, then SIGKILL, for the whole process group. | `2m`; `10m` for an agent and for a `[fix] verify` program |
 | `stdin` | `none`, or `file`: the text of `{file}`. | `none` |
+| `cwd` | Where it runs: `root`, the project's root, or `file`, the directory of `{file}`, for a tool that looks for its configuration from where it runs (`rustfmt` on stdin finds the `rustfmt.toml` nearest the file). `file` needs `stdin: file`. Under `file`, `{file}` is the file's name from its directory and a relative path the program prints (`path:line:` or a path alone) is relative to that directory. A file whose directory is not on disk (a buffer not saved yet) runs at the root. | `root` |
+| `batch` | Only a bundled check with `stdin: file` and `independent`: the command that tells many files at once, with `{files}`, run at the root for the files of a run that have no stored findings; `command` runs for the one file an edit changed. Files the run names beyond the ones it was given are left out, and a file it names is run alone with `command`, not answered from the batch: a tool that follows `mod` reaches a module through its parent, under the parent's configuration (a `rustfmt.toml` in a module directory), so what it names is a guess; what it does not name is clean. | none |
 | `output` | What it prints, which decides the result ([results](#results)). | `lines` for a check, `files` for a fix, `status` for a verify program, `stdout` for a provider |
 | `success` | The exit codes that mean the program ran. Any other code, a signal or a timeout is an error, never a clean result. | `[0, 1]` for `lines` and `sarif` (linters exit 1 with findings), `[0]` otherwise |
-| `independent` | What the program finds in a file depends on that file and the program's configuration alone (`gofmt -l`, `markdownlint-cli2`), not so for a program that follows what a file names (`rustfmt` and `mod`, `lychee` and links). Only with `{files}` or `{file}`. A check that is `independent` keeps the findings of a file while the file, the program and its configuration are as they were, and over `{files}` runs once for the files of a run that have no stored findings and tells each its findings. | `false` |
+| `independent` | What the program finds in a file depends on that file and the program's configuration alone (`gofmt -l`, `markdownlint-cli2`), not so for a program that follows what a file names (`rustfmt` given the file as an argument follows its `mod` declarations, so it is not `independent` that way; `rustfmt` given the text on stdin does not, and is; `lychee` and links). Only with `{files}` or `{file}`. A check that is `independent` keeps the findings of a file while the file, the program and its configuration are as they were, and over `{files}` runs once for the files of a run that have no stored findings and tells each its findings. | `false` |
 | `follows` | The program reads what a file names besides the file (`lychee` and the files its links point to). Only with `{files}` or `{file}`, and not with `independent`. A check that follows keeps the findings of a file while the project's files, the text of its files of the same language, the program and its configuration are as they were. | `false` |
 | `sarif` | How a SARIF log is read, under SARIF's names: `rules` (globs over `ruleId`), `levels`, `columns` (`utf16CodeUnits`, `unicodeCodePoints`, `bytes`). Only with `output: sarif`. | every result |
 | `sandbox` | What the program may reach besides the project's `[sandbox]`: `network` (hosts) and `write` (places). Its lists are added to the project's. | none |
@@ -38,7 +41,7 @@ A check adds `files`, globs of the project-relative paths the program is run for
 
 | Result | `output` | Read as |
 | --- | --- | --- |
-| findings | `lines` | one finding per non-blank stdout line. A leading `path:line[:col]:` places it. A line that is only the path of a project file, as `gofmt -l`, `rustfmt -l` and `prettier --list-different` print, places it at line 1 of that file with the decision's title as the message, once however often the tool names the file. Any other line attaches to the file the program was run for, or to the project. |
+| findings | `lines` | one finding per non-blank stdout line. A leading `path:line[:col]:` places it. A line that is only the path of a project file, as `gofmt -l`, `rustfmt -l` and `prettier --list-different` print (or `<stdin>`, as `rustfmt -l` prints for the text on stdin, which names the file the program was run for), places it at line 1 of that file with the decision's title as the message, once however often the tool names the file. Any other line attaches to the file the program was run for, or to the project. |
 | | `sarif` | one finding per SARIF result, filtered by `sarif`. See [wrapping linters](wrapping-linters.md). |
 | | `status` | one finding when the exit code is not in `success`, the tail of stderr or stdout as its message. A program that only passes or fails is a check whose one finding is the failure. |
 | changes | `files` | the files the program changed in its scratch copy of the project |

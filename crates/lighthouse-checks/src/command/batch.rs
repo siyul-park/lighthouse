@@ -50,7 +50,9 @@ impl CommandRule {
             && scope == RunScope::File
             && self.programs.all().next().is_some()
             && self.programs.all().all(|p| {
-                p.env.is_empty() && p.stdin == Stdin::None && p.batching() == Batching::Files
+                p.env.is_empty()
+                    && (!p.batch.is_empty()
+                        || (p.stdin == Stdin::None && p.batching() == Batching::Files))
             })
     }
 
@@ -161,7 +163,7 @@ impl CommandRule {
                 continue;
             };
             for group in groups {
-                for chunk in chunks(&program.command, &group) {
+                for chunk in chunks(program.together(), &group) {
                     run.settle(chunk, program.independent, &mut answers);
                 }
             }
@@ -193,10 +195,10 @@ impl Invocation<'_> {
     /// and they can be told apart: those of a program that is `independent`
     /// are on the file they name, and none of another's.
     fn answer(&self, files: &[PathBuf], independent: bool) -> Answer {
-        let Ok(command) = self.arguments(files) else {
+        let Ok(command) = self.arguments_of(self.program.together(), files) else {
             return Answer::Failed;
         };
-        let Ok(printed) = self.invoke(&command, &[]) else {
+        let Ok(printed) = self.invoke(&command, &[], None) else {
             return Answer::Failed;
         };
         let Ok(found) = self.collect(&printed, None) else {
@@ -207,10 +209,19 @@ impl Invocation<'_> {
         }
         let mut by_file: Findings = files.iter().map(|f| (f.clone(), Vec::new())).collect();
         for diagnostic in found {
-            let Some(own) = by_file.get_mut(&diagnostic.file) else {
-                return Answer::Failed;
-            };
-            own.push(diagnostic);
+            match by_file.get_mut(&diagnostic.file) {
+                Some(own) => own.push(diagnostic),
+                // A tool that follows `mod` names the modules of the files it
+                // was given: a file the run was not given has its own answer.
+                None if !self.program.batch.is_empty() => {}
+                None => return Answer::Failed,
+            }
+        }
+        if !self.program.batch.is_empty() {
+            // The run reaches a module through its parent, under the parent's
+            // configuration, so what it names is a guess: only the files it
+            // does not name are answered, the others are run alone.
+            by_file.retain(|_, own| own.is_empty());
         }
         Answer::Told(by_file)
     }

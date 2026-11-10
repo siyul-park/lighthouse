@@ -159,7 +159,7 @@ pub enum ModelProvider {
         protocol: CommandProtocol,
         /// The program: its `command` has `{model}` for the model part of the
         /// reference.
-        program: Program,
+        program: Box<Program>,
         pointer: Option<String>,
         /// What an agent's stdout means, when the project says.
         events: Option<Box<EventsSpec>>,
@@ -378,7 +378,7 @@ impl ProviderSpec {
         }
         Ok(ModelProvider::Command {
             protocol,
-            program,
+            program: Box::new(program),
             pointer: self.pointer.clone(),
             events: self.events.clone().map(Box::new),
             cost: self.cost.unwrap_or(DEFAULT_COST),

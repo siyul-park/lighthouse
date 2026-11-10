@@ -242,6 +242,30 @@ fn a_line_that_is_only_a_path_places_the_finding_at_line_one_once_however_it_is_
 }
 
 #[test]
+fn a_program_run_in_the_directory_of_its_file_names_it_and_places_its_findings_from_there() {
+    let script = "cat >/dev/null; echo \"$1:1: here\"; echo \"../a.txt:1: up\"; exit 1";
+    let rule = decision(&format!(
+        "  check:\n    type: command\n    command: [sh, -c, {script:?}, sh, \"{{file}}\"]\n    stdin: file\n    cwd: file\n    files: [\"sub/c.txt\"]\n"
+    ));
+    let dir = project(&rule);
+    write(dir.path(), "sub/c.txt", "hello\n");
+    trust(dir.path());
+    let out = lighthouse(dir.path()).arg("check").output().unwrap();
+    let report = String::from_utf8_lossy(&out.stdout);
+
+    // `{file}` is the name from the directory, and what the program prints
+    // is placed from the directory too.
+    assert!(
+        report.contains("sub/c.txt:1:1: error local/probe: here"),
+        "{report}"
+    );
+    assert!(
+        report.contains("a.txt:1:1: error local/probe: up"),
+        "{report}"
+    );
+}
+
+#[test]
 fn a_secret_a_check_prints_never_reaches_a_finding() {
     let rule = decision(
         "  check:\n    type: command\n    command: [sh, -c, \"echo \\\"$1:1: key $TOKEN\\\"; exit 1\", sh, \"{file}\"]\n    env: { TOKEN: \"${LIGHTHOUSE_CHECK_TEST_SECRET}\" }\n",

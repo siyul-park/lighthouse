@@ -2,7 +2,7 @@
 
 use lighthouse_process::Policy;
 use lighthouse_spec::{
-    Batching, Catalog, Check, CheckKind, CommandCheck, Decision, DecisionStatus, ModelCheck,
+    Batching, Catalog, Check, CheckKind, CommandCheck, Cwd, Decision, DecisionStatus, ModelCheck,
     Output, Point, Program, ProgramSpec, Sandbox, Stdin,
 };
 use lighthouse_test_support::catalog::*;
@@ -91,7 +91,7 @@ fn command_check_reads_the_program_fields_and_refuses_strays() {
     assert_eq!(ok.program.env["TOKEN"], "${TOKEN}");
     assert!(check(json!({"type":"command","command":["x"],"where":"true"})).is_err());
     assert!(check(json!({"type":"command","command":["x"],"scope":"file"})).is_err());
-    for gone in ["argv", "batch", "exitCodes", "select", "columns"] {
+    for gone in ["argv", "exitCodes", "select", "columns"] {
         let stray = check(json!({"type": "command", "command": ["x"], gone: []}));
         assert!(stray.is_err(), "`{gone}` is gone");
     }
@@ -402,7 +402,10 @@ fn a_fact_of_a_file_is_a_placeholder_of_a_check_beside_its_files_and_of_a_fix() 
         None
     );
     let alone = program(&["fmt", fact]).problem(Point::Check).unwrap();
-    assert!(alone.contains("needs `{file}` or `{files}`"), "{alone}");
+    assert!(
+        alone.contains("needs `{file}`, `{files}` or `stdin: file`"),
+        "{alone}"
+    );
     let mixed = program(&["fmt", "--edition={file.edition}", "{files}"])
         .problem(Point::Check)
         .unwrap();
@@ -412,4 +415,53 @@ fn a_fact_of_a_file_is_a_placeholder_of_a_check_beside_its_files_and_of_a_fix() 
         let why = program(&["fmt", fact]).problem(point).unwrap();
         assert!(why.contains("is not a placeholder"), "{point}: {why}");
     }
+}
+
+#[test]
+fn a_batch_tells_many_files_what_the_command_tells_one_and_cwd_file_needs_the_text_on_stdin() {
+    let one = |batch: &[&str], stdin, cwd| Program {
+        batch: batch.iter().map(|a| (*a).to_owned()).collect(),
+        stdin,
+        cwd,
+        ..Program::of(vec!["fmt".to_owned()])
+    };
+    let ok = Program {
+        independent: true,
+        ..one(&["fmt", "{files}"], Stdin::File, Cwd::File)
+    };
+    assert_eq!(ok.problem(Point::Check), None);
+    assert_eq!(ok.together(), ["fmt", "{files}"]);
+    assert_eq!(one(&[], Stdin::File, Cwd::Root).together(), ["fmt"]);
+
+    let dependent = one(&["fmt", "{files}"], Stdin::File, Cwd::Root);
+    assert!(
+        dependent
+            .problem(Point::Check)
+            .unwrap()
+            .contains("`independent`")
+    );
+    let no_stdin = one(&["fmt", "{files}"], Stdin::None, Cwd::Root);
+    assert!(
+        no_stdin
+            .problem(Point::Check)
+            .unwrap()
+            .contains("`stdin: file`")
+    );
+    let no_files = Program {
+        independent: true,
+        ..one(&["fmt"], Stdin::File, Cwd::Root)
+    };
+    assert!(
+        no_files
+            .problem(Point::Check)
+            .unwrap()
+            .contains("`{files}`")
+    );
+    let fix = Program {
+        independent: true,
+        ..one(&["fmt", "{files}"], Stdin::File, Cwd::Root)
+    };
+    assert!(fix.problem(Point::Fix).is_some());
+    let cwd = one(&[], Stdin::None, Cwd::File);
+    assert!(cwd.problem(Point::Check).unwrap().contains("`cwd: file`"));
 }

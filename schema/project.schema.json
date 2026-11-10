@@ -1,5 +1,20 @@
 {
   "$defs": {
+    "Cwd": {
+      "description": "Where a program runs.",
+      "oneOf": [
+        {
+          "const": "root",
+          "description": "The root of the project.",
+          "type": "string"
+        },
+        {
+          "const": "file",
+          "description": "The directory of `{file}`.",
+          "type": "string"
+        }
+      ]
+    },
     "Evaluation": {
       "additionalProperties": false,
       "description": "How a rule's check is judged by `lighthouse eval`. A policy, not a\nmeaning: changing it moves no meaning version.",
@@ -985,6 +1000,13 @@
     "program": {
       "description": "A program as the files write it. Where a program is a table of its own\n(a `check` or a `fix`), its fields stand beside the others.",
       "properties": {
+        "batch": {
+          "description": "The command that tells many files at once, for a check whose `command`\ntakes the text of one file on stdin (`stdin: file`): a run over `{files}`\nthat names the files it finds something in. A bundled check uses it\nfor the files of a run that have no stored findings, and `command` for\nthe one file an edit changed. Only bundled, and only with `independent`\nfindings. What it names outside the files it was given is left out, and a\nfile it names is run alone with `command`: only the files it does not\nname are answered from it.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "command": {
           "default": [],
           "description": "The program and its arguments, run without a shell. `{file}`,\n`{files}`, `{line}`, `{symbol}`, `{decision}` and `{model}` fill whole\narguments where the binding point accepts them; they say how many\nfiles a run is given. A decision's `check` and `fix` may leave it out\nwhen each language it covers gives its own program under\n`languages.<id>`.",
@@ -992,6 +1014,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "cwd": {
+          "$ref": "#/$defs/Cwd",
+          "description": "Where it runs: the project's root, or the directory of `{file}`, which\na tool that looks for its configuration from where it runs needs\n(`rustfmt` on stdin). `file` needs `stdin: file`. `{file}` is then the\nfile's name from that directory, and a relative path the program prints\nis relative to it. A directory not on disk runs at the root."
         },
         "env": {
           "additionalProperties": {

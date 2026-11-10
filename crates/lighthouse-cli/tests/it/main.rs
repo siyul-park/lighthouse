@@ -49,6 +49,7 @@ mod review_agent;
 mod rewrite;
 mod run;
 mod rust_edition;
+mod rust_format;
 mod sandbox;
 mod sarif_places;
 mod serve;

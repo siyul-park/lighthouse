@@ -52,6 +52,15 @@ spec:
         - "{file.edition}"
         - "--check"
         - "-l"
+        stdin: file
+        cwd: file
+        independent: true
+        batch:
+        - rustfmt
+        - "--edition"
+        - "{file.edition}"
+        - "--check"
+        - "-l"
         - "{files}"
       fix:
         command:
@@ -61,6 +70,7 @@ spec:
         - "--emit"
         - stdout
         stdin: file
+        cwd: file
         output: stdout
     python:
       check:

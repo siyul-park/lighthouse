@@ -147,7 +147,7 @@ pub enum FixKind {
         scope: Option<FixScope>,
     },
     /// An external program on a scratch copy of the files.
-    Command(CommandSpec),
+    Command(Box<CommandSpec>),
     /// An agent that edits fixes the finding, and the checks accept the
     /// result or not. The project lists the decisions this applies to
     /// (`[fix] decisions`); a listed decision without a fix of its own has
