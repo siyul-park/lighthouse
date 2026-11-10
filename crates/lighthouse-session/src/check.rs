@@ -7,7 +7,7 @@ use std::{
     time::Instant,
 };
 
-use lighthouse_engine::{Engine, ModelOptions, Run, cache};
+use lighthouse_engine::{Engine, ModelOptions, Overlays, Run, cache};
 use lighthouse_model::{Diagnostic, Preview, Severity, Suppressed, slashed};
 use lighthouse_report::{
     Briefing, Compact, Descriptor, Detail, Format, Full, Report, render, report,
@@ -53,6 +53,12 @@ pub struct CheckRequest {
     /// Leave out the models revisions attached: the run is the check without
     /// that layer, as grading it needs.
     pub detached: bool,
+    /// Read these texts in place of the files of the same project-relative
+    /// path, as an editor's unsaved buffers are: nothing is read from or
+    /// written to those files, and nothing of them stays in the engine for
+    /// the next request. Such a run is never remembered and does not narrow
+    /// the report to changed files.
+    pub overlays: Overlays,
 }
 
 /// The counts of a run, shared by every frontend that reports on one.
@@ -337,6 +343,14 @@ pub(crate) fn check_with(
     request: &CheckRequest,
     started: Instant,
 ) -> Result<Checked> {
+    if !request.overlays.is_empty() {
+        if request.store {
+            return Err("a run over overlays is never remembered".into());
+        }
+        if request.changed || request.diff.is_some() {
+            return Err("overlays and a changed or diff scope are alternatives".into());
+        }
+    }
     let root = session.root.clone();
     let catalog = Arc::clone(&session.catalog);
     let attached = if request.detached {
@@ -483,7 +497,10 @@ fn analyze(
     } else {
         &request.paths
     };
-    Ok(engine.check(paths, rules)?)
+    if request.overlays.is_empty() {
+        return Ok(engine.check(paths, rules)?);
+    }
+    Ok(engine.check_overlaid(paths, rules, &request.overlays)?.run)
 }
 
 /// The changed files that also lie under the given paths, when there are any.

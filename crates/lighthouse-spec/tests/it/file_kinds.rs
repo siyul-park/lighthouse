@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use lighthouse_graph::{Durability, Graph, Options};
 use lighthouse_protocol::hash;
-use lighthouse_spec::{CONTENT, Content, Held, OVERLAY, ProjectFiles, ROOT, Readable, STAT};
+use lighthouse_spec::{CONTENT, Content, FILES, Held, OVERLAY, ProjectFiles, ROOT, Readable, STAT};
 
 fn graph() -> Graph {
     Graph::in_memory(Options::default()).unwrap()
@@ -97,6 +97,50 @@ fn held_overlaid() {
     assert_eq!(shown.text.as_deref(), Some("edit"));
     assert!(held.overlaid().is_empty());
     assert_eq!(after.sha256, hash::sha256("disk"), "the overlay is unset");
+}
+
+#[test]
+fn held_overlaid_adds_a_file_to_a_directory_the_project_has() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir(dir.path().join("src")).unwrap();
+    fs::write(dir.path().join("src/a.txt"), "disk").unwrap();
+    let project = ProjectFiles::new(dir.path(), &[]).unwrap();
+    let (mut graph, mut held) = (graph(), Held::default());
+    let new = |paths: &[&str]| {
+        paths
+            .iter()
+            .map(|path| (std::path::PathBuf::from(path), "new".to_owned()))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let listed = |graph: &Graph| graph.query(&FILES, &()).unwrap().as_ref().clone();
+
+    let walked = project
+        .walk(
+            &mut graph,
+            &mut held,
+            &new(&["src/b.txt", "src/a.txt", "gone/c.txt"]),
+        )
+        .unwrap();
+    assert_eq!(listed(&graph), ["src/a.txt", "src/b.txt"]);
+    let walked: Vec<_> = walked
+        .listing
+        .files
+        .iter()
+        .map(|f| f.to_str().unwrap())
+        .collect();
+    assert_eq!(walked, ["src/a.txt", "src/b.txt"]);
+    let added = graph.query(&CONTENT, &"src/b.txt".to_owned()).unwrap();
+    assert_eq!(added.text.as_deref(), Some("new"));
+    assert!(!dir.path().join("src/b.txt").exists());
+
+    project
+        .walk(&mut graph, &mut held, &BTreeMap::new())
+        .unwrap();
+    assert_eq!(
+        listed(&graph),
+        ["src/a.txt"],
+        "the added file is gone with its overlay"
+    );
 }
 
 #[test]

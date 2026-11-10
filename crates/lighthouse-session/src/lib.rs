@@ -40,7 +40,7 @@ pub use extends::{AUTHORING, Extended, ensure_extends};
 pub use findings::Remembered;
 pub use generated::{AGENT_LOOP, SKILL_MARKER, pack_docs, schema_of, schemas, skill, skill_for};
 pub use git::head;
-pub use lighthouse_engine::{FailOn, ModelOptions, Timings, cache};
+pub use lighthouse_engine::{FailOn, ModelOptions, Overlays, Timings, cache};
 pub use lighthouse_model::schema_file;
 pub use lighthouse_model::{AgentKind, Attribution, Judgment, Severity};
 pub use lighthouse_report::docs::DOCS_DIR;

@@ -94,6 +94,17 @@ impl Stat {
         Some((self, self.racy(started).then_some(started)))
     }
 
+    /// The stat of a file that only an overlay holds.
+    pub(crate) fn overlaid() -> Self {
+        Self {
+            mtime_ns: 0,
+            ctime_ns: 0,
+            size: 0,
+            inode: 0,
+            mode: 0o100_644,
+        }
+    }
+
     /// The stat of what `meta` describes.
     pub fn of(meta: &fs::Metadata) -> Self {
         #[cfg(unix)]
@@ -178,6 +189,9 @@ impl Walk<'_> {
         let stats = stat_all(&root, &self.files);
         let mut files: Vec<PathBuf> = Vec::with_capacity(stats.len());
         for (rel, stat) in stats {
+            // A file an overlay adds is not on disk: it is there as far as the
+            // run is concerned.
+            let stat = stat.or_else(|| self.reading.overlaid(&rel).then(Stat::overlaid));
             if let Some(stat) = stat {
                 self.out.stats.insert(rel.clone(), stat);
                 files.push(rel);

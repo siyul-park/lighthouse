@@ -114,3 +114,80 @@ fn warm_check() {
         .unwrap();
     assert_eq!(uncached.render(Format::Text, None), warned);
 }
+
+#[test]
+fn overlays_stand_in_for_files_for_one_request_only() {
+    let dir = project("error");
+    let mut warm = Warm::new();
+    let at = (dir.path(), None);
+    let plain = |warm: &mut Warm| {
+        warm.check(at, |session| Ok(request(session)))
+            .unwrap()
+            .render(Format::Text, None)
+    };
+    let before = plain(&mut warm);
+    assert!(before.contains("a.txt"), "{before}");
+
+    let overlaid = |warm: &mut Warm, texts: &[(&str, &str)]| {
+        let overlays = texts
+            .iter()
+            .map(|(path, text)| (std::path::PathBuf::from(path), (*text).to_owned()))
+            .collect();
+        warm.check(at, |session| {
+            Ok(CheckRequest {
+                overlays,
+                ..request(session)
+            })
+        })
+        .unwrap()
+    };
+    assert!(
+        overlaid(&mut warm, &[("a.txt", "a\n")])
+            .run
+            .diagnostics
+            .is_empty()
+    );
+    assert_eq!(
+        plain(&mut warm),
+        before,
+        "an overlay is gone after its request"
+    );
+    let created = overlaid(&mut warm, &[("b.txt", LONG)]);
+    assert_eq!(created.run.diagnostics.len(), 2);
+    assert_eq!(plain(&mut warm), before);
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+        LONG
+    );
+    assert!(!dir.path().join("b.txt").exists());
+}
+
+#[test]
+fn an_overlaid_request_that_remembers_or_narrows_to_changes_is_refused() {
+    let dir = project("error");
+    let mut warm = Warm::new();
+    let at = (dir.path(), None);
+    let overlays = || [(std::path::PathBuf::from("a.txt"), "a\n".to_owned())].into();
+    let remembered = warm.check(at, |session| {
+        Ok(CheckRequest {
+            overlays: overlays(),
+            store: true,
+            ..request(session)
+        })
+    });
+    assert!(
+        remembered
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("never remembered")
+    );
+    let narrowed = warm.check(at, |session| {
+        Ok(CheckRequest {
+            overlays: overlays(),
+            changed: true,
+            ..request(session)
+        })
+    });
+    assert!(narrowed.err().unwrap().to_string().contains("alternatives"));
+}

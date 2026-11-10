@@ -22,7 +22,7 @@ pub use lighthouse_model::ucm::key;
 pub use content::{Content, Readable};
 pub use held::Held;
 
-use crate::{Entries, Kind, Stat, read_entries};
+use crate::{Entries, Kind, Raw, Stat, read_entries};
 
 /// A directory with fewer entries than this is hashed on one thread.
 const FAN_OUT: usize = 4;
@@ -37,6 +37,10 @@ pub static STAT: Input<String, Stamped> = Input::new("stat");
 /// What replaces a file for a check of an edit before it is written: an input
 /// of its own so that an overlay never looks like a change on disk.
 pub static OVERLAY: Input<String, Option<Content>> = Input::new("overlay");
+
+/// The names of the files an overlay adds to a directory the file system
+/// has: files that exist only in the text of an edit not yet written.
+pub static VIRTUAL: Input<String, Vec<String>> = Input::new("virtual");
 
 /// What a directory holds, ignored or not.
 pub static ENTRIES: Query<String, Entries> = Query::new("entries", entries);
@@ -69,7 +73,17 @@ struct Child {
 fn entries(graph: &Graph, dir: &String) -> Result<Entries, Error> {
     graph.input(&STAT, dir)?;
     let root = graph.input(&ROOT, &())?.unwrap_or_default();
-    Ok(read_entries(&Path::new(root.as_str()).join(dir)))
+    let mut entries = read_entries(&Path::new(root.as_str()).join(dir));
+    let added = graph.input(&VIRTUAL, dir)?;
+    for name in added.iter().flat_map(|names| names.iter()) {
+        entries.raw.push(Raw {
+            name: name.into(),
+            kind: Kind::File,
+        });
+    }
+    entries.raw.sort_by(|a, b| a.name.cmp(&b.name));
+    entries.raw.dedup_by(|a, b| a.name == b.name);
+    Ok(entries)
 }
 
 /// The Merkle hash of a directory: BLAKE3 over its children in the project,

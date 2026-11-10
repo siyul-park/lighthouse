@@ -51,6 +51,12 @@ impl<'a> Reading<'a> {
         }
     }
 
+    /// Whether an overlay stands in for the file at the project-relative
+    /// `rel`.
+    pub(super) fn overlaid(&self, rel: &Path) -> bool {
+        self.held.overlaid().contains(&key(rel))
+    }
+
     /// The text of the ignore file at the project-relative `rel`, if it can be
     /// read as text.
     pub(super) fn text(&mut self, rel: &Path) -> Option<String> {

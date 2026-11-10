@@ -296,3 +296,41 @@ fn remembered() {
         second.remembered.messages
     );
 }
+
+#[test]
+fn overlays_replace_files_for_a_cold_check_too() {
+    let dir = project("error");
+    let session = session(dir.path());
+    let plain = || {
+        everything(&session)
+            .run
+            .diagnostics
+            .iter()
+            .map(|d| d.fingerprint.as_str().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let before = plain();
+    assert_eq!(before.len(), 1);
+    let overlaid = run(
+        &session,
+        CheckRequest {
+            overlays: [(std::path::PathBuf::from("a.txt"), "a\n".to_owned())].into(),
+            ..CheckRequest::default()
+        },
+    );
+    assert!(overlaid.run.diagnostics.is_empty());
+    assert_eq!(plain(), before);
+    assert!(
+        lighthouse_session::review::list(
+            dir.path(),
+            &lighthouse_session::review::Query {
+                rules: Vec::new(),
+                status: lighthouse_session::review::StatusFilter::All,
+                all_tiers: true,
+            }
+        )
+        .unwrap()
+        .is_none(),
+        "nothing was remembered"
+    );
+}
