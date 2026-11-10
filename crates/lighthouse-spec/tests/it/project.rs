@@ -2,8 +2,8 @@ use std::{path::Path, sync::Arc, time::Duration};
 
 use lighthouse_model::{Format, Metadata, Resource, Safety, Severity};
 use lighthouse_spec::{
-    Config, Error, Level, PluginRef, ProjectSpec, Projects, RuleConfig, RuleSetting, Rules,
-    glob_set,
+    Config, Error, Level, PluginRef, ProjectSpec, Projects, RuleConfig, RuleSetting, Rules, Stage,
+    Trace, glob_set,
 };
 use serde_json::json;
 
@@ -645,6 +645,87 @@ rules = { "core/a" = { level = "error", options = { depth = 7 } } }
         .resolve(Path::new("x"), "text", &projects())
         .unwrap_err();
     assert!(matches!(err, Error::UnknownProject(id) if id == "nope/x"));
+}
+
+#[test]
+fn trace() {
+    let trace = |text: &str, path: &str, lang: &str| {
+        let body = text
+            .replace("[rules]", "[spec.rules]")
+            .replace("[[overrides]]", "[[spec.overrides]]");
+        let text = format!(
+            "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Project\"\n[metadata]\nname = \"demo\"\n[spec]\n{body}"
+        );
+        let config = Config::parse_as(Format::Toml, "lighthouse.toml", &text).unwrap();
+        let rules = config.resolve(Path::new(path), lang, &projects()).unwrap();
+        rules["core/a"]
+            .trace
+            .0
+            .iter()
+            .map(|s| {
+                (
+                    s.stage.clone(),
+                    s.source.clone(),
+                    s.matched.clone(),
+                    s.level,
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let got = trace(
+        &format!("extends = [\"core/recommended\"]\n{LAYERED}"),
+        "internal/x.go",
+        "go",
+    );
+    let extends = (
+        Stage::Extends,
+        "core/recommended".to_owned(),
+        None,
+        Level::Warn,
+    );
+    let project = (
+        Stage::Project,
+        "lighthouse.toml".to_owned(),
+        None,
+        Level::Warn,
+    );
+    let at = |n: usize, selects: &str, level| {
+        (
+            Stage::Override,
+            "lighthouse.toml".to_owned(),
+            Some(format!("overrides[{n}]: {selects}")),
+            level,
+        )
+    };
+    assert_eq!(
+        got,
+        [
+            extends.clone(),
+            project.clone(),
+            at(0, "files internal/**", Level::Error),
+            at(1, "languages go", Level::Info),
+            at(2, "files internal/**; languages go", Level::Error),
+        ]
+    );
+    // Overrides the file does not match leave no step.
+    let got = trace(LAYERED, "pkg/x.rs", "rust");
+    assert_eq!(got, [project]);
+    // The trace is provenance: two rules that say the same are equal, whatever
+    // layers said it.
+    assert_eq!(Trace::default(), Trace(vec![]));
+    let rules = Config::parse_inline("[rules]\n\"core/a\" = \"warn\"")
+        .unwrap()
+        .resolve(Path::new("x"), "text", &projects())
+        .unwrap();
+    assert_eq!(rules["core/a"].trace.0.len(), 1);
+    assert_eq!(rules["core/a"], RuleConfig::new(Some(Severity::Warn)));
+    // A rule only an override names starts its trace there.
+    let got = trace(
+        "[[overrides]]\nfiles = [\"a/**\"]\nrules = { \"core/a\" = \"off\" }",
+        "a/x",
+        "text",
+    );
+    assert_eq!(got, [at(0, "files a/**", Level::Off)]);
 }
 
 #[test]

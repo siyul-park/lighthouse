@@ -42,7 +42,8 @@ use lighthouse_protocol::Selector;
 pub use models::{Evaluation, Models, Routing};
 pub use provider::{CommandProtocol, ModelProvider, ProviderSpec, RESERVED_PROVIDERS, Task};
 use resolved::Resolved;
-pub use rules::{Level, RuleConfig, RuleSetting, Rules};
+use rules::Place;
+pub use rules::{Level, RuleConfig, RuleSetting, Rules, Stage, Step, Trace};
 pub use sandbox::SandboxSpec;
 pub use signals::{SignalsSpec, Surface};
 use spec::PluginEntry;
@@ -161,6 +162,8 @@ impl Projects {
 #[derive(Debug, Clone)]
 pub struct Config {
     name: String,
+    /// The file the project was read from; its name when it is shared.
+    origin: String,
     plugins: Vec<PluginRef>,
     languages: BTreeMap<String, LanguageConfig>,
     injections: Vec<InjectionSpec>,
@@ -192,7 +195,9 @@ impl Config {
 
     /// Parses `text` in `format`; `path` only names it in errors.
     pub fn parse_as(format: Format, path: &str, text: &str) -> Result<Self, Error> {
-        Self::from_resource(parse_project(format, path, text)?)
+        let mut config = Self::from_resource(parse_project(format, path, text)?)?;
+        path.clone_into(&mut config.origin);
+        Ok(config)
     }
 
     /// Parses a bare spec written in TOML, without the envelope: for
@@ -238,6 +243,7 @@ impl Config {
             .into_iter()
             .map(|o| {
                 Ok(Override {
+                    selects: selects(&o.files, &o.languages),
                     files: globs(&o.files)?,
                     languages: o.languages,
                     rules: rules(o.rules),
@@ -260,6 +266,7 @@ impl Config {
             );
         }
         Ok(Self {
+            origin: metadata.name.clone(),
             name: metadata.name,
             plugins: spec
                 .plugins
@@ -476,10 +483,25 @@ impl Config {
             let mut flags = matched.iter();
             let mut out = Rules::new();
             for config in &chain {
-                rules::merge(&mut out, &config.rules);
-                for o in &config.overrides {
+                let stage = if std::ptr::eq(*config, self) {
+                    Stage::Project
+                } else {
+                    Stage::Extends
+                };
+                let at = Place {
+                    stage,
+                    source: &config.origin,
+                    matched: None,
+                };
+                rules::merge(&mut out, &config.rules, &at);
+                for (n, o) in config.overrides.iter().enumerate() {
                     if flags.next().copied().unwrap_or(false) {
-                        rules::merge(&mut out, &o.rules);
+                        let at = Place {
+                            stage: Stage::Override,
+                            source: &config.origin,
+                            matched: Some(format!("overrides[{n}]: {}", o.selects)),
+                        };
+                        rules::merge(&mut out, &o.rules, &at);
                     }
                 }
             }
@@ -529,6 +551,8 @@ struct LanguageConfig {
 /// Rules for the files and languages that match.
 #[derive(Debug, Clone)]
 struct Override {
+    /// What it selects, as the project wrote it: `files internal/**`.
+    selects: String,
     files: Option<GlobSet>,
     languages: Vec<String>,
     rules: Rules,
@@ -569,6 +593,18 @@ where
         pattern: all.join(", "),
         source,
     })
+}
+
+/// What an override selects, as text: `files a/**, b/**; languages go`.
+fn selects(files: &[String], languages: &[String]) -> String {
+    let mut parts = Vec::new();
+    if !files.is_empty() {
+        parts.push(format!("files {}", files.join(", ")));
+    }
+    if !languages.is_empty() {
+        parts.push(format!("languages {}", languages.join(", ")));
+    }
+    parts.join("; ")
 }
 
 fn globs(patterns: &[String]) -> Result<Option<GlobSet>, Error> {

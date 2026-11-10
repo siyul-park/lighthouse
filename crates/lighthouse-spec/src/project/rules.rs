@@ -30,6 +30,48 @@ pub struct RuleConfig {
     pub safety: Option<Safety>,
     /// How `lighthouse eval` judges this rule's check.
     pub evaluation: Option<Evaluation>,
+    /// The layers that set the level, in the order they applied; empty for a
+    /// rule not resolved from a project.
+    pub trace: Trace,
+}
+
+/// The layers a rule's level went through. Provenance, not part of what a
+/// rule says: it never takes part in equality.
+#[derive(Debug, Clone, Default, Eq, Serialize, JsonSchema)]
+#[serde(transparent)]
+pub struct Trace(pub Vec<Step>);
+
+impl PartialEq for Trace {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+/// One layer that set a rule's level.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Step {
+    pub stage: Stage,
+    /// The file the project was read from, or its name when it is shared.
+    pub source: String,
+    /// For an override, which one and what it selects: `overrides[1]: files
+    /// internal/**`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matched: Option<String>,
+    pub level: Level,
+}
+
+/// Where a layer of a project's rules comes from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Stage {
+    /// A project the resolved one extends (a pack's `recommended`, a shared
+    /// project).
+    Extends,
+    /// The `rules` of the resolved project.
+    Project,
+    /// An `[[overrides]]` entry the file matched.
+    Override,
 }
 
 impl RuleConfig {
@@ -43,6 +85,7 @@ impl RuleConfig {
             agent: None,
             safety: None,
             evaluation: None,
+            trace: Trace::default(),
         }
     }
 }
@@ -157,14 +200,28 @@ impl From<Option<Severity>> for Level {
     }
 }
 
+/// Where the rules being merged come from: what a [`Step`] records.
+pub(crate) struct Place<'a> {
+    pub stage: Stage,
+    pub source: &'a str,
+    pub matched: Option<String>,
+}
+
 /// Later level replaces the earlier one; options merge per key, later wins,
 /// and an object-valued option (a limit per role) merges per key too; a
 /// model route, an agent route and an evaluation policy the later sets replace
 /// the earlier; a safety does too, unless either is `unsafe`.
-pub(crate) fn merge(into: &mut Rules, from: &Rules) {
+pub(crate) fn merge(into: &mut Rules, from: &Rules, at: &Place) {
     for (id, next) in from {
+        let step = Step {
+            stage: at.stage.clone(),
+            source: at.source.to_owned(),
+            matched: at.matched.clone(),
+            level: next.level.into(),
+        };
         match into.get_mut(id) {
             Some(prev) => {
+                prev.trace.0.push(step);
                 prev.level = next.level;
                 for (key, value) in &next.options {
                     let merged = match prev.options.get(key) {
@@ -187,7 +244,9 @@ pub(crate) fn merge(into: &mut Rules, from: &Rules) {
                 };
             }
             None => {
-                into.insert(id.clone(), next.clone());
+                let mut first = next.clone();
+                first.trace = Trace(vec![step]);
+                into.insert(id.clone(), first);
             }
         }
     }

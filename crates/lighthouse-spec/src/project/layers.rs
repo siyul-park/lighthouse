@@ -70,6 +70,7 @@ impl Layers {
         spec.fix.unsafe_fixes = merged.fix.unsafe_fixes;
         spec.sandbox = merged.sandbox;
         let mut config = Config::from_resource(Resource::new(project.metadata, spec))?;
+        path.clone_into(&mut config.origin);
         config.environment = personal.rules;
         let project = Layer {
             origin: path.to_owned(),
