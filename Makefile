@@ -16,6 +16,10 @@ SOURCES := $(shell find crates plugins protocol Cargo.toml Cargo.lock -type f ! 
 GO_TOOLCHAIN := $(shell cd plugins/lang-go && go env GOROOT 2>/dev/null)
 export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
 
+# Test builds of the gates keep no incremental state: it grows the debug
+# target by tens of gigabytes. Plain `cargo` outside make keeps its default.
+export CARGO_INCREMENTAL := 0
+
 .PHONY: plugins cli test lint decisions docs ci fast
 
 # `decision test` of the decisions $(1) (all when empty), which fails when it
