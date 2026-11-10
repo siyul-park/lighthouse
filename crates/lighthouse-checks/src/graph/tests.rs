@@ -530,6 +530,99 @@ fn a_body_edit_runs_the_facts_of_the_files_it_reaches_and_of_no_other() {
     );
 }
 
+/// A graph with the inputs the facts read, over the units of `specs`.
+fn primed(mut graph: Graph, specs: &[Spec]) -> Graph {
+    let class = class_of(&everything());
+    graph
+        .set_input(&READS, &class, everything(), Durability::Stable)
+        .unwrap();
+    graph
+        .set_input(
+            &CONVENTIONS,
+            &(),
+            Conventions::default(),
+            Durability::Stable,
+        )
+        .unwrap();
+    Host::set_units(&mut graph, &fragments(specs)).unwrap();
+    graph
+}
+
+fn pull_facts(graph: &Graph, files: usize) {
+    let pull = Pull::new(graph);
+    for at in 0..files {
+        for kind in [SYMBOL, FUNCTION, TEST] {
+            let key = fact_key(kind, &class_of(&everything()), &specs_path(at));
+            pull.pull(FACT, &key).unwrap();
+        }
+    }
+}
+
+fn indexed(ran: &[String]) -> Vec<&String> {
+    ran.iter()
+        .filter(|label| label.starts_with("index") || label.starts_with("aggregate"))
+        .collect()
+}
+
+#[test]
+fn a_new_process_reads_the_indexes_from_the_store_and_runs_no_aggregate() {
+    let specs: Vec<Spec> = (0..3)
+        .map(|n| {
+            let mut s = spec(&format!("m{n}"), &["x", "y"]);
+            s.methods = vec!["x".to_owned(), "y".to_owned()];
+            s
+        })
+        .collect();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("graph.db");
+    let open = || {
+        let options = Options::default().data(analyzers());
+        primed(Graph::open(&path, options).unwrap(), &specs)
+    };
+    let mut graph = open();
+    pull_facts(&graph, 3);
+    assert!(!indexed(&graph.take_executed()).is_empty());
+    graph.commit().unwrap();
+    drop(graph);
+
+    let graph = open();
+    pull_facts(&graph, 3);
+
+    let ran = graph.take_executed();
+    assert!(ran.iter().any(|label| label.starts_with("fact")), "{ran:?}");
+    assert_eq!(indexed(&ran), Vec::<&String>::new());
+}
+
+#[test]
+fn a_revert_of_a_comment_edit_runs_no_fact_and_no_index() {
+    let specs = vec![spec("m0", &["x"]), spec("m1", &["y"])];
+    let mut graph = primed(
+        Graph::in_memory(Options::default().data(analyzers())).unwrap(),
+        &specs,
+    );
+    let text = |graph: &mut Graph, text: &str| {
+        let content = Some(Content::of_text(text));
+        graph
+            .set_input(&OVERLAY, &"p0.rs".to_owned(), content, Durability::Volatile)
+            .unwrap();
+    };
+    text(&mut graph, "fn x() {}\n");
+    pull_facts(&graph, 2);
+    text(&mut graph, "// note\nfn x() {}\n");
+    pull_facts(&graph, 2);
+    graph.take_executed();
+
+    text(&mut graph, "fn x() {}\n");
+    pull_facts(&graph, 2);
+
+    let ran = graph.take_executed();
+    let made: Vec<&String> = ran
+        .iter()
+        .filter(|label| label.starts_with("fact") || label.starts_with("index"))
+        .collect();
+    assert_eq!(made, Vec::<&String>::new());
+}
+
 fn specs_path(at: usize) -> String {
     format!("p{at}.rs")
 }

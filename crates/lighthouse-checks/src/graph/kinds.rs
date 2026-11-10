@@ -51,7 +51,9 @@ pub static READS: Input<String, Reads> = Input::new("reads");
 pub static CONVENTIONS: Input<(), Conventions> = Input::new("conventions");
 
 pub static AGGREGATE: Query<Sort, Aggregate> = Query::new("aggregate", aggregate).transient();
-pub static INDEX: Query<(String, String), Entry> = Query::new("index", index).transient();
+/// Kept, unlike the others: a value the next process finds in the store is
+/// not made again from the aggregate it reads.
+pub static INDEX: Query<(String, String), Entry> = Query::new("index", index);
 pub static SUBJECT: Query<(String, String, String), Facts> = Query::new("fact", fact).transient();
 
 /// The conventions of the languages the facts follow.
