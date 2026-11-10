@@ -10,6 +10,7 @@ doctest = false
 
 [dependencies]
 blake3.workspace = true
+rayon.workspace = true
 lighthouse-model.workspace = true
 lighthouse-protocol.workspace = true
 rusqlite.workspace = true

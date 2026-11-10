@@ -20,11 +20,29 @@ pub fn user_name(root: &Path) -> Option<String> {
         .filter(|name| !name.is_empty())
 }
 
-/// Whether tracked files differ from the commit the working tree is at.
-/// Untracked files do not count; `false` when there is no repository.
-pub fn dirty(root: &Path) -> bool {
-    git(root, &["status", "--porcelain", "--untracked-files=no"])
-        .is_ok_and(|out| !out.trim().is_empty())
+/// The commit the working tree is at, when the project is in a git repository
+/// that has one, and whether tracked files differ from it (untracked files do
+/// not count; `false` when there is no repository), from one run of git.
+pub fn state(root: &Path) -> (Option<String>, bool) {
+    let Ok(out) = git(
+        root,
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "--untracked-files=no",
+        ],
+    ) else {
+        return (None, false);
+    };
+    let (mut commit, mut dirty) = (None, false);
+    for line in out.lines() {
+        match line.strip_prefix("# branch.oid ") {
+            Some(oid) => commit = Some(oid.trim()).filter(|oid| *oid != "(initial)"),
+            None => dirty |= !line.starts_with('#'),
+        }
+    }
+    (commit.map(str::to_owned), dirty)
 }
 
 /// Runs `git -C root args` and returns its stdout.

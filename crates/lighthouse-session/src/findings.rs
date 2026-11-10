@@ -226,14 +226,15 @@ fn observed_all(catalog: &Catalog, run: &engine::Run) -> Vec<Observed> {
 /// options and rule versions, the paths and rules it covered, what it could not
 /// check, and where and with which tools it ran.
 fn run_of(root: &Path, catalog: &Catalog, run: &engine::Run) -> Run {
+    let (commit, dirty) = git::state(root);
     Run {
         observed: observed_all(catalog, run),
         reported: run.reported.iter().map(|p| slashed(p)).collect(),
         ran: run.ran.clone(),
         active: run.active.clone(),
         unchecked: unchecked(&run.incomplete),
-        commit: git::head(root),
-        dirty: git::dirty(root),
+        commit,
+        dirty,
         catalog_version: Some(catalog.version().to_owned()),
         lighthouse_version: env!("CARGO_PKG_VERSION").to_owned(),
     }

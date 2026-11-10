@@ -7,6 +7,7 @@ use std::{
 };
 
 use lighthouse_model::{Judgment, STATE_DIR};
+use rayon::prelude::*;
 use rusqlite::{
     Connection, ErrorCode, OptionalExtension, Transaction, TransactionBehavior, named_params,
     params,
@@ -124,8 +125,12 @@ impl Store {
         let mut summary = RunSummary::default();
         let kept = remembered(&tx)?;
         let (mut unchanged, mut written) = (BTreeSet::new(), BTreeSet::new());
-        for observed in &run.observed {
-            let digest = observation(observed, run);
+        let digests: Vec<String> = run
+            .observed
+            .par_iter()
+            .map(|observed| observation(observed, run))
+            .collect();
+        for (observed, digest) in run.observed.iter().zip(digests) {
             match kept.get(observed.fingerprint.as_str()) {
                 Some(Kept::Open(was)) if *was == digest => {
                     unchanged.insert(observed.fingerprint.as_str());

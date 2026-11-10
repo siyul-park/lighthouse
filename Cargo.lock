@@ -2146,6 +2146,7 @@ dependencies = [
  "blake3",
  "lighthouse-model",
  "lighthouse-protocol",
+ "rayon",
  "rusqlite",
  "schemars",
  "serde",
