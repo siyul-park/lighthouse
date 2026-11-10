@@ -5,6 +5,7 @@ use std::{fs, path::Path, process::Command};
 
 use serde_json::{Value, json};
 
+use crate::ask::diff;
 use crate::mcp::{Client, notes, rust_project};
 
 /// What `lighthouse check --format json` prints in `dir`.
@@ -126,4 +127,85 @@ fn a_provider_that_was_killed_starts_again() {
     let again = client.tool("check", json!({})).unwrap();
     assert_eq!(again, cli(dir.path()));
     assert_eq!(again["status"], "findings");
+}
+
+const HELPER: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap()\n}\n";
+const SAFE: &str = "pub fn run(x: Option<u8>) -> u8 {\n    x.unwrap_or(0)\n}\n";
+
+#[test]
+fn a_question_to_a_server_changes_nothing_and_the_next_check_is_a_command_line_run() {
+    let dir = rust_project();
+    let mut client = Client::start(dir.path());
+    let edit = diff("src/lib.rs", Some(HELPER), SAFE);
+
+    let answer = client
+        .tool("decision_ask", json!({ "edit": edit, "detail": "full" }))
+        .unwrap();
+    assert_eq!(answer["kind"], "whatIf");
+    assert_eq!(
+        answer["cleared"][0]["decision"], "design/no-panic",
+        "{answer}"
+    );
+    assert_eq!(answer["fired"], json!([]));
+    assert!(
+        !dir.path().join(".lighthouse/lighthouse.db").exists(),
+        "a question remembers nothing"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join("src/lib.rs")).unwrap(),
+        HELPER
+    );
+
+    let plain = cli(dir.path());
+    for _ in 0..2 {
+        assert_eq!(client.tool("check", json!({})).unwrap(), plain);
+        client
+            .tool("decision_ask", json!({ "edit": edit }))
+            .unwrap();
+    }
+    assert_eq!(client.tool("check", json!({})).unwrap(), cli(dir.path()));
+}
+
+#[test]
+fn an_edit_that_does_not_apply_is_a_tool_error_that_names_the_file() {
+    let dir = rust_project();
+    let mut client = Client::start(dir.path());
+    let stale = diff("src/lib.rs", Some("fn other() {}\n"), "fn another() {}\n");
+    let refused = client
+        .tool("decision_ask", json!({ "edit": stale }))
+        .unwrap_err();
+    assert!(refused.contains("src/lib.rs"), "{refused}");
+    let renamed = client.tool(
+        "decision_ask",
+        json!({ "edit": "diff --git a/x b/y\nrename from x\nrename to y\n" }),
+    );
+    assert!(renamed.unwrap_err().contains("rename"));
+    let outside = client.tool(
+        "decision_ask",
+        json!({ "edit": diff("src/lib.rs", Some(HELPER), SAFE), "paths": ["/etc"] }),
+    );
+    assert!(outside.is_err());
+}
+
+#[test]
+fn a_provider_that_was_killed_leaves_the_answer_unknown() {
+    let dir = rust_project();
+    let mut client = Client::start(dir.path());
+    client.tool("check", json!({})).unwrap();
+    let children = Command::new("pgrep")
+        .args(["-P", &client.pid().to_string()])
+        .output()
+        .unwrap();
+    for pid in String::from_utf8(children.stdout)
+        .unwrap()
+        .split_whitespace()
+    {
+        Command::new("kill").args(["-9", pid]).status().unwrap();
+    }
+    let edit = diff("src/lib.rs", Some(HELPER), "pub fn run() {}\n");
+    let gone = client
+        .tool("decision_ask", json!({ "edit": edit }))
+        .unwrap();
+    assert_eq!(gone["verdict"], "unknown", "{gone}");
+    assert!(!gone["incomplete"].as_array().unwrap().is_empty());
 }

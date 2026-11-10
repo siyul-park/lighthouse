@@ -9,6 +9,7 @@ test = false
 doctest = false
 
 [dependencies]
+diffy.workspace = true
 globset.workspace = true
 lang-cel.workspace = true
 lighthouse-checks.workspace = true

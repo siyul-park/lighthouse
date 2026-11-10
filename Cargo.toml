@@ -17,6 +17,7 @@ cel = "0.15"
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 comrak = { version = "=0.59.0", default-features = false }
+diffy = "=0.4.2"
 globset = "0.4"
 hf-hub = { version = "0.5", default-features = false, features = ["ureq", "native-tls"] }
 ignore = "0.4"

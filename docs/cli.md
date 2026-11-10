@@ -174,6 +174,7 @@ Commands:
   signal   Settle the session signals
   test     Run the examples of checked decisions through the whole engine
   eval     Measure a decision's check against its labels
+  ask      Ask what a proposed edit would do: which decisions fire or clear
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -458,6 +459,50 @@ Examples:
   lighthouse decision eval design/prefer-method
   lighthouse decision eval design/prefer-method --check candidate.yaml --format json
   lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50
+```
+
+## `lighthouse decision ask`
+
+```text
+Ask what a proposed edit would do: which decisions fire or clear.
+
+The edit is a unified diff (git's format, paths relative to the project root; edits and new files only). The project is checked as it is and as it would be with the edit applied in memory, and the findings are compared by fingerprint: `fired` are the ones the edit adds, `cleared` the ones it removes, in the files it touches and in PATHS. No file is written and nothing is remembered. The verdict is `forbidden` when a decision at `error` or `warn` fires, `permitted` when none does (or only at `info`), and `unknown` when the analysis was incomplete; it is open-world: `permitted` means no enabled decision fires within what ran, and `gaps` lists the enabled decisions a model decides, which this answer cannot cover. Each fired finding carries the fix its decision declares. Exits 0 permitted, 1 forbidden, 3 unknown.
+
+Usage: lighthouse decision ask [OPTIONS] --edit <FILE|-> [PATHS]...
+
+Arguments:
+  [PATHS]...
+          Report the answer for these files or directories as well as the files the edit touches
+
+Options:
+      --edit <FILE|->
+          The edit to ask about, as a unified diff in git's format with paths relative to the project root (what `git diff` prints and `git apply` takes; new files are allowed). On the command line this is a file, or `-` for stdin; the tool takes the text
+
+      --detail <DETAIL>
+          With `--format json`: compact groups the findings by decision; full gives one record per finding with its evidence
+
+          Possible values:
+          - compact: Grouped by decision, a decision's text said once
+          - full:    One self-contained record per item
+          
+          [default: compact]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  git diff | lighthouse decision ask --edit -
+  lighthouse decision ask --edit change.patch src/store --format json
+  lighthouse decision ask --edit change.patch --detail full --format json
 ```
 
 ## `lighthouse review`

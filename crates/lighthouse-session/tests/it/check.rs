@@ -1,5 +1,6 @@
 //! A run of the project's checks and what a frontend reads out of it.
 
+use lighthouse_engine::Overlays;
 use lighthouse_report::{Detail, Format};
 use lighthouse_session::{CheckReport, CheckRequest, Checked, RunStatus, Session};
 use serde_json::{Value, json};
@@ -333,4 +334,15 @@ fn overlays_replace_files_for_a_cold_check_too() {
         .is_none(),
         "nothing was remembered"
     );
+}
+
+#[test]
+fn unremembered() {
+    let dir = project("error");
+    let session = session(dir.path());
+
+    let request = CheckRequest::unremembered(&session.root, Overlays::new());
+
+    assert_eq!(request.paths, std::slice::from_ref(&session.root));
+    assert!(!request.store && request.cache && request.models.off);
 }

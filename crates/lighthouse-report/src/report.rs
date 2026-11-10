@@ -183,6 +183,16 @@ pub struct Gap {
     pub reason: String,
 }
 
+impl From<&Incomplete> for Gap {
+    fn from(item: &Incomplete) -> Self {
+        Self {
+            kind: "incomplete",
+            path: item.path.clone(),
+            reason: item.reason.clone(),
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct Finding<'a> {
     #[serde(rename = "type")]
@@ -417,14 +427,7 @@ fn full(diagnostics: &[Diagnostic], incomplete: &[Incomplete], briefing: &Briefi
         .collect();
     Full {
         findings,
-        incomplete: incomplete
-            .iter()
-            .map(|item| Gap {
-                kind: "incomplete",
-                path: item.path.clone(),
-                reason: item.reason.clone(),
-            })
-            .collect(),
+        incomplete: incomplete.iter().map(Gap::from).collect(),
         omitted,
         judgments: shown
             .iter()

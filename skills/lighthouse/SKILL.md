@@ -55,6 +55,11 @@ judged is remembered with its reason and is not raised again.
    it is: the layers its severity went through, the judgment that hides it or
    not, and the judgments on other findings of its decision.
 
+5. **Ask** before an edit you suspect a decision forbids: `decision_ask` with the
+   edit as a unified diff says which findings it would add (`fired`) or remove
+   (`cleared`) and a `verdict` (`forbidden`, `permitted`, `unknown`), without
+   writing a file or remembering anything.
+
 ## Rules of conduct
 
 - Never suppress an error to make it go away. Fix the code.

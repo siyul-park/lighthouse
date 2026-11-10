@@ -430,3 +430,18 @@ fn a_descriptor_line_for_a_decision_without_a_fix_names_the_brief_of_the_finding
         "fix: none \u{2014} lighthouse review show a1b2c3d for a brief"
     );
 }
+
+#[test]
+fn gap() {
+    let item = lighthouse_model::Incomplete {
+        path: Some("a.rs".into()),
+        provider: None,
+        reason: "it did not parse".to_owned(),
+    };
+
+    let gap = lighthouse_report::Gap::from(&item);
+
+    assert_eq!(gap.kind, "incomplete");
+    assert_eq!(gap.path, item.path);
+    assert_eq!(gap.reason, item.reason);
+}

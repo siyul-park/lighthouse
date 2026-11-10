@@ -62,6 +62,7 @@ output as `structuredContent` (validated by the tool's `outputSchema`, the schem
 | `decision_create`, `decision_update` | `decision create`, `decision update` | `AuthorReport` |
 | `decision_test` | `decision test` | `TestReport` |
 | `decision_eval` | `decision eval` | `EvalReport` |
+| `decision_ask` | `decision ask` | `Answer`: what a proposed edit would do, `fired` and `cleared` findings and a `verdict` |
 | `review_list` | `review list` | `ReviewList` |
 | `review_show` | `review show` | `Finding`: one finding in full; `detail: "full"` adds why it is as it is: `precedence` (the layers its severity went through), `suppressions` (the judgment that hides it or not) and `precedents` (judgments on other findings of its decision) |
 | `review_resolve` | `review resolve` | `ResolveReport` |
@@ -169,6 +170,26 @@ prompt and session-start hooks work as before. Nothing is written until the whol
 a file that changed meanwhile is skipped and reported, with every file of a fix that
 spans it. The findings the fixes removed
 are resolved by the run that ends the fixing. Recheck with `check` afterwards.
+
+### Asking what an edit would do
+
+`decision_ask {edit, paths?, detail?}` (CLI: `decision ask --edit <FILE|-> [PATHS]`) answers
+before an edit is written: `edit` is a unified diff in git's format, paths relative to the
+project root (edits and new files in a directory the project has; no renames, deletions,
+mode changes or binary files, and nothing under `.lighthouse/` or any `lighthouse.toml`).
+The project is checked as it is and as it would be with the edit applied in memory, and the
+findings are compared by fingerprint in the files the edit touches and in `paths`: `fired`
+are the ones the edit adds, `cleared` the ones it removes, and `unchanged` counts the rest.
+The verdict is `forbidden` when a decision at `error` or `warn` fires (exit 1), `permitted`
+when none does, or only at `info` (exit 0), and `unknown` when the analysis was incomplete
+and nothing certain fired (exit 3). It is open-world: `permitted` means that no enabled
+decision fires within what ran, and `gaps` lists the enabled decisions only a model decides,
+which the answer does not cover. Each fired finding carries the fix its decision declares
+(`fix`: who makes it, `safe` or `unsafe`, whether it runs). No file is written, nothing is
+remembered and no model is asked; the answer is the one a `check` of a copy with the edit
+applied would give, which a test checks. `basis` is always `evaluated`. A hunk that does not
+apply, or a refused edit, is a usage error (exit 2; `isError` for the tool) that names the
+file.
 
 ### Resources
 

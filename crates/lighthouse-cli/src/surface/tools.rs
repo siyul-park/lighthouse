@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use lighthouse_model::{SCHEMA_URL_BASE, schema_file};
 use lighthouse_session::{
     Authored, CheckReport, Session,
+    ask::Answer,
     fix::Fixed,
     model::{Attachment, Detachment, EvalReport, Rebuilt, Trained, remote_bound},
     review::{Recorded, Shown},
@@ -21,9 +22,9 @@ use serde_json::{Value, json};
 use crate::surface::{
     Result,
     args::{
-        CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
-        DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs, FixArgs,
-        ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelTrainArgs, ReviewListArgs,
+        CheckArgs, ConfigShowArgs, DecisionAskArgs, DecisionEvalArgs, DecisionListArgs,
+        DecisionShowArgs, DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs,
+        FixArgs, ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelTrainArgs, ReviewListArgs,
         ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
     },
     check,
@@ -44,7 +45,7 @@ const FIX_DESCRIPTION: &str = "Fix findings with the fixers the decisions name (
 const REBUILD_KIND: &str = "ModelRebuild";
 
 /// The tools, in the order they are listed.
-pub const TOOLS: [Tool; 19] = [
+pub const TOOLS: [Tool; 20] = [
     Tool::new::<CheckArgs, CheckReport>(
         "check",
         &["check"],
@@ -121,6 +122,13 @@ pub const TOOLS: [Tool; 19] = [
         "DecisionEval",
         Hints::READ.open(),
         |ctx, args| decision::eval(ctx, &parse(args)?, Format::Json),
+    ),
+    Tool::new::<DecisionAskArgs, Answer>(
+        "decision_ask",
+        &["decision", "ask"],
+        "Answer",
+        Hints::READ,
+        |ctx, args| decision::ask(ctx, &parse(args)?, Format::Json),
     ),
     Tool::new::<ReviewListArgs, ReviewList>(
         "review_list",

@@ -237,6 +237,27 @@ pub struct DocumentArgs {
     pub document: String,
 }
 
+/// `decision ask`.
+#[derive(Debug, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionAskArgs {
+    /// The edit to ask about, as a unified diff in git's format with paths
+    /// relative to the project root (what `git diff` prints and `git apply`
+    /// takes; new files are allowed). On the command line this is a file, or
+    /// `-` for stdin; the tool takes the text.
+    #[arg(long, value_name = "FILE|-")]
+    pub edit: String,
+    /// Report the answer for these files or directories as well as the files
+    /// the edit touches.
+    #[serde(default)]
+    pub paths: Vec<PathBuf>,
+    /// With `--format json`: compact groups the findings by decision; full
+    /// gives one record per finding with its evidence.
+    #[arg(long, value_enum, default_value_t)]
+    #[serde(default)]
+    pub detail: Detail,
+}
+
 /// `decision test`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", default)]

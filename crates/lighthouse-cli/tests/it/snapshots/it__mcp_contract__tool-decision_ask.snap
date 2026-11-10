@@ -1,0 +1,933 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "Ask what a proposed edit would do: which decisions fire or clear.\n\nThe edit is a unified diff (git's format, paths relative to the project root; edits and new files only). The project is checked as it is and as it would be with the edit applied in memory, and the findings are compared by fingerprint: `fired` are the ones the edit adds, `cleared` the ones it removes, in the files it touches and in PATHS. No file is written and nothing is remembered. The verdict is `forbidden` when a decision at `error` or `warn` fires, `permitted` when none does (or only at `info`), and `unknown` when the analysis was incomplete; it is open-world: `permitted` means no enabled decision fires within what ran, and `gaps` lists the enabled decisions a model decides, which this answer cannot cover. Each fired finding carries the fix its decision declares. Exits 0 permitted, 1 forbidden, 3 unknown.\n\nExamples:\n  git diff | lighthouse decision ask --edit -\n  lighthouse decision ask --edit change.patch src/store --format json\n  lighthouse decision ask --edit change.patch --detail full --format json",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision ask`.",
+    "properties": {
+      "detail": {
+        "default": "compact",
+        "description": "With `--format json`: compact groups the findings by decision; full\ngives one record per finding with its evidence.",
+        "oneOf": [
+          {
+            "const": "compact",
+            "description": "Grouped by decision, a decision's text said once.",
+            "type": "string"
+          },
+          {
+            "const": "full",
+            "description": "One self-contained record per item.",
+            "type": "string"
+          }
+        ]
+      },
+      "edit": {
+        "description": "The edit to ask about, as a unified diff in git's format with paths\nrelative to the project root (what `git diff` prints and `git apply`\ntakes; new files are allowed). On the command line this is a file, or\n`-` for stdin; the tool takes the text.",
+        "type": "string"
+      },
+      "paths": {
+        "default": [],
+        "description": "Report the answer for these files or directories as well as the files\nthe edit touches.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "edit"
+    ],
+    "type": "object"
+  },
+  "name": "decision_ask",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/answer.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The `Answer` kind: what the decisions say of an edit.",
+    "properties": {
+      "basis": {
+        "description": "How the answer was reached.",
+        "oneOf": [
+          {
+            "const": "evaluated",
+            "description": "By checking the code as it is and as the edit would make it.",
+            "type": "string"
+          }
+        ]
+      },
+      "cleared": {
+        "anyOf": [
+          {
+            "description": "Grouped by decision, as `check` groups them.",
+            "items": {
+              "description": "The findings of one decision at one severity.",
+              "properties": {
+                "decision": {
+                  "type": "string"
+                },
+                "files": {
+                  "additionalProperties": {
+                    "items": {
+                      "maxItems": 4,
+                      "minItems": 4,
+                      "prefixItems": [
+                        {
+                          "format": "uint32",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "format": "uint32",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
+                    },
+                    "type": "array"
+                  },
+                  "description": "By file, each `[line, col, message, fingerprint prefix]`.",
+                  "type": "object"
+                },
+                "fix": {
+                  "description": "The fix the decision declares, for the findings in it.",
+                  "properties": {
+                    "apply": {
+                      "description": "The command line.",
+                      "type": "string"
+                    },
+                    "by": {
+                      "description": "What makes the fix of a decision.",
+                      "enum": [
+                        "cel",
+                        "command",
+                        "model",
+                        "rpc"
+                      ],
+                      "type": "string"
+                    },
+                    "runs": {
+                      "description": "False when the fix cannot run, and `why` says why.",
+                      "type": "boolean"
+                    },
+                    "safety": {
+                      "description": "The effective safety of the fix at best: a provider can only lower it.",
+                      "oneOf": [
+                        {
+                          "const": "safe",
+                          "description": "Mechanical and meaning-preserving: written by `--fix`.",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unsafe",
+                          "description": "Probably right but a judgment call: written only when the project allows\nit or the run asks for unsafe fixes, else previewed.",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "tool": {
+                      "description": "A tool call: the twin of a command line.",
+                      "properties": {
+                        "arguments": true,
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "arguments"
+                      ],
+                      "type": "object"
+                    },
+                    "why": {
+                      "anyOf": [
+                        {
+                          "description": "Why the fix of a decision does not run, whoever would make it: one of a\nclosed set, said the same way for a rule, a command, a plugin and a model.",
+                          "oneOf": [
+                            {
+                              "const": "no agent binding",
+                              "description": "A model fix, and no agent that edits is bound to the decision.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "untrusted project",
+                              "description": "The fix runs a program, and the user has not trusted the project.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "sandbox unavailable",
+                              "description": "The fix runs a program, and this machine has no sandbox to run it in.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "no budget",
+                              "description": "A model that costs, and `[models] budget` allows no request.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "budget spent",
+                              "description": "A model that costs, and the requests the budget allows were made.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "provider unavailable",
+                              "description": "Nothing serves the kind of fix the decision names.",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "written": {
+                      "description": "Whether an `unsafe` fix run without `--unsafe-fixes` is written\n(`[fix] unsafe`) or previewed. Absent for a `safe` fix.",
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "by",
+                    "safety",
+                    "runs",
+                    "apply",
+                    "tool"
+                  ],
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "severity": {
+                  "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
+                  "oneOf": [
+                    {
+                      "const": "error",
+                      "description": "Fails the run.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "warn",
+                      "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "info",
+                      "description": "Reported, never fails the run.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "decision",
+                "severity",
+                "files"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          {
+            "description": "One record per finding.",
+            "items": {
+              "description": "One finding.",
+              "properties": {
+                "col": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "decision": {
+                  "type": "string"
+                },
+                "evidence": true,
+                "fingerprint": {
+                  "type": "string"
+                },
+                "fix": {
+                  "description": "The fix the decision declares.",
+                  "properties": {
+                    "apply": {
+                      "description": "The command line.",
+                      "type": "string"
+                    },
+                    "by": {
+                      "description": "What makes the fix of a decision.",
+                      "enum": [
+                        "cel",
+                        "command",
+                        "model",
+                        "rpc"
+                      ],
+                      "type": "string"
+                    },
+                    "runs": {
+                      "description": "False when the fix cannot run, and `why` says why.",
+                      "type": "boolean"
+                    },
+                    "safety": {
+                      "description": "The effective safety of the fix at best: a provider can only lower it.",
+                      "oneOf": [
+                        {
+                          "const": "safe",
+                          "description": "Mechanical and meaning-preserving: written by `--fix`.",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unsafe",
+                          "description": "Probably right but a judgment call: written only when the project allows\nit or the run asks for unsafe fixes, else previewed.",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "tool": {
+                      "description": "A tool call: the twin of a command line.",
+                      "properties": {
+                        "arguments": true,
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "arguments"
+                      ],
+                      "type": "object"
+                    },
+                    "why": {
+                      "anyOf": [
+                        {
+                          "description": "Why the fix of a decision does not run, whoever would make it: one of a\nclosed set, said the same way for a rule, a command, a plugin and a model.",
+                          "oneOf": [
+                            {
+                              "const": "no agent binding",
+                              "description": "A model fix, and no agent that edits is bound to the decision.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "untrusted project",
+                              "description": "The fix runs a program, and the user has not trusted the project.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "sandbox unavailable",
+                              "description": "The fix runs a program, and this machine has no sandbox to run it in.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "no budget",
+                              "description": "A model that costs, and `[models] budget` allows no request.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "budget spent",
+                              "description": "A model that costs, and the requests the budget allows were made.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "provider unavailable",
+                              "description": "Nothing serves the kind of fix the decision names.",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "written": {
+                      "description": "Whether an `unsafe` fix run without `--unsafe-fixes` is written\n(`[fix] unsafe`) or previewed. Absent for a `safe` fix.",
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "by",
+                    "safety",
+                    "runs",
+                    "apply",
+                    "tool"
+                  ],
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "line": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "severity": {
+                  "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
+                  "oneOf": [
+                    {
+                      "const": "error",
+                      "description": "Fails the run.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "warn",
+                      "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "info",
+                      "description": "Reported, never fails the run.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "symbol": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "decision",
+                "severity",
+                "path",
+                "line",
+                "col",
+                "message",
+                "evidence",
+                "fingerprint"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        ],
+        "description": "Findings there now that the edit would remove."
+      },
+      "fired": {
+        "anyOf": [
+          {
+            "description": "Grouped by decision, as `check` groups them.",
+            "items": {
+              "description": "The findings of one decision at one severity.",
+              "properties": {
+                "decision": {
+                  "type": "string"
+                },
+                "files": {
+                  "additionalProperties": {
+                    "items": {
+                      "maxItems": 4,
+                      "minItems": 4,
+                      "prefixItems": [
+                        {
+                          "format": "uint32",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "format": "uint32",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
+                    },
+                    "type": "array"
+                  },
+                  "description": "By file, each `[line, col, message, fingerprint prefix]`.",
+                  "type": "object"
+                },
+                "fix": {
+                  "description": "The fix the decision declares, for the findings in it.",
+                  "properties": {
+                    "apply": {
+                      "description": "The command line.",
+                      "type": "string"
+                    },
+                    "by": {
+                      "description": "What makes the fix of a decision.",
+                      "enum": [
+                        "cel",
+                        "command",
+                        "model",
+                        "rpc"
+                      ],
+                      "type": "string"
+                    },
+                    "runs": {
+                      "description": "False when the fix cannot run, and `why` says why.",
+                      "type": "boolean"
+                    },
+                    "safety": {
+                      "description": "The effective safety of the fix at best: a provider can only lower it.",
+                      "oneOf": [
+                        {
+                          "const": "safe",
+                          "description": "Mechanical and meaning-preserving: written by `--fix`.",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unsafe",
+                          "description": "Probably right but a judgment call: written only when the project allows\nit or the run asks for unsafe fixes, else previewed.",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "tool": {
+                      "description": "A tool call: the twin of a command line.",
+                      "properties": {
+                        "arguments": true,
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "arguments"
+                      ],
+                      "type": "object"
+                    },
+                    "why": {
+                      "anyOf": [
+                        {
+                          "description": "Why the fix of a decision does not run, whoever would make it: one of a\nclosed set, said the same way for a rule, a command, a plugin and a model.",
+                          "oneOf": [
+                            {
+                              "const": "no agent binding",
+                              "description": "A model fix, and no agent that edits is bound to the decision.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "untrusted project",
+                              "description": "The fix runs a program, and the user has not trusted the project.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "sandbox unavailable",
+                              "description": "The fix runs a program, and this machine has no sandbox to run it in.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "no budget",
+                              "description": "A model that costs, and `[models] budget` allows no request.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "budget spent",
+                              "description": "A model that costs, and the requests the budget allows were made.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "provider unavailable",
+                              "description": "Nothing serves the kind of fix the decision names.",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "written": {
+                      "description": "Whether an `unsafe` fix run without `--unsafe-fixes` is written\n(`[fix] unsafe`) or previewed. Absent for a `safe` fix.",
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "by",
+                    "safety",
+                    "runs",
+                    "apply",
+                    "tool"
+                  ],
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "severity": {
+                  "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
+                  "oneOf": [
+                    {
+                      "const": "error",
+                      "description": "Fails the run.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "warn",
+                      "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "info",
+                      "description": "Reported, never fails the run.",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "decision",
+                "severity",
+                "files"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          {
+            "description": "One record per finding.",
+            "items": {
+              "description": "One finding.",
+              "properties": {
+                "col": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "decision": {
+                  "type": "string"
+                },
+                "evidence": true,
+                "fingerprint": {
+                  "type": "string"
+                },
+                "fix": {
+                  "description": "The fix the decision declares.",
+                  "properties": {
+                    "apply": {
+                      "description": "The command line.",
+                      "type": "string"
+                    },
+                    "by": {
+                      "description": "What makes the fix of a decision.",
+                      "enum": [
+                        "cel",
+                        "command",
+                        "model",
+                        "rpc"
+                      ],
+                      "type": "string"
+                    },
+                    "runs": {
+                      "description": "False when the fix cannot run, and `why` says why.",
+                      "type": "boolean"
+                    },
+                    "safety": {
+                      "description": "The effective safety of the fix at best: a provider can only lower it.",
+                      "oneOf": [
+                        {
+                          "const": "safe",
+                          "description": "Mechanical and meaning-preserving: written by `--fix`.",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unsafe",
+                          "description": "Probably right but a judgment call: written only when the project allows\nit or the run asks for unsafe fixes, else previewed.",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "tool": {
+                      "description": "A tool call: the twin of a command line.",
+                      "properties": {
+                        "arguments": true,
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "arguments"
+                      ],
+                      "type": "object"
+                    },
+                    "why": {
+                      "anyOf": [
+                        {
+                          "description": "Why the fix of a decision does not run, whoever would make it: one of a\nclosed set, said the same way for a rule, a command, a plugin and a model.",
+                          "oneOf": [
+                            {
+                              "const": "no agent binding",
+                              "description": "A model fix, and no agent that edits is bound to the decision.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "untrusted project",
+                              "description": "The fix runs a program, and the user has not trusted the project.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "sandbox unavailable",
+                              "description": "The fix runs a program, and this machine has no sandbox to run it in.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "no budget",
+                              "description": "A model that costs, and `[models] budget` allows no request.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "budget spent",
+                              "description": "A model that costs, and the requests the budget allows were made.",
+                              "type": "string"
+                            },
+                            {
+                              "const": "provider unavailable",
+                              "description": "Nothing serves the kind of fix the decision names.",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "written": {
+                      "description": "Whether an `unsafe` fix run without `--unsafe-fixes` is written\n(`[fix] unsafe`) or previewed. Absent for a `safe` fix.",
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "by",
+                    "safety",
+                    "runs",
+                    "apply",
+                    "tool"
+                  ],
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "line": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "severity": {
+                  "description": "How hard a finding fails a run; serialized and parsed as the lowercase\nvariant name. Whether a finding also asks for review is not a level: it\nfollows from the severity its decision authored.",
+                  "oneOf": [
+                    {
+                      "const": "error",
+                      "description": "Fails the run.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "warn",
+                      "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+                      "type": "string"
+                    },
+                    {
+                      "const": "info",
+                      "description": "Reported, never fails the run.",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "symbol": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "decision",
+                "severity",
+                "path",
+                "line",
+                "col",
+                "message",
+                "evidence",
+                "fingerprint"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        ],
+        "description": "Findings the edit would add to the files it edits and to `paths`."
+      },
+      "gaps": {
+        "description": "The enabled decisions that only a model decides: the answer does not\ncover them.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "incomplete": {
+        "description": "Parts of the project not analyzed, as `check` reports them.",
+        "items": {
+          "description": "A part of the project that was not checked, and why.",
+          "properties": {
+            "path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "type": {
+              "description": "`incomplete`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "kind": {
+        "description": "What the question asks about.",
+        "oneOf": [
+          {
+            "const": "whatIf",
+            "description": "What the decisions say of an edit that is proposed.",
+            "type": "string"
+          }
+        ]
+      },
+      "premises": {
+        "items": {
+          "description": "A decision that bears on the answer.",
+          "properties": {
+            "decision": {
+              "type": "string"
+            },
+            "requirement": {
+              "description": "The first line of its requirement.",
+              "type": "string"
+            },
+            "severity": {
+              "description": "The severity it fires at here.",
+              "oneOf": [
+                {
+                  "const": "error",
+                  "description": "Fails the run.",
+                  "type": "string"
+                },
+                {
+                  "const": "warn",
+                  "description": "Fails the run only under `--strict` or past `--max-warnings`.",
+                  "type": "string"
+                },
+                {
+                  "const": "info",
+                  "description": "Reported, never fails the run.",
+                  "type": "string"
+                }
+              ]
+            },
+            "uid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "decision",
+            "requirement",
+            "severity"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "unchanged": {
+        "description": "How many findings there are both ways.",
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "verdict": {
+        "description": "What the decisions say of the edit. Open-world: `permitted` is that no\nenabled decision fires within what ran.",
+        "oneOf": [
+          {
+            "const": "forbidden",
+            "description": "A decision at `error` or `warn` fires on the edit.",
+            "type": "string"
+          },
+          {
+            "const": "permitted",
+            "description": "None does, or only at `info`.",
+            "type": "string"
+          },
+          {
+            "const": "unknown",
+            "description": "None fires that is certain, and some analysis is incomplete.",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "required": [
+      "kind",
+      "verdict",
+      "premises",
+      "fired",
+      "cleared",
+      "unchanged",
+      "gaps",
+      "incomplete",
+      "basis"
+    ],
+    "title": "Answer",
+    "type": "object"
+  },
+  "title": "Ask what a proposed edit would do: which decisions fire or clear"
+}

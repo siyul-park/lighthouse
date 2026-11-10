@@ -61,6 +61,23 @@ pub struct CheckRequest {
     pub overlays: Overlays,
 }
 
+impl CheckRequest {
+    /// The check of the project at `root` as it is, or with `overlays` for the
+    /// files they name. Nothing is remembered; no model is asked.
+    pub fn unremembered(root: &Path, overlays: Overlays) -> Self {
+        Self {
+            paths: vec![root.to_owned()],
+            cache: true,
+            models: ModelOptions {
+                off: true,
+                ..ModelOptions::default()
+            },
+            overlays,
+            ..Self::default()
+        }
+    }
+}
+
 /// The counts of a run, shared by every frontend that reports on one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Summary {

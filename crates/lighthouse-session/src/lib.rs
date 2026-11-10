@@ -13,6 +13,7 @@ mod extends;
 mod findings;
 mod generated;
 mod git;
+mod patch;
 mod permit;
 mod project;
 mod scope;
@@ -22,6 +23,7 @@ mod validate;
 mod warm;
 mod why;
 
+pub mod ask;
 pub mod baseline;
 pub mod environment;
 pub mod fix;

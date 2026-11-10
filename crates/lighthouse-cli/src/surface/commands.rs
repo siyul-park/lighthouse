@@ -9,10 +9,10 @@ use clap::{Args, Subcommand};
 use crate::surface::{
     Result,
     args::{
-        CheckArgs, ConfigShowArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs,
-        DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs, FixOptions,
-        ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelRebuildArgs, ModelTrainArgs,
-        ReviewListArgs, ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
+        CheckArgs, ConfigShowArgs, DecisionAskArgs, DecisionEvalArgs, DecisionListArgs,
+        DecisionShowArgs, DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs,
+        FixOptions, ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelRebuildArgs,
+        ModelTrainArgs, ReviewListArgs, ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
     },
     check, config, decision, model,
     reply::{CheckFormat, Context, FormatArg, Reply},
@@ -37,6 +37,12 @@ Examples:
   lighthouse decision eval design/prefer-method
   lighthouse decision eval design/prefer-method --check candidate.yaml --format json
   lighthouse decision eval design/prefer-method --repo cel=../cel --audit 50";
+
+const ASK_EXAMPLES: &str = "\
+Examples:
+  git diff | lighthouse decision ask --edit -
+  lighthouse decision ask --edit change.patch src/store --format json
+  lighthouse decision ask --edit change.patch --detail full --format json";
 
 const TRAIN_EXAMPLES: &str = "\
 Examples:
@@ -219,6 +225,28 @@ pub enum DecisionCommand {
     Eval {
         #[command(flatten)]
         args: DecisionEvalArgs,
+        #[command(flatten)]
+        output: FormatArg,
+    },
+    /// Ask what a proposed edit would do: which decisions fire or clear.
+    ///
+    /// The edit is a unified diff (git's format, paths relative to the
+    /// project root; edits and new files only). The project is checked as it
+    /// is and as it would be with the edit applied in memory, and the
+    /// findings are compared by fingerprint: `fired` are the ones the edit
+    /// adds, `cleared` the ones it removes, in the files it touches and in
+    /// PATHS. No file is written and nothing is remembered. The verdict is
+    /// `forbidden` when a decision at `error` or `warn` fires, `permitted`
+    /// when none does (or only at `info`), and `unknown` when the analysis was
+    /// incomplete; it is open-world: `permitted` means no enabled decision
+    /// fires within what ran, and `gaps` lists the enabled decisions a model
+    /// decides, which this answer cannot cover. Each fired
+    /// finding carries the fix its decision declares. Exits 0 permitted, 1
+    /// forbidden, 3 unknown.
+    #[command(after_long_help = ASK_EXAMPLES)]
+    Ask {
+        #[command(flatten)]
+        args: DecisionAskArgs,
         #[command(flatten)]
         output: FormatArg,
     },
@@ -487,6 +515,14 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
             },
             DecisionCommand::Test { args, output } => decision::test(ctx, args, output.format),
             DecisionCommand::Eval { args, output } => decision::eval(ctx, args, output.format),
+            DecisionCommand::Ask { args, output } => decision::ask(
+                ctx,
+                &DecisionAskArgs {
+                    edit: decision::read_document(&args.edit)?,
+                    ..args.clone()
+                },
+                output.format,
+            ),
         },
         Action::Review { command } => match command {
             ReviewCommand::List { args, output } => review::list(ctx, args, output.format),

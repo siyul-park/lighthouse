@@ -63,8 +63,8 @@ pub use program::{
 };
 pub use project::{
     BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule, EnvironmentSpec, Evaluation,
-    EventsSpec, FILE_NAME, FixEnvironment, FixPolicy, FixSpec, GlobSet, InjectionSpec, Layer,
-    Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
+    EventsSpec, FILE_NAME, FILE_NAMES, FixEnvironment, FixPolicy, FixSpec, GlobSet, InjectionSpec,
+    Layer, Layers, Level, ModelProvider, Models, OverrideSpec, PluginRef, ProjectSpec, Projects,
     RESERVED_PROVIDERS, Routing, RuleConfig, RuleSetting, Rules, SandboxSpec, SignalsSpec, Stage,
     Step, Surface, Task, TestNamingSpec, Trace, glob_set,
 };

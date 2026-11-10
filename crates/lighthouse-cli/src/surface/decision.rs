@@ -1,6 +1,7 @@
 //! `decision list|show|create|update|test|eval`.
 
 use std::{
+    env,
     fmt::Write,
     fs,
     io::{Read, stdin},
@@ -9,7 +10,9 @@ use std::{
 use lighthouse_model::Attribution;
 use lighthouse_report::{Aim, CheckInfo, Descriptor, FixInfo};
 use lighthouse_session::{
-    Authored, DecisionRow, DecisionTest, Fixing, Session, TestTimings, active_decisions,
+    Authored, CheckRequest, Checked, DecisionRow, DecisionTest, Fixing, Session, TestTimings,
+    active_decisions,
+    ask::{self, Answer, Delta, WhatIf},
     create_decision, decision_rows, explain,
     model::{self, EvalReport, EvalRequest, Side},
     replace_decision,
@@ -23,7 +26,7 @@ use serde_json::Value;
 use crate::surface::{
     Result,
     args::{
-        DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionSignalsArgs,
+        DecisionAskArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionSignalsArgs,
         DecisionTestArgs, SignalDismissArgs,
     },
     list::{Page, omitted_line, page},
@@ -231,6 +234,31 @@ pub fn read_document(source: &str) -> Result<String> {
     fs::read_to_string(source).map_err(|e| format!("{source}: {e}").into())
 }
 
+/// `decision ask`: `args.edit` is the text of the diff.
+pub fn ask(ctx: &Context, args: &DecisionAskArgs, format: Format) -> Result<Reply> {
+    let session = ctx.session()?;
+    let question = WhatIf {
+        edit: &args.edit,
+        paths: &ctx.paths(&session.root, &args.paths)?,
+        // The text names every finding; the detail is the JSON's.
+        detail: match format {
+            Format::Text => lighthouse_report::Detail::Full,
+            Format::Json => args.detail.into(),
+        },
+    };
+    let mut check = |request: CheckRequest| -> lighthouse_session::Result<Checked> {
+        match ctx.kept() {
+            Some(mut warm) => warm.check((&env::current_dir()?, ctx.config.as_deref()), |_| {
+                Ok(request)
+            }),
+            None => lighthouse_session::check(&session, &request),
+        }
+    };
+    let answer = ask::what_if(&session, &question, &mut check)?;
+    let code = answer.code();
+    Ok(Reply::data(format, &answer, || answered(&answer))?.with_code(code))
+}
+
 /// `decision test`.
 pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Reply> {
     let session = ctx.session()?;
@@ -286,6 +314,41 @@ pub fn eval(ctx: &Context, args: &DecisionEvalArgs, format: Format) -> Result<Re
         audit: args.audit,
     })?;
     Reply::data(format, &report, || eval_text(&report))
+}
+
+/// The answer as text: the verdict, then a line for each finding the edit
+/// adds or removes.
+fn answered(answer: &Answer) -> String {
+    let mut out = format!("{}\n", answer.verdict);
+    for (label, delta) in [("fired", &answer.fired), ("cleared", &answer.cleared)] {
+        let Delta::Full(items) = delta else { continue };
+        for item in items {
+            let fix = item.fix.as_ref().map_or(String::new(), |fix| {
+                format!(" (fix: {}, {})", fix.safety, fix.by.as_str())
+            });
+            let _ = writeln!(
+                out,
+                "{label} {}:{}:{}: {} {}: {}{fix}",
+                item.path, item.line, item.col, item.severity, item.decision, item.message
+            );
+        }
+    }
+    let _ = writeln!(out, "unchanged: {}", answer.unchanged);
+    if !answer.gaps.is_empty() {
+        let _ = writeln!(
+            out,
+            "undecided: {} enabled decision(s) a model decides",
+            answer.gaps.len()
+        );
+    }
+    for gap in &answer.incomplete {
+        let path = gap
+            .path
+            .as_ref()
+            .map_or("-".to_owned(), |p| p.display().to_string());
+        let _ = writeln!(out, "incomplete: {path}: {}", gap.reason);
+    }
+    out
 }
 
 fn tally(counts: &std::collections::BTreeMap<String, usize>) -> String {

@@ -1,5 +1,6 @@
 //! The session operations, one binary.
 
+mod ask;
 mod authoring;
 mod baseline;
 mod check;
