@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use lighthouse_engine::ModelOptions;
+use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_ml::{
     eval::{Candidate, EvalReport, Found, Overlaid, Overlay, RepoResult, grade},
     labels::{Sample, Source},
@@ -19,7 +19,7 @@ use lighthouse_model::Severity;
 use lighthouse_spec::{Catalog, Env, local_files};
 
 use super::{Labelling, Repo, attached, examples, labelling};
-use crate::{CheckRequest, Checked, Result, Session, check};
+use crate::{CheckRequest, Result, Session, check::check_owning};
 
 /// What to evaluate.
 pub struct EvalRequest {
@@ -138,14 +138,14 @@ fn one(request: &EvalRequest, repo: &Repo, session: &Session, first: bool) -> Re
         .filter(|l| l.observed.is_none())
         .map(|l| l.key.clone())
         .collect();
-    let (checked, base) = run(
+    let (engine, base) = run(
         session,
         &request.decision,
         Some(labelled),
         layered || request.audit.is_some(),
     )?;
     let reference = decision.reference();
-    let models_of = |model: &str| Ok(checked.engine.model(model)?);
+    let models_of = |model: &str| Ok(engine.model(model)?);
     let layer = |model| Overlay {
         model,
         decision: &reference,
@@ -204,8 +204,8 @@ fn run(
     rule: &str,
     fingerprints: Option<BTreeSet<String>>,
     collect: bool,
-) -> Result<(Checked, Found)> {
-    let checked = check(
+) -> Result<(Engine, Found)> {
+    let (checked, engine) = check_owning(
         session,
         &CheckRequest {
             rules: vec![rule.to_owned()],
@@ -222,5 +222,5 @@ fn run(
         },
     )?;
     let found = Found::of(&checked.run);
-    Ok((checked, found))
+    Ok((engine, found))
 }

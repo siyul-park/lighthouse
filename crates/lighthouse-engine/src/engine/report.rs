@@ -59,7 +59,7 @@ impl Engine {
             "{only:?}{:?}{:?}{:?}{}",
             run.incomplete, self.active, self.models, self.trusted
         ));
-        hasher.update(format!("{:?}", self.config));
+        hasher.update(&self.setup);
         let tools: BTreeSet<String> = selected
             .iter()
             .flat_map(|rule| rule.manifest().tools.iter().cloned())

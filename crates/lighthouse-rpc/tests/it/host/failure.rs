@@ -8,7 +8,7 @@ use std::{
 };
 
 use lighthouse_engine::EXIT_INCOMPLETE;
-use lighthouse_plugin::{Registry, Workspace};
+use lighthouse_plugin::{Plugin, Registry, Workspace};
 use lighthouse_rpc::register;
 
 use super::{
@@ -239,4 +239,51 @@ fn a_plugin_that_dies_during_initialize_is_incomplete_not_a_config_error() {
     assert!(registered.incomplete[0].reason.contains("unavailable"));
     assert!(registry.has_plugin("fake"));
     assert_eq!(registry.languages().len(), 0);
+}
+
+#[test]
+fn rpc_plugin_revive() {
+    let fake = Fake::new("crash");
+    let plugin = fake.connect(T).unwrap();
+    let provider = plugin.languages().remove(0);
+    let ws = Workspace::new(fake.path());
+    assert_eq!(index(provider.as_ref(), &ws, &["a.fake"]).notices.len(), 2);
+    assert!(
+        index(provider.as_ref(), &ws, &["a.fake"])
+            .notices
+            .is_empty()
+    );
+
+    plugin.revive();
+
+    let again = index(provider.as_ref(), &ws, &["a.fake"]);
+    assert_eq!(again.notices[0], "plugin `fake` stderr: boom");
+}
+
+#[test]
+fn started_revive() {
+    let fake = Fake::new("crash");
+    let toml = format!(
+        "[{{ id = \"fake\", path = {:?} }}]",
+        fake.path().to_str().unwrap()
+    );
+    let started = lighthouse_rpc::start(
+        &Registry::default(),
+        &config(&toml),
+        fake.path(),
+        fake.path(),
+        &[],
+        &lighthouse_rpc::StartOptions::default(),
+    )
+    .unwrap();
+    let mut registry = Registry::default();
+    started.register(&mut registry).unwrap();
+    let ws = Workspace::new(fake.path());
+    let provider = &registry.languages()[0].provider;
+    index(provider.as_ref(), &ws, &["a.fake"]);
+
+    started.revive();
+
+    let again = index(provider.as_ref(), &ws, &["a.fake"]);
+    assert_eq!(again.notices[0], "plugin `fake` stderr: boom");
 }

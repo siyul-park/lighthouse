@@ -590,3 +590,22 @@ fn reading_the_log_attaches_a_suppression_to_the_judgment_it_goes_with() {
     assert_eq!(judgment.suppressions[0].spec.judgment, judgment.id);
     assert_eq!(judgment.label(), Label::Separate);
 }
+
+#[test]
+fn store_refresh() {
+    let findings = [observed("f1", "design/a", "a.go")];
+    let judged = clone_with(&findings, &[("f1", Judgment::Pass)]);
+    let tree = tempfile::tempdir().unwrap();
+    let mut store = Store::open(tree.path()).unwrap();
+    store.record(&run(findings.to_vec())).unwrap();
+    store.refresh().unwrap();
+    assert_eq!(standing_of(&store, "f1"), None);
+
+    fs::write(Store::log_path_in(tree.path()), log_of(judged.path())).unwrap();
+    store.refresh().unwrap();
+    assert_eq!(standing_of(&store, "f1"), Some(Standing::Suppressed));
+
+    fs::write(Store::log_path_in(tree.path()), "").unwrap();
+    store.refresh().unwrap();
+    assert_eq!(standing_of(&store, "f1"), None, "the judgment left the log");
+}

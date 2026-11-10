@@ -54,6 +54,9 @@ pub(crate) struct Client {
     timeout: Duration,
     session: Mutex<Slot>,
     stderr: Arc<Captured>,
+    /// What starts the process again, once the host holds its answer to
+    /// `initialize`.
+    restart: Option<Idle>,
 }
 
 /// Where the process of a client stands.
@@ -66,6 +69,7 @@ enum Slot {
 }
 
 /// What starts a process that was put off, and what it must answer.
+#[derive(Clone)]
 struct Idle {
     found: Found,
     cwd: PathBuf,
@@ -89,7 +93,38 @@ impl Client {
             timeout,
             session: Mutex::new(Slot::Up(session)),
             stderr,
+            restart: None,
         })
+    }
+
+    /// The client that can start its process again as `params` and `expected`
+    /// say: what [`revive`](Self::revive) needs of a client that started at
+    /// once.
+    pub(crate) fn restartable(
+        &mut self,
+        found: &Found,
+        cwd: &Path,
+        env: &[(String, String)],
+        (params, expected): (wire::InitializeParams, wire::InitializeResult),
+    ) {
+        self.restart = Some(Idle {
+            found: found.clone(),
+            cwd: cwd.to_owned(),
+            env: env.to_vec(),
+            params,
+            expected,
+        });
+    }
+
+    /// Makes a plugin that is gone start again at its next call. One that is
+    /// up, or waiting for its first call, is left as it is.
+    pub(crate) fn revive(&self) {
+        let Some(restart) = &self.restart else { return };
+        if let Ok(mut slot) = self.session.lock()
+            && matches!(*slot, Slot::Down(_))
+        {
+            *slot = Slot::Idle(Box::new(restart.clone()));
+        }
     }
 
     /// A client whose process starts at the first call, and answers
@@ -102,17 +137,19 @@ impl Client {
         params: wire::InitializeParams,
         expected: wire::InitializeResult,
     ) -> Self {
+        let idle = Idle {
+            found: found.clone(),
+            cwd: cwd.to_owned(),
+            env: env.to_vec(),
+            params,
+            expected,
+        };
         Self {
             plugin: found.id().to_owned(),
             timeout,
-            session: Mutex::new(Slot::Idle(Box::new(Idle {
-                found: found.clone(),
-                cwd: cwd.to_owned(),
-                env: env.to_vec(),
-                params,
-                expected,
-            }))),
+            session: Mutex::new(Slot::Idle(Box::new(idle.clone()))),
             stderr: Arc::new(Captured::default()),
+            restart: Some(idle),
         }
     }
 

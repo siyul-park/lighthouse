@@ -3,7 +3,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     thread,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use lighthouse_model::{Judgment, STATE_DIR};
@@ -33,6 +33,10 @@ const BUSY: Duration = Duration::from_secs(5);
 /// pause between them.
 const OPEN_ATTEMPTS: u32 = 100;
 const OPEN_PAUSE: Duration = Duration::from_millis(20);
+/// How long after a write the size and time of the log may not tell it from
+/// the same log: a write within the granularity of the clock leaves both as
+/// they were.
+const RACY: Duration = Duration::from_secs(2);
 /// Format version of the feature snapshot of a judgment.
 const SNAPSHOT_VERSION: u32 = 2;
 
@@ -96,9 +100,25 @@ impl Store {
             conn,
             log,
             notices: Vec::new(),
+            synced: None,
         };
         store.sync()?;
         Ok(store)
+    }
+
+    /// Brings the cache up to date with the log if the log changed since it
+    /// was last imported, as opening the store does: a store kept open across
+    /// runs sees the judgments another process appended.
+    pub fn refresh(&mut self) -> Result<(), Error> {
+        let unchanged = match (&self.log, &self.synced) {
+            (Some(log), Some(synced)) => synced.covers(&Stamp::of(log)),
+            _ => true,
+        };
+        if unchanged {
+            return Ok(());
+        }
+        self.notices.clear();
+        self.sync()
     }
 
     /// What opening the store skipped in the log: a last line an interrupted
@@ -287,6 +307,7 @@ impl Store {
         let Some(path) = self.log.clone() else {
             return Ok(());
         };
+        let stamp = Stamp::of(&path);
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -327,6 +348,10 @@ impl Store {
             insert_judgment(&tx, event)?;
         }
         tx.commit()?;
+        self.synced = Some(Synced {
+            stamp,
+            at: SystemTime::now(),
+        });
         Ok(())
     }
 }
@@ -340,6 +365,40 @@ pub struct Store {
     conn: Connection,
     log: Option<PathBuf>,
     notices: Vec<String>,
+    /// The log as it was when the cache last imported it.
+    synced: Option<Synced>,
+}
+
+/// What the cache imported, and when.
+struct Synced {
+    stamp: Stamp,
+    at: SystemTime,
+}
+
+/// The size and modification time of the log; `None` when there is no log.
+#[derive(PartialEq)]
+struct Stamp(Option<(u64, SystemTime)>);
+
+impl Stamp {
+    fn of(log: &Path) -> Self {
+        Self(
+            fs::metadata(log)
+                .ok()
+                .and_then(|meta| Some((meta.len(), meta.modified().ok()?))),
+        )
+    }
+}
+
+impl Synced {
+    /// Whether the log as `now` has it is the one that was imported: the same
+    /// stamp, written long enough before the import to be told from a write
+    /// that came after it.
+    fn covers(&self, now: &Stamp) -> bool {
+        let settled = self.stamp.0.is_none_or(|(_, modified)| {
+            self.at.duration_since(modified).is_ok_and(|age| age > RACY)
+        });
+        settled && self.stamp == *now
+    }
 }
 
 /// What the store knew of a finding before a run saw it again.

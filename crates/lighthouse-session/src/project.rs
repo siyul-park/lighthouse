@@ -114,7 +114,7 @@ impl Session {
         }
     }
 
-    fn open(here: &Path, config: Option<&Path>, required: bool) -> Result<Self> {
+    pub(crate) fn open(here: &Path, config: Option<&Path>, required: bool) -> Result<Self> {
         if let Some(path) = config {
             let text = fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
             return Self::assemble(path, &text, here.to_owned());
@@ -309,13 +309,16 @@ impl Session {
     /// them had to say. It trusts what the user trusts and runs the models the
     /// project's providers name.
     pub fn engine(&self) -> Result<(Engine, Vec<String>)> {
-        self.engine_kept(None)
+        let (engine, notices, _) = self.engine_kept(None)?;
+        Ok((engine, notices))
     }
 
     /// Like [`engine`](Self::engine), keeping what the plugins answered to
     /// `initialize` in `cache` (see [`start_plugins`](Self::start_plugins)): a
-    /// plugin that no file of the run needs is not started.
-    pub fn engine_kept(&self, cache: Option<&Path>) -> Result<(Engine, Vec<String>)> {
+    /// plugin that no file of the run needs is not started. The plugins come
+    /// with it, so that a host that serves run after run can start again
+    /// one that crashed.
+    pub fn engine_kept(&self, cache: Option<&Path>) -> Result<(Engine, Vec<String>, Started)> {
         let sandbox = self.config.sandbox().clone();
         if !sandbox.enabled && !self.trusted() {
             return Err(NO_SANDBOX_UNTRUSTED.into());
@@ -326,19 +329,18 @@ impl Session {
         };
         let started = self.start_plugins(&options)?;
         let registry = self.registry_from(&started)?;
-        let plugins = started.registered;
         self.require_packs(true, |pack| registry.has_plugin(pack))?;
         let config = self.enabled_in(&registry);
         let engine = self
             .engine_with(registry, config, &self.catalog, &self.root)?
-            .with_incomplete(plugins.incomplete);
+            .with_incomplete(started.registered.incomplete.clone());
         let listed = permitted(&self.config, &self.catalog, &|id| engine.active(id))?;
-        let mut notices = plugins.notices;
+        let mut notices = started.registered.notices.clone();
         if !sandbox.enabled {
             notices.push(SANDBOX_OFF.to_owned());
         }
         notices.extend(listed.warnings);
-        Ok((engine, notices))
+        Ok((engine, notices, started))
     }
 
     /// The configuration with every plugin of `registry` enabled: those the

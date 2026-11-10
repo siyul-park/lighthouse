@@ -92,10 +92,16 @@ impl Seen {
 /// evidence changed no longer applies, and an error is never hidden; both stay
 /// in the report with a note. A store that cannot be used never fails the
 /// check: it is reported, and judgments already recorded are still applied
-/// read-only.
-pub fn remember(root: &Path, catalog: &Catalog, run: &mut engine::Run) -> Remembered {
+/// read-only. The store is opened into `kept` when it is not there, and a
+/// store already in it is used again, brought up to date with the log.
+pub fn remember(
+    root: &Path,
+    catalog: &Catalog,
+    run: &mut engine::Run,
+    kept: &mut Option<Store>,
+) -> Remembered {
     let mut remembered = Remembered::default();
-    let rulings = match record(root, catalog, run) {
+    let rulings = match record(root, catalog, run, kept) {
         Ok((rulings, notices)) => {
             remembered.messages.extend(notices);
             rulings
@@ -188,8 +194,16 @@ fn record(
     root: &Path,
     catalog: &Catalog,
     run: &engine::Run,
+    kept: &mut Option<Store>,
 ) -> Result<Rulings, lighthouse_store::Error> {
-    let mut store = Store::open(root)?;
+    let store = match kept.take() {
+        Some(mut store) => {
+            store.refresh()?;
+            store
+        }
+        None => Store::open(root)?,
+    };
+    let store = kept.insert(store);
     let seen = run_of(root, catalog, run);
     let subjects: Vec<Subject> = seen.observed.iter().map(Observed::subject).collect();
     store.record(&seen)?;

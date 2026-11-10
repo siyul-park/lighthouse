@@ -19,6 +19,7 @@ mod scope;
 mod selector;
 mod trust;
 mod validate;
+mod warm;
 
 pub mod baseline;
 pub mod environment;
@@ -48,6 +49,7 @@ pub use scope::{changed, since};
 pub(crate) use selector::Selector;
 pub use trust::{Basis, revoke, trust};
 pub use validate::{Problem, Validated, validate_paths};
+pub use warm::Warm;
 
 /// Directories no search for files enters.
 pub use lighthouse_model::Result;

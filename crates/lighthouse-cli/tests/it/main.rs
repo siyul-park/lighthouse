@@ -36,6 +36,7 @@ mod layers;
 mod markdown_cache;
 mod mcp;
 mod mcp_contract;
+mod mcp_warm;
 mod models;
 mod models_plugin;
 mod plugin_trust;

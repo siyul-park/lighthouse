@@ -69,7 +69,7 @@ impl Found {
     /// What tells one build of the plugin's program from another: its size and
     /// modification time, as the host does of its own. `None` when it cannot
     /// be read, a bare command found on the `PATH` among them.
-    pub(crate) fn program_stamp(&self) -> Option<String> {
+    pub fn program_stamp(&self) -> Option<String> {
         let meta = fs::metadata(self.command_path()?).ok()?;
         let modified = meta
             .modified()

@@ -2,12 +2,12 @@
 //! way evaluation does, in each repository the labels are about, and hands
 //! them to the host's training (`lighthouse_ml::train`).
 
-use lighthouse_engine::ModelOptions;
+use lighthouse_engine::{Engine, ModelOptions};
 use lighthouse_ml::train::{Fit, Rows, Trained};
 use lighthouse_plugin::DecisionRef;
 
 use super::{Labelling, Repo, examples, labelling};
-use crate::{CheckRequest, Checked, Result, Session, check};
+use crate::{CheckRequest, Result, Session, check::check_owning};
 
 /// What to train.
 pub struct TrainRequest {
@@ -29,8 +29,9 @@ pub(super) struct Labelled {
     /// The model trained: `model`, else the one bound to the decision.
     pub(super) reference: Option<String>,
     pub(super) decision: DecisionRef,
-    /// The first repository's run, which holds the models, and its store.
-    pub(super) checked: Checked,
+    /// The engine of the first repository's run, which builds the models.
+    pub(super) engine: Engine,
+    /// The store of the first repository's project.
     pub(super) store: std::path::PathBuf,
 }
 
@@ -45,7 +46,7 @@ pub fn train(request: &TrainRequest) -> Result<Trained> {
     let model = labelled
         .reference
         .as_deref()
-        .map(|r| labelled.checked.engine.model(r))
+        .map(|r| labelled.engine.model(r))
         .transpose()?;
     let fit = Fit {
         root: &labelled.store,
@@ -95,7 +96,7 @@ fn gather(
     first: bool,
 ) -> Result<Labelled> {
     let binding = session.config.models(session.catalog.projects())?;
-    let checked = check(
+    let (checked, engine) = check_owning(
         session,
         &CheckRequest {
             rules: vec![decision.to_owned()],
@@ -139,7 +140,7 @@ fn gather(
     )?;
     let decision_ref = found.reference();
     let teacher = from_model
-        .map(|teacher| checked.engine.model(teacher))
+        .map(|teacher| engine.model(teacher))
         .transpose()?;
     let rows = Rows::of(
         &labels,
@@ -153,6 +154,6 @@ fn gather(
         reference,
         decision: decision_ref,
         store: session.store.clone(),
-        checked,
+        engine,
     })
 }

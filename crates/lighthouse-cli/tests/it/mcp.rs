@@ -78,6 +78,11 @@ impl Client {
         self.input.flush().unwrap();
     }
 
+    /// The process id of the server.
+    pub(crate) fn pid(&self) -> u32 {
+        self.child.id()
+    }
+
     pub(crate) fn request(&mut self, method: &str, params: Value) -> Value {
         self.next += 1;
         let id = self.next;
@@ -182,7 +187,7 @@ fn long_file_document(id: &str, invalid_body: &str, condition: &str, context: &s
     })
 }
 
-fn notes(id: &str, invalid_body: &str) -> Value {
+pub(crate) fn notes(id: &str, invalid_body: &str) -> Value {
     long_file_document(
         id,
         invalid_body,

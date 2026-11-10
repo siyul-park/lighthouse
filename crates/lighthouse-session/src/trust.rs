@@ -57,6 +57,9 @@ pub struct Basis {
     pub(crate) digest: String,
     /// One line per program, as shown to the user.
     pub commands: Vec<String>,
+    /// The files inside the project that the programs name, whose content
+    /// the digest holds.
+    pub(crate) files: Vec<PathBuf>,
 }
 
 /// A program the project would run, with its arguments, for the digest and for the user.
@@ -88,6 +91,7 @@ impl Basis {
         }
         let prefixes = prefixes(root);
         let root = root.canonicalize().ok();
+        let mut files = Vec::new();
         for command in programs {
             field(&mut hash, "program", &[]);
             // The program and every argument that names a file inside the
@@ -101,7 +105,8 @@ impl Basis {
                         in_project(r, arg)
                     }
                 });
-                let content = named.and_then(|p| fs::read(p).ok());
+                let content = named.as_ref().and_then(|p| fs::read(p).ok());
+                files.extend(named.filter(|_| content.is_some()));
                 field(&mut hash, "binary", &{
                     let mut file = Hasher::new();
                     file.update(content.unwrap_or_default());
@@ -112,6 +117,7 @@ impl Basis {
         Self {
             digest: hash.hex(),
             commands: programs.iter().map(|c| c.what.clone()).collect(),
+            files,
         }
     }
 

@@ -2,7 +2,10 @@
 //! operations. Each call runs on the blocking pool because checks start
 //! processes and open SQLite.
 
+use std::sync::{Arc, Mutex};
+
 use crate::surface::{Context, Reply, reply::Body, tools};
+use lighthouse_session::Warm;
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
     model::{
@@ -21,7 +24,11 @@ use crate::mcp::{definitions, resources};
 /// `LIGHTHOUSE_ATTRIBUTED_TO` says nothing.
 const ANONYMOUS: &str = "mcp-agent";
 
-pub struct Lighthouse;
+/// The server of one client: the project it keeps loaded serves every call.
+#[derive(Default)]
+pub struct Lighthouse {
+    warm: Arc<Mutex<Warm>>,
+}
 
 impl ServerHandler for Lighthouse {
     fn get_info(&self) -> ServerConfig {
@@ -53,7 +60,7 @@ impl ServerHandler for Lighthouse {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
-        let ctx = Context::agent(agent(&context));
+        let ctx = Context::agent(agent(&context)).warmed(Arc::clone(&self.warm));
         let name = request.name.to_string();
         let args = request.arguments.map_or(Value::Null, Value::Object);
         let outcome = tokio::task::spawn_blocking(move || {

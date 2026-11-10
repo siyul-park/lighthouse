@@ -89,6 +89,16 @@ enum Entry {
 }
 
 impl Started {
+    /// Makes every plugin whose process is gone start again at its next
+    /// request. A plugin that never came up stays unavailable.
+    pub fn revive(&self) {
+        for entry in &self.entries {
+            if let Entry::Running(plugin) = entry {
+                plugin.revive();
+            }
+        }
+    }
+
     /// Puts the started plugins into `registry`. No process starts. A plugin
     /// whose id `registry` already holds is an error.
     pub fn register(&self, registry: &mut Registry) -> Result<(), Error> {

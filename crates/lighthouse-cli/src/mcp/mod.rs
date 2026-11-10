@@ -13,14 +13,14 @@ use rmcp::{ServiceExt, transport::stdio};
 use server::Lighthouse;
 
 /// Serves MCP on stdin and stdout until the client disconnects. The project is
-/// the one found upward from the current directory, looked up on every call
-/// so that edits to its config and decisions take effect at once.
+/// the one found upward from the current directory, kept loaded between calls
+/// and loaded again when its config, decisions or plugins change.
 pub fn serve() -> Result<(), Box<dyn Error + Send + Sync>> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async {
-        let running = Lighthouse.serve(stdio()).await?;
+        let running = Lighthouse::default().serve(stdio()).await?;
         running.waiting().await?;
         Ok(())
     })

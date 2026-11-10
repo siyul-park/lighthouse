@@ -244,3 +244,25 @@ fn a_trained_model_is_another_model_to_the_answer_cache_by_its_digest() {
     assert_ne!(first.version, second.version);
     assert_eq!(first.version, manifest("aa").version);
 }
+
+#[test]
+fn engine_set_models() {
+    let dir = tempfile::tempdir().unwrap();
+    let config =
+        Config::parse_inline("plugins = [\"echo\"]\n[models.providers.work]\nplugin = \"echo\"\n")
+            .unwrap();
+    let mut engine = Engine::new(
+        registry(),
+        config,
+        lighthouse_test_support::bundled(),
+        dir.path(),
+    )
+    .unwrap();
+
+    engine.set_models(ModelOptions {
+        off: true,
+        ..ModelOptions::default()
+    });
+
+    assert!(engine.model("work/some/model:free").is_ok());
+}

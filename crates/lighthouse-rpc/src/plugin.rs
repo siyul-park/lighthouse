@@ -77,15 +77,15 @@ impl RpcPlugin {
             let client = Client::lazy(found, root, timeout, options.env, params, result.clone());
             return Self::from_result(found, root, timeout, client, result);
         }
-        let client = Client::spawn(found, root, timeout, options.env).map_err(failed)?;
-        let result: wire::InitializeResult =
-            client
-                .call(wire::INITIALIZE, params)
-                .map_err(|reason| crate::Error::Unavailable {
-                    id: id.to_owned(),
-                    reason,
-                    notices: client.drain_stderr(),
-                })?;
+        let mut client = Client::spawn(found, root, timeout, options.env).map_err(failed)?;
+        let result: wire::InitializeResult = client
+            .call(wire::INITIALIZE, params.clone())
+            .map_err(|reason| crate::Error::Unavailable {
+                id: id.to_owned(),
+                reason,
+                notices: client.drain_stderr(),
+            })?;
+        client.restartable(found, root, options.env, (params, result.clone()));
         let plugin = Self::from_result(found, root, timeout, client, result.clone())?;
         if let Some(kept) = &kept {
             kept.write(&result);
@@ -144,6 +144,13 @@ impl RpcPlugin {
             digest,
             agent: Agent::new(id, found.argv(), &Policy::default(), root, timeout),
         })
+    }
+
+    /// Makes the process of a plugin that crashed start again at its next
+    /// request: a run that sees a plugin gone stays incomplete, and the run
+    /// after it asks again.
+    pub fn revive(&self) {
+        self.client.revive();
     }
 
     /// The plugin with its agents run under the `[sandbox]` of the project at

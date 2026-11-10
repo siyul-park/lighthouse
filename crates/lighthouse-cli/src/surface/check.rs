@@ -1,7 +1,7 @@
 //! `check`, and `fix`: analyze the project, apply the fixes the catalog names,
 //! verified, and report.
 
-use std::{collections::BTreeMap, time::Instant};
+use std::{collections::BTreeMap, env, time::Instant};
 
 use lighthouse_report::Format;
 use lighthouse_session::{
@@ -88,23 +88,30 @@ pub fn fix(ctx: &Context, args: &FixArgs, format: reply::Format) -> Result<Reply
 
 /// Analyzes the project and keeps what the arguments report.
 fn analyze(ctx: &Context, args: &CheckArgs) -> Result<Checked> {
-    let session = Session::load(ctx.config.as_deref())?;
-    let request = CheckRequest {
-        paths: ctx.paths(&session.root, &args.paths)?,
-        changed: args.changed,
-        diff: args.diff.clone(),
-        rules: args.decision.clone(),
-        store: !args.no_store,
-        cache: !args.no_cache,
-        models: ModelOptions {
-            off: args.no_models,
-            all: args.all_models,
-            ..ModelOptions::default()
-        },
-        record_model_labels: args.record_model_labels,
-        ..CheckRequest::default()
+    let request = |session: &Session| {
+        Ok(CheckRequest {
+            paths: ctx.paths(&session.root, &args.paths)?,
+            changed: args.changed,
+            diff: args.diff.clone(),
+            rules: args.decision.clone(),
+            store: !args.no_store,
+            cache: !args.no_cache,
+            models: ModelOptions {
+                off: args.no_models,
+                all: args.all_models,
+                ..ModelOptions::default()
+            },
+            record_model_labels: args.record_model_labels,
+            ..CheckRequest::default()
+        })
     };
-    lighthouse_session::check(&session, &request)
+    match ctx.kept() {
+        Some(mut warm) => warm.check((&env::current_dir()?, ctx.config.as_deref()), request),
+        None => {
+            let session = Session::load(ctx.config.as_deref())?;
+            lighthouse_session::check(&session, &request(&session)?)
+        }
+    }
 }
 
 /// Fixes what `args` selects. `store` says whether the run is remembered and

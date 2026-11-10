@@ -26,6 +26,7 @@ use lighthouse_model::{
 use lighthouse_plugin::{
     Annotations, EmbeddedFile, Facts, Findings, LanguageProvider, Registry, Rule, Source, Workspace,
 };
+use lighthouse_protocol::hash::Hasher;
 use lighthouse_spec::{
     Catalog, Config, GlobSet, Held, Models as BoundModels, ProjectFiles, Projects, Routing,
     RuleConfig, Subject as DecisionSubject,
@@ -313,6 +314,10 @@ pub(crate) type Unsettled = BTreeSet<(String, Option<PathBuf>)>;
 pub struct Engine {
     pub(crate) registry: Arc<Registry>,
     pub(crate) config: Config,
+    /// A digest of the configuration as the engine was built over it. Its
+    /// compiled patterns show what they matched when printed, so it is taken
+    /// once, before any run.
+    setup: String,
     /// The projects `extends` can name.
     projects: Projects,
     /// The models the configuration binds to its decisions.
@@ -441,8 +446,11 @@ impl Engine {
             ignores,
         };
         let enabled = active(&config, &projects)?;
+        let mut setup = Hasher::new();
+        setup.update(format!("{config:?}"));
         Ok(Self {
             registry: Arc::new(registry),
+            setup: setup.hex(),
             config,
             projects,
             binding,
@@ -508,8 +516,14 @@ impl Engine {
 
     /// Sets what the run may do with models.
     pub fn with_models(mut self, models: ModelOptions) -> Self {
-        self.models = models;
+        self.set_models(models);
         self
+    }
+
+    /// Sets what the next run may do with models: an engine that serves one
+    /// request after another takes the options of each.
+    pub fn set_models(&mut self, models: ModelOptions) {
+        self.models = models;
     }
 
     /// Adds gaps found while assembling the plugins; every run reports them.

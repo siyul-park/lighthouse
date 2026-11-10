@@ -384,7 +384,7 @@ pub fn run(session: &Session, request: &Selection) -> Result<Fixed> {
     let mut report = engine.fix(&plan, &run)?;
     messages.extend(report.notes.iter().cloned());
     if request.store && !request.dry_run {
-        let remembered = findings::remember(root, catalog, &mut report.finished);
+        let remembered = findings::remember(root, catalog, &mut report.finished, &mut None);
         messages.extend(remembered.messages);
     }
     let diff = report
@@ -480,7 +480,7 @@ fn suppressed(
         .map(|d| d.fingerprint.clone())
         .collect();
     if store {
-        findings::remember(root, catalog, &mut outcome);
+        findings::remember(root, catalog, &mut outcome, &mut None);
     } else {
         findings::apply_judgments(root, catalog, &mut outcome)?;
     }

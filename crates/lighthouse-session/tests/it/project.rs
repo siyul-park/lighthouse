@@ -129,7 +129,7 @@ fn session_engine() {
 fn session_engine_kept() {
     let dir = project("error");
     let cache = dir.path().join(".lighthouse/cache");
-    let (engine, notices) = session(dir.path()).engine_kept(Some(&cache)).unwrap();
+    let (engine, notices, _) = session(dir.path()).engine_kept(Some(&cache)).unwrap();
     assert!(engine.active("local/short"));
     assert!(notices.is_empty(), "{notices:?}");
 }

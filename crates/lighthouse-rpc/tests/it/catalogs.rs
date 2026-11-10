@@ -79,3 +79,17 @@ fn the_plugin_of_a_pack_is_the_one_that_holds_it_else_the_plugin_of_the_language
     assert_eq!(by_catalog, "toolbox");
     assert_eq!(by_language, "lang-go");
 }
+
+#[test]
+fn found_program_stamp() {
+    let dir = tempfile::tempdir().unwrap();
+    plugin(dir.path(), "lang-x", WITH_CATALOG, "x");
+    let found = lighthouse_rpc::load(&dir.path().join("lang-x")).unwrap();
+    assert_eq!(found.program_stamp(), None, "there is no program yet");
+
+    fs::write(dir.path().join("lang-x/run"), "a").unwrap();
+    let first = found.program_stamp().unwrap();
+    fs::write(dir.path().join("lang-x/run"), "ab").unwrap();
+
+    assert_ne!(found.program_stamp().unwrap(), first);
+}

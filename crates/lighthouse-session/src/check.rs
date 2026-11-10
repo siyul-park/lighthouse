@@ -13,6 +13,7 @@ use lighthouse_report::{
     Briefing, Compact, Descriptor, Detail, Format, Full, Report, render, report,
 };
 use lighthouse_spec::{Catalog, Decision};
+use lighthouse_store::Store;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -113,9 +114,6 @@ pub struct Checked {
     pub suppressions: Vec<Suppressed>,
     /// What the user should know, in the order it happened.
     pub messages: Vec<String>,
-    /// The engine that ran, which builds the models the commands that train
-    /// and evaluate them ask for.
-    pub(crate) engine: Engine,
     /// The project root, to read the files SARIF columns are measured in.
     root: PathBuf,
     /// How the check and the fix of each decision with a finding run, by
@@ -305,25 +303,51 @@ impl Checked {
 /// Analyzes the project, reports what `request` selects and, when asked,
 /// records the run and drops the findings that judgments keep out.
 pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
+    check_owning(session, request).map(|(checked, _)| checked)
+}
+
+/// Like [`check`], with the engine that ran, which builds the models the
+/// commands that train and evaluate them ask for.
+pub(crate) fn check_owning(session: &Session, request: &CheckRequest) -> Result<(Checked, Engine)> {
     let started = Instant::now();
+    let kept = request.cache.then(|| cache::dir(&session.root));
+    let (engine, notices, _) = session.engine_kept(kept.as_deref())?;
+    let mut engine = if request.cache {
+        engine.with_cache(cache::dir(&session.root), cache_limit())
+    } else {
+        engine
+    };
+    let checked = check_with(
+        session,
+        (&mut engine, &notices),
+        &mut None,
+        request,
+        started,
+    )?;
+    Ok((checked, engine))
+}
+
+/// Like [`check`] over an `engine` that has served runs before, with the
+/// `notices` its assembly left, and the store `kept` open by an earlier one.
+/// Nothing of a request stays in the engine but what the graph keeps.
+pub(crate) fn check_with(
+    session: &Session,
+    (engine, notices): (&mut Engine, &[String]),
+    kept: &mut Option<Store>,
+    request: &CheckRequest,
+    started: Instant,
+) -> Result<Checked> {
     let root = session.root.clone();
-    let kept = request.cache.then(|| cache::dir(&root));
-    let (engine, notices) = session.engine_kept(kept.as_deref())?;
     let catalog = Arc::clone(&session.catalog);
     let attached = if request.detached {
         BTreeMap::new()
     } else {
         attached(&root, &catalog)
     };
-    let engine = engine.with_models(ModelOptions {
+    engine.set_models(ModelOptions {
         attached,
         ..request.models.clone()
     });
-    let engine = if request.cache {
-        engine.with_cache(cache::dir(&root), cache_limit())
-    } else {
-        engine
-    };
     let setup = started.elapsed();
     let mut messages = Vec::new();
     let enabled = catalog
@@ -331,7 +355,7 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
         .map(Decision::id)
         .filter(|id| engine.active(id));
     let rules = Selector::new(&request.rules)?.expand(enabled)?;
-    let mut run = analyze(&engine, &root, request, &rules, &mut messages)?;
+    let mut run = analyze(engine, &root, request, &rules, &mut messages)?;
     run.timings.setup = setup;
     run.timings.session = session
         .loading
@@ -341,7 +365,7 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
     messages.extend(notices.iter().chain(&run.notices).cloned());
     let started = Instant::now();
     let remembered = if request.store {
-        findings::remember(&root, &catalog, &mut run)
+        findings::remember(&root, &catalog, &mut run, kept)
     } else {
         Remembered::default()
     };
@@ -376,7 +400,6 @@ pub fn check(session: &Session, request: &CheckRequest) -> Result<Checked> {
         remembered,
         suppressions,
         messages,
-        engine,
         root,
         descriptors,
     })

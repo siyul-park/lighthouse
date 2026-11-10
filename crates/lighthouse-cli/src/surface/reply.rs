@@ -1,10 +1,14 @@
 //! What an operation hands back to its frontend, and who is calling.
 
-use std::path::{Path, PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, MutexGuard, PoisonError},
+};
 
 use clap::{Args, ValueEnum};
 use lighthouse_session::{
-    AgentKind, Attribution, Session, project_root,
+    AgentKind, Attribution, Session, Warm, project_root,
     review::{attribute_to, person},
 };
 use serde::Serialize;
@@ -59,6 +63,9 @@ pub struct Context {
     /// The project file, when `--config` names one.
     pub config: Option<PathBuf>,
     pub caller: Caller,
+    /// The project kept loaded between operations, for a host that serves
+    /// them one after another.
+    pub warm: Option<Arc<Mutex<Warm>>>,
 }
 
 impl Context {
@@ -67,6 +74,7 @@ impl Context {
         Self {
             config,
             caller: Caller::Person,
+            warm: None,
         }
     }
 
@@ -75,12 +83,31 @@ impl Context {
         Self {
             config: None,
             caller: Caller::Agent(name.into()),
+            warm: None,
         }
+    }
+
+    /// The same caller served by `warm`.
+    pub fn warmed(self, warm: Arc<Mutex<Warm>>) -> Self {
+        Self {
+            warm: Some(warm),
+            ..self
+        }
+    }
+
+    /// The project kept loaded, locked for one operation.
+    pub fn kept(&self) -> Option<MutexGuard<'_, Warm>> {
+        self.warm
+            .as_ref()
+            .map(|warm| warm.lock().unwrap_or_else(PoisonError::into_inner))
     }
 
     /// The project, or the default one where there is none.
     pub fn session(&self) -> Result<Session> {
-        Session::load_or_default(self.config.as_deref())
+        match self.kept() {
+            Some(mut warm) => warm.session((&env::current_dir()?, self.config.as_deref()), false),
+            None => Session::load_or_default(self.config.as_deref()),
+        }
     }
 
     /// The project root, without loading the project.
