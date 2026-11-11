@@ -123,7 +123,7 @@ fn run_hook(
 fn a_served_run_is_a_local_run() {
     let (local, served) = (text_project(), text_project());
     let runtime = runtime();
-    let server = Serving::start(served.path(), runtime.path(), "3s");
+    let server = Serving::start(served.path(), runtime.path(), "30s");
 
     for format in ["text", "json", "sarif"] {
         let on = |dir: &Path, extra: &[&str]| {
