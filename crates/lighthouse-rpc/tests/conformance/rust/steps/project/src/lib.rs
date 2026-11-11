@@ -77,3 +77,9 @@ impl Second for B {
         2
     }
 }
+
+/// Calls through a multi-segment macro path and a method.
+pub fn logged(n: i32) -> i32 {
+    tracing::info!("n = {}", n);
+    helper(n).abs()
+}

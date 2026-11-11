@@ -48,13 +48,20 @@ func (c *stepCounter) visit(n ast.Node) bool {
 		c.literals++
 	case *ast.CompositeLit:
 		c.literals++
-	case *ast.CallExpr:
-		c.call(n)
 	}
 	return true
 }
 
-// call records a call that is not a conversion or a builtin.
+// collect records the calls of a statement.
+func (c *stepCounter) collect(n ast.Node) bool {
+	if call, ok := n.(*ast.CallExpr); ok {
+		c.call(call)
+	}
+	return true
+}
+
+// call records a call that is not a conversion or a builtin, named as
+// written, or `importpath.Func` and `importpath.Type.Method` when it resolves.
 func (c *stepCounter) call(n *ast.CallExpr) {
 	if tv, ok := c.info.Types[n.Fun]; ok && (tv.IsType() || tv.IsBuiltin()) {
 		return
@@ -62,17 +69,25 @@ func (c *stepCounter) call(n *ast.CallExpr) {
 	call := sdk.StepCall{Site: span(c.fset, n.Lparen, n.Lparen+1)}
 	switch f := callee(n.Fun).(type) {
 	case *ast.Ident:
-		call.Name = f.Name
-		call.Site = span(c.fset, f.Pos(), f.End())
+		call.Name, call.Site = f.Name, span(c.fset, f.Pos(), f.End())
 	case *ast.SelectorExpr:
-		call.Name = f.Sel.Name
-		x, _ := f.X.(*ast.Ident)
-		if _, pkg := c.info.Uses[x].(*types.PkgName); pkg {
-			call.Name = x.Name + "." + f.Sel.Name
-		}
-		call.Site = span(c.fset, f.Sel.Pos(), f.Sel.End())
+		call.Name, call.Site = c.written(f), span(c.fset, f.Sel.Pos(), f.Sel.End())
+	}
+	if fn, on := calledFunc(c.info, n); fn != nil {
+		call.Name = qualified(fn, on)
 	}
 	c.calls = append(c.calls, call)
+}
+
+// written names the callee of a call that resolves to no function, as the
+// package path and the name for a package-level value (`pkg.Var`).
+func (c *stepCounter) written(f *ast.SelectorExpr) string {
+	if x, ok := f.X.(*ast.Ident); ok {
+		if pkg, ok := c.info.Uses[x].(*types.PkgName); ok {
+			return pkg.Imported().Path() + "." + f.Sel.Name
+		}
+	}
+	return f.Sel.Name
 }
 
 // steps reports the top-level statements of a body with the syntax counted
@@ -92,6 +107,7 @@ func (u *unit) step(s ast.Stmt) sdk.Step {
 	info := u.info()
 	c := &stepCounter{info: info, fset: u.fset}
 	ast.Inspect(s, c.visit)
+	ast.Inspect(s, c.collect)
 	f := &flow{info: info, events: []sdk.Flow{}}
 	f.walk(s)
 	step := sdk.Step{
@@ -139,4 +155,33 @@ func stepKind(s ast.Stmt) string {
 		return "block"
 	}
 	return "call"
+}
+
+// qualified names a function `importpath.Func`, and a method
+// `importpath.Type.Method` on the type it is called on, the pointer stripped
+// (`error.Error` for a universe type, a local type by its package). A method
+// on a type parameter or an unnamed type is `.Method`, as Rust writes it.
+func qualified(fn *types.Func, on types.Type) string {
+	sig, _ := fn.Type().(*types.Signature)
+	if sig == nil || sig.Recv() == nil {
+		if fn.Pkg() == nil {
+			return fn.Name()
+		}
+		return fn.Pkg().Path() + "." + fn.Name()
+	}
+	if on == nil {
+		on = sig.Recv().Type()
+	}
+	if p, ok := types.Unalias(on).(*types.Pointer); ok {
+		on = p.Elem()
+	}
+	named, ok := types.Unalias(on).(*types.Named)
+	if !ok {
+		return "." + fn.Name()
+	}
+	owner := named.Origin().Obj()
+	if owner.Pkg() == nil {
+		return owner.Name() + "." + fn.Name()
+	}
+	return owner.Pkg().Path() + "." + owner.Name() + "." + fn.Name()
 }

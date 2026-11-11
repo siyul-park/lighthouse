@@ -7,11 +7,11 @@
           "span": {
             "end": {
               "col": 37,
-              "line": 19
+              "line": 20
             },
             "start": {
               "col": 1,
-              "line": 19
+              "line": 20
             }
           },
           "text": "// kinds has one step of every kind."
@@ -21,11 +21,11 @@
           "span": {
             "end": {
               "col": 47,
-              "line": 66
+              "line": 67
             },
             "start": {
               "col": 1,
-              "line": 66
+              "line": 67
             }
           },
           "text": "// Holder embeds one Foo and only has another."
@@ -35,14 +35,28 @@
           "span": {
             "end": {
               "col": 60,
-              "line": 73
+              "line": 74
             },
             "start": {
               "col": 1,
-              "line": 73
+              "line": 74
             }
           },
           "text": "// Plain has a field named as its type that embeds nothing."
+        },
+        {
+          "attached_to": ".::names#function",
+          "span": {
+            "end": {
+              "col": 53,
+              "line": 82
+            },
+            "start": {
+              "col": 1,
+              "line": 81
+            }
+          },
+          "text": "// names calls an error method, a local type, a type parameter, a package-level\n// function variable and a method through a pointer."
         }
       ],
       "edges": [
@@ -72,12 +86,30 @@
           "resolution": "semantic",
           "site": {
             "end": {
-              "col": 7,
+              "col": 8,
               "line": 5
             },
             "start": {
               "col": 2,
               "line": 5
+            }
+          },
+          "to": "flag"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 7,
+              "line": 6
+            },
+            "start": {
+              "col": 2,
+              "line": 6
             }
           },
           "to": "fmt"
@@ -139,11 +171,11 @@
           "site": {
             "end": {
               "col": 16,
-              "line": 23
+              "line": 24
             },
             "start": {
               "col": 10,
-              "line": 23
+              "line": 24
             }
           },
           "to": ".::helper"
@@ -157,11 +189,11 @@
           "site": {
             "end": {
               "col": 17,
-              "line": 34
+              "line": 35
             },
             "start": {
               "col": 11,
-              "line": 34
+              "line": 35
             }
           },
           "to": ".::helper"
@@ -175,11 +207,11 @@
           "site": {
             "end": {
               "col": 11,
-              "line": 42
+              "line": 43
             },
             "start": {
               "col": 5,
-              "line": 42
+              "line": 43
             }
           },
           "to": ".::helper"
@@ -193,11 +225,11 @@
           "site": {
             "end": {
               "col": 11,
-              "line": 44
+              "line": 45
             },
             "start": {
               "col": 8,
-              "line": 44
+              "line": 45
             }
           },
           "to": ".::Max"
@@ -211,11 +243,11 @@
           "site": {
             "end": {
               "col": 17,
-              "line": 45
+              "line": 46
             },
             "start": {
               "col": 13,
-              "line": 45
+              "line": 46
             }
           },
           "to": ".::Pair"
@@ -229,11 +261,11 @@
           "site": {
             "end": {
               "col": 21,
-              "line": 46
+              "line": 47
             },
             "start": {
               "col": 15,
-              "line": 46
+              "line": 47
             }
           },
           "to": ".::helper"
@@ -309,11 +341,169 @@
           "kind": "contains",
           "resolution": "semantic",
           "to": ".::Plain::Foo#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::shape#interface"
+        },
+        {
+          "from": {
+            "symbol": ".::shape#interface"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::shape::Area#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::names#function"
+        },
+        {
+          "from": {
+            "symbol": ".::names#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 25,
+              "line": 84
+            },
+            "start": {
+              "col": 21,
+              "line": 84
+            }
+          },
+          "to": ".::Pair"
+        },
+        {
+          "from": {
+            "symbol": ".::names#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 86
+            },
+            "start": {
+              "col": 17,
+              "line": 86
+            }
+          },
+          "to": ".::Pair::sum"
+        },
+        {
+          "from": {
+            "symbol": ".::names#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 15,
+              "line": 88
+            },
+            "start": {
+              "col": 11,
+              "line": 88
+            }
+          },
+          "to": ".::shape::Area"
+        },
+        {
+          "from": {
+            "symbol": ".::names#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 33,
+              "line": 88
+            },
+            "start": {
+              "col": 30,
+              "line": 88
+            }
+          },
+          "to": ".::Pair::sum"
+        },
+        {
+          "from": {
+            "symbol": ".::names#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 26,
+              "line": 88
+            },
+            "start": {
+              "col": 22,
+              "line": 88
+            }
+          },
+          "to": ".::Pair"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair::sum#method"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair::sum#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 38,
+              "line": 91
+            },
+            "start": {
+              "col": 37,
+              "line": 91
+            }
+          },
+          "to": ".::Pair::a"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair::sum#method"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 44,
+              "line": 91
+            },
+            "start": {
+              "col": 43,
+              "line": 91
+            }
+          },
+          "to": ".::Pair::b"
         }
       ],
       "file": {
         "facts": {
-          "inline_bodies": "[{\"line\":17,\"open\":{\"col\":25,\"line\":17},\"close\":{\"col\":35,\"line\":17},\"statements\":[\"return n\"],\"plain\":true}]"
+          "inline_bodies": "[{\"line\":18,\"open\":{\"col\":25,\"line\":18},\"close\":{\"col\":35,\"line\":18},\"statements\":[\"return n\"],\"plain\":true},{\"line\":91,\"open\":{\"col\":27,\"line\":91},\"close\":{\"col\":45,\"line\":91},\"statements\":[\"return p.a + p.b\"],\"plain\":true}]"
         },
         "path": "steps.go"
       },
@@ -353,11 +543,11 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 13
+                  "line": 14
                 },
                 "start": {
                   "col": 2,
-                  "line": 11
+                  "line": 12
                 }
               }
             },
@@ -366,11 +556,11 @@
               "span": {
                 "end": {
                   "col": 10,
-                  "line": 14
+                  "line": 15
                 },
                 "start": {
                   "col": 2,
-                  "line": 14
+                  "line": 15
                 }
               }
             }
@@ -403,11 +593,11 @@
               "span": {
                 "end": {
                   "col": 34,
-                  "line": 17
+                  "line": 18
                 },
                 "start": {
                   "col": 26,
-                  "line": 17
+                  "line": 18
                 }
               }
             }
@@ -473,11 +663,11 @@
               "span": {
                 "end": {
                   "col": 15,
-                  "line": 21
+                  "line": 22
                 },
                 "start": {
                   "col": 2,
-                  "line": 21
+                  "line": 22
                 }
               }
             },
@@ -487,26 +677,26 @@
               "span": {
                 "end": {
                   "col": 18,
-                  "line": 22
+                  "line": 23
                 },
                 "start": {
                   "col": 2,
-                  "line": 22
+                  "line": 23
                 }
               }
             },
             {
               "calls": [
                 {
-                  "name": "helper",
+                  "name": "example.com/steps.helper",
                   "site": {
                     "end": {
                       "col": 16,
-                      "line": 23
+                      "line": 24
                     },
                     "start": {
                       "col": 10,
-                      "line": 23
+                      "line": 24
                     }
                   }
                 }
@@ -518,11 +708,11 @@
               "span": {
                 "end": {
                   "col": 33,
-                  "line": 23
+                  "line": 24
                 },
                 "start": {
                   "col": 2,
-                  "line": 23
+                  "line": 24
                 }
               }
             },
@@ -534,11 +724,11 @@
               "span": {
                 "end": {
                   "col": 21,
-                  "line": 24
+                  "line": 25
                 },
                 "start": {
                   "col": 2,
-                  "line": 24
+                  "line": 25
                 }
               }
             },
@@ -548,11 +738,11 @@
               "span": {
                 "end": {
                   "col": 9,
-                  "line": 25
+                  "line": 26
                 },
                 "start": {
                   "col": 2,
-                  "line": 25
+                  "line": 26
                 }
               }
             },
@@ -563,11 +753,11 @@
                   "site": {
                     "end": {
                       "col": 23,
-                      "line": 27
+                      "line": 28
                     },
                     "start": {
                       "col": 20,
-                      "line": 27
+                      "line": 28
                     }
                   }
                 }
@@ -579,11 +769,11 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 28
+                  "line": 29
                 },
                 "start": {
                   "col": 2,
-                  "line": 26
+                  "line": 27
                 }
               }
             },
@@ -594,26 +784,26 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 31
+                  "line": 32
                 },
                 "start": {
                   "col": 2,
-                  "line": 29
+                  "line": 30
                 }
               }
             },
             {
               "calls": [
                 {
-                  "name": "helper",
+                  "name": "example.com/steps.helper",
                   "site": {
                     "end": {
                       "col": 17,
-                      "line": 34
+                      "line": 35
                     },
                     "start": {
                       "col": 11,
-                      "line": 34
+                      "line": 35
                     }
                   }
                 }
@@ -624,11 +814,11 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 35
+                  "line": 36
                 },
                 "start": {
                   "col": 2,
-                  "line": 32
+                  "line": 33
                 }
               }
             },
@@ -639,11 +829,11 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 38
+                  "line": 39
                 },
                 "start": {
                   "col": 2,
-                  "line": 36
+                  "line": 37
                 }
               }
             },
@@ -653,26 +843,26 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 41
+                  "line": 42
                 },
                 "start": {
                   "col": 2,
-                  "line": 39
+                  "line": 40
                 }
               }
             },
             {
               "calls": [
                 {
-                  "name": "helper",
+                  "name": "example.com/steps.helper",
                   "site": {
                     "end": {
                       "col": 11,
-                      "line": 42
+                      "line": 43
                     },
                     "start": {
                       "col": 5,
-                      "line": 42
+                      "line": 43
                     }
                   }
                 }
@@ -681,11 +871,11 @@
               "span": {
                 "end": {
                   "col": 18,
-                  "line": 42
+                  "line": 43
                 },
                 "start": {
                   "col": 2,
-                  "line": 42
+                  "line": 43
                 }
               }
             },
@@ -696,11 +886,11 @@
                   "site": {
                     "end": {
                       "col": 19,
-                      "line": 43
+                      "line": 44
                     },
                     "start": {
                       "col": 12,
-                      "line": 43
+                      "line": 44
                     }
                   }
                 }
@@ -710,26 +900,26 @@
               "span": {
                 "end": {
                   "col": 27,
-                  "line": 43
+                  "line": 44
                 },
                 "start": {
                   "col": 2,
-                  "line": 43
+                  "line": 44
                 }
               }
             },
             {
               "calls": [
                 {
-                  "name": "Max",
+                  "name": "example.com/steps.Max",
                   "site": {
                     "end": {
                       "col": 11,
-                      "line": 44
+                      "line": 45
                     },
                     "start": {
                       "col": 8,
-                      "line": 44
+                      "line": 45
                     }
                   }
                 }
@@ -739,11 +929,11 @@
               "span": {
                 "end": {
                   "col": 22,
-                  "line": 44
+                  "line": 45
                 },
                 "start": {
                   "col": 2,
-                  "line": 44
+                  "line": 45
                 }
               }
             },
@@ -754,11 +944,11 @@
                   "site": {
                     "end": {
                       "col": 12,
-                      "line": 45
+                      "line": 46
                     },
                     "start": {
                       "col": 6,
-                      "line": 45
+                      "line": 46
                     }
                   }
                 }
@@ -769,26 +959,26 @@
               "span": {
                 "end": {
                   "col": 39,
-                  "line": 45
+                  "line": 46
                 },
                 "start": {
                   "col": 2,
-                  "line": 45
+                  "line": 46
                 }
               }
             },
             {
               "calls": [
                 {
-                  "name": "helper",
+                  "name": "example.com/steps.helper",
                   "site": {
                     "end": {
                       "col": 21,
-                      "line": 46
+                      "line": 47
                     },
                     "start": {
                       "col": 15,
-                      "line": 46
+                      "line": 47
                     }
                   }
                 },
@@ -797,11 +987,11 @@
                   "site": {
                     "end": {
                       "col": 31,
-                      "line": 46
+                      "line": 47
                     },
                     "start": {
                       "col": 30,
-                      "line": 46
+                      "line": 47
                     }
                   }
                 }
@@ -811,11 +1001,11 @@
               "span": {
                 "end": {
                   "col": 32,
-                  "line": 46
+                  "line": 47
                 },
                 "start": {
                   "col": 2,
-                  "line": 46
+                  "line": 47
                 }
               }
             },
@@ -825,11 +1015,11 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 50
+                  "line": 51
                 },
                 "start": {
                   "col": 1,
-                  "line": 47
+                  "line": 48
                 }
               }
             },
@@ -838,11 +1028,11 @@
               "span": {
                 "end": {
                   "col": 19,
-                  "line": 51
+                  "line": 52
                 },
                 "start": {
                   "col": 2,
-                  "line": 51
+                  "line": 52
                 }
               }
             }
@@ -883,11 +1073,11 @@
               "span": {
                 "end": {
                   "col": 3,
-                  "line": 59
+                  "line": 60
                 },
                 "start": {
                   "col": 2,
-                  "line": 55
+                  "line": 56
                 }
               }
             }
@@ -912,6 +1102,214 @@
           "symbol": ".::Foo::Run#method",
           "tokens": 2,
           "top_level": 0
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "error"
+              },
+              {
+                "text": "S"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 5,
+          "steps": [
+            {
+              "kind": "declare",
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 84
+                },
+                "start": {
+                  "col": 2,
+                  "line": 84
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "error.Error",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 85
+                    },
+                    "start": {
+                      "col": 10,
+                      "line": 85
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 17,
+                  "line": 85
+                },
+                "start": {
+                  "col": 2,
+                  "line": 85
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "example.com/steps.local.sum",
+                  "site": {
+                    "end": {
+                      "col": 20,
+                      "line": 86
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 86
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 22,
+                  "line": 86
+                },
+                "start": {
+                  "col": 2,
+                  "line": 86
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "flag.Usage",
+                  "site": {
+                    "end": {
+                      "col": 12,
+                      "line": 87
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 87
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 87
+                },
+                "start": {
+                  "col": 2,
+                  "line": 87
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": ".Area",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 88
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 88
+                    }
+                  }
+                },
+                {
+                  "name": "example.com/steps.Pair.sum",
+                  "site": {
+                    "end": {
+                      "col": 33,
+                      "line": 88
+                    },
+                    "start": {
+                      "col": 30,
+                      "line": 88
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 35,
+                  "line": 88
+                },
+                "start": {
+                  "col": 2,
+                  "line": 88
+                }
+              }
+            }
+          ],
+          "symbol": ".::names#function",
+          "tokens": 49,
+          "top_level": 5
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Pair#type"
+            ],
+            "key": "sum\"example.com/steps\":func()(int)"
+          },
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 44,
+                  "line": 91
+                },
+                "start": {
+                  "col": 28,
+                  "line": 91
+                }
+              }
+            }
+          ],
+          "symbol": ".::Pair::sum#method",
+          "tokens": 10,
+          "top_level": 1
         }
       ],
       "modules": [
@@ -925,25 +1323,28 @@
           "extent": {
             "end": {
               "col": 29,
-              "line": 8
+              "line": 9
             },
             "start": {
               "col": 1,
-              "line": 8
+              "line": 9
             }
           },
           "file": "steps.go",
           "id": ".::Pair#type",
           "kind": "type",
           "name": "Pair",
+          "provides": [
+            "sum\"example.com/steps\":func()(int)"
+          ],
           "span": {
             "end": {
               "col": 29,
-              "line": 8
+              "line": 9
             },
             "start": {
               "col": 6,
-              "line": 8
+              "line": 9
             }
           },
           "visibility": "public"
@@ -957,11 +1358,11 @@
           "span": {
             "end": {
               "col": 27,
-              "line": 8
+              "line": 9
             },
             "start": {
               "col": 19,
-              "line": 8
+              "line": 9
             }
           },
           "type_ref": {
@@ -978,11 +1379,11 @@
           "span": {
             "end": {
               "col": 27,
-              "line": 8
+              "line": 9
             },
             "start": {
               "col": 22,
-              "line": 8
+              "line": 9
             }
           },
           "type_ref": {
@@ -994,11 +1395,11 @@
           "extent": {
             "end": {
               "col": 2,
-              "line": 15
+              "line": 16
             },
             "start": {
               "col": 1,
-              "line": 10
+              "line": 11
             }
           },
           "file": "steps.go",
@@ -1008,11 +1409,11 @@
           "span": {
             "end": {
               "col": 2,
-              "line": 15
+              "line": 16
             },
             "start": {
               "col": 1,
-              "line": 10
+              "line": 11
             }
           },
           "visibility": "public"
@@ -1021,11 +1422,11 @@
           "extent": {
             "end": {
               "col": 36,
-              "line": 17
+              "line": 18
             },
             "start": {
               "col": 1,
-              "line": 17
+              "line": 18
             }
           },
           "file": "steps.go",
@@ -1035,11 +1436,11 @@
           "span": {
             "end": {
               "col": 36,
-              "line": 17
+              "line": 18
             },
             "start": {
               "col": 1,
-              "line": 17
+              "line": 18
             }
           },
           "visibility": "private"
@@ -1049,11 +1450,11 @@
           "extent": {
             "end": {
               "col": 2,
-              "line": 52
+              "line": 53
             },
             "start": {
               "col": 1,
-              "line": 19
+              "line": 20
             }
           },
           "file": "steps.go",
@@ -1063,11 +1464,11 @@
           "span": {
             "end": {
               "col": 2,
-              "line": 52
+              "line": 53
             },
             "start": {
               "col": 1,
-              "line": 20
+              "line": 21
             }
           },
           "visibility": "private"
@@ -1076,11 +1477,11 @@
           "extent": {
             "end": {
               "col": 2,
-              "line": 60
+              "line": 61
             },
             "start": {
               "col": 1,
-              "line": 54
+              "line": 55
             }
           },
           "file": "steps.go",
@@ -1090,11 +1491,11 @@
           "span": {
             "end": {
               "col": 2,
-              "line": 60
+              "line": 61
             },
             "start": {
               "col": 1,
-              "line": 54
+              "line": 55
             }
           },
           "visibility": "private"
@@ -1103,11 +1504,11 @@
           "extent": {
             "end": {
               "col": 18,
-              "line": 62
+              "line": 63
             },
             "start": {
               "col": 1,
-              "line": 62
+              "line": 63
             }
           },
           "file": "steps.go",
@@ -1120,11 +1521,11 @@
           "span": {
             "end": {
               "col": 18,
-              "line": 62
+              "line": 63
             },
             "start": {
               "col": 6,
-              "line": 62
+              "line": 63
             }
           },
           "visibility": "public"
@@ -1133,11 +1534,11 @@
           "extent": {
             "end": {
               "col": 20,
-              "line": 64
+              "line": 65
             },
             "start": {
               "col": 1,
-              "line": 64
+              "line": 65
             }
           },
           "file": "steps.go",
@@ -1148,11 +1549,11 @@
           "span": {
             "end": {
               "col": 20,
-              "line": 64
+              "line": 65
             },
             "start": {
               "col": 1,
-              "line": 64
+              "line": 65
             }
           },
           "visibility": "public"
@@ -1162,11 +1563,11 @@
           "extent": {
             "end": {
               "col": 2,
-              "line": 71
+              "line": 72
             },
             "start": {
               "col": 1,
-              "line": 66
+              "line": 67
             }
           },
           "file": "steps.go",
@@ -1179,11 +1580,11 @@
           "span": {
             "end": {
               "col": 2,
-              "line": 71
+              "line": 72
             },
             "start": {
               "col": 6,
-              "line": 67
+              "line": 68
             }
           },
           "visibility": "public"
@@ -1193,11 +1594,11 @@
           "extent": {
             "end": {
               "col": 5,
-              "line": 68
+              "line": 69
             },
             "start": {
               "col": 2,
-              "line": 68
+              "line": 69
             }
           },
           "file": "steps.go",
@@ -1208,11 +1609,11 @@
           "span": {
             "end": {
               "col": 5,
-              "line": 68
+              "line": 69
             },
             "start": {
               "col": 2,
-              "line": 68
+              "line": 69
             }
           },
           "type_ref": {
@@ -1226,11 +1627,11 @@
           "extent": {
             "end": {
               "col": 11,
-              "line": 69
+              "line": 70
             },
             "start": {
               "col": 2,
-              "line": 69
+              "line": 70
             }
           },
           "file": "steps.go",
@@ -1241,11 +1642,11 @@
           "span": {
             "end": {
               "col": 11,
-              "line": 69
+              "line": 70
             },
             "start": {
               "col": 2,
-              "line": 69
+              "line": 70
             }
           },
           "type_ref": {
@@ -1259,11 +1660,11 @@
           "extent": {
             "end": {
               "col": 11,
-              "line": 70
+              "line": 71
             },
             "start": {
               "col": 2,
-              "line": 70
+              "line": 71
             }
           },
           "file": "steps.go",
@@ -1274,11 +1675,11 @@
           "span": {
             "end": {
               "col": 11,
-              "line": 70
+              "line": 71
             },
             "start": {
               "col": 2,
-              "line": 70
+              "line": 71
             }
           },
           "type_ref": {
@@ -1293,11 +1694,11 @@
           "extent": {
             "end": {
               "col": 2,
-              "line": 76
+              "line": 77
             },
             "start": {
               "col": 1,
-              "line": 73
+              "line": 74
             }
           },
           "file": "steps.go",
@@ -1307,11 +1708,11 @@
           "span": {
             "end": {
               "col": 2,
-              "line": 76
+              "line": 77
             },
             "start": {
               "col": 6,
-              "line": 74
+              "line": 75
             }
           },
           "visibility": "public"
@@ -1320,11 +1721,11 @@
           "extent": {
             "end": {
               "col": 9,
-              "line": 75
+              "line": 76
             },
             "start": {
               "col": 2,
-              "line": 75
+              "line": 76
             }
           },
           "file": "steps.go",
@@ -1335,11 +1736,11 @@
           "span": {
             "end": {
               "col": 9,
-              "line": 75
+              "line": 76
             },
             "start": {
               "col": 2,
-              "line": 75
+              "line": 76
             }
           },
           "type_ref": {
@@ -1348,6 +1749,120 @@
             "text": "example.com/steps.Foo"
           },
           "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 35,
+              "line": 79
+            },
+            "start": {
+              "col": 1,
+              "line": 79
+            }
+          },
+          "file": "steps.go",
+          "id": ".::shape#interface",
+          "kind": "interface",
+          "name": "shape",
+          "requires": [
+            "Area:func()(int)"
+          ],
+          "span": {
+            "end": {
+              "col": 35,
+              "line": 79
+            },
+            "start": {
+              "col": 6,
+              "line": 79
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 33,
+              "line": 79
+            },
+            "start": {
+              "col": 23,
+              "line": 79
+            }
+          },
+          "file": "steps.go",
+          "id": ".::shape::Area#method",
+          "kind": "method",
+          "name": "Area",
+          "owner": ".::shape#interface",
+          "span": {
+            "end": {
+              "col": 33,
+              "line": 79
+            },
+            "start": {
+              "col": 23,
+              "line": 79
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "names calls an error method, a local type, a type parameter, a package-level\nfunction variable and a method through a pointer.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 89
+            },
+            "start": {
+              "col": 1,
+              "line": 81
+            }
+          },
+          "file": "steps.go",
+          "id": ".::names#function",
+          "kind": "function",
+          "name": "names",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 89
+            },
+            "start": {
+              "col": 1,
+              "line": 83
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 46,
+              "line": 91
+            },
+            "start": {
+              "col": 1,
+              "line": 91
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Pair::sum#method",
+          "kind": "method",
+          "name": "sum",
+          "owner": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 46,
+              "line": 91
+            },
+            "start": {
+              "col": 1,
+              "line": 91
+            }
+          },
+          "visibility": "private"
         }
       ],
       "tests": []

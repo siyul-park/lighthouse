@@ -578,7 +578,7 @@
             {
               "calls": [
                 {
-                  "name": "Map",
+                  "name": "example.com/generics.Map",
                   "site": {
                     "end": {
                       "col": 12,
@@ -627,7 +627,7 @@
             {
               "calls": [
                 {
-                  "name": "Sum",
+                  "name": "example.com/generics.Sum",
                   "site": {
                     "end": {
                       "col": 34,
@@ -690,7 +690,7 @@
             {
               "calls": [
                 {
-                  "name": "Push",
+                  "name": "example.com/generics.Stack.Push",
                   "site": {
                     "end": {
                       "col": 8,
@@ -719,7 +719,7 @@
             {
               "calls": [
                 {
-                  "name": "Len",
+                  "name": "example.com/generics.Stack.Len",
                   "site": {
                     "end": {
                       "col": 14,

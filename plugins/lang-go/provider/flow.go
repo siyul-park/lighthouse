@@ -157,17 +157,7 @@ func (f *flow) recursive(n *ast.CallExpr) bool {
 	if f.self == nil {
 		return false
 	}
-	var fn *types.Func
-	switch c := callee(n.Fun).(type) {
-	case *ast.Ident:
-		fn, _ = f.info.Uses[c].(*types.Func)
-	case *ast.SelectorExpr:
-		if s := f.info.Selections[c]; s != nil {
-			fn, _ = s.Obj().(*types.Func)
-		} else {
-			fn, _ = f.info.Uses[c.Sel].(*types.Func)
-		}
-	}
+	fn, _ := calledFunc(f.info, n)
 	return fn != nil && fn.Origin() == f.self
 }
 
@@ -294,4 +284,23 @@ func signature(t *ast.FuncType) (params, returns int) {
 		return n
 	}
 	return count(t.Params), count(t.Results)
+}
+
+// calledFunc is the function or method a call names, and the type it is
+// called on when that is not its own; nil for a function value or a name
+// that does not resolve.
+func calledFunc(info *types.Info, n *ast.CallExpr) (*types.Func, types.Type) {
+	switch c := callee(n.Fun).(type) {
+	case *ast.Ident:
+		fn, _ := info.Uses[c].(*types.Func)
+		return fn, nil
+	case *ast.SelectorExpr:
+		if s := info.Selections[c]; s != nil {
+			fn, _ := s.Obj().(*types.Func)
+			return fn, s.Recv()
+		}
+		fn, _ := info.Uses[c.Sel].(*types.Func)
+		return fn, nil
+	}
+	return nil, nil
 }

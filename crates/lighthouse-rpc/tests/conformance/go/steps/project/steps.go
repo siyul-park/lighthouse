@@ -2,6 +2,7 @@ package steps
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 )
 
@@ -74,3 +75,17 @@ type Holder struct {
 type Plain struct {
 	Foo Foo
 }
+
+type shape interface{ Area() int }
+
+// names calls an error method, a local type, a type parameter, a package-level
+// function variable and a method through a pointer.
+func names[S shape](err error, s S) int {
+	type local struct{ Pair }
+	_ = err.Error()
+	_ = (&local{}).sum()
+	flag.Usage()
+	return s.Area() + (&Pair{}).sum()
+}
+
+func (p *Pair) sum() int { return p.a + p.b }

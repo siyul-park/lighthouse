@@ -642,7 +642,7 @@
             {
               "calls": [
                 {
-                  "name": "check",
+                  "name": ".check",
                   "site": {
                     "end": {
                       "col": 19,
@@ -670,7 +670,7 @@
             {
               "calls": [
                 {
-                  "name": "push",
+                  "name": ".push",
                   "site": {
                     "end": {
                       "col": 24,
@@ -797,7 +797,7 @@
             {
               "calls": [
                 {
-                  "name": "name",
+                  "name": ".name",
                   "site": {
                     "end": {
                       "col": 18,
@@ -810,7 +810,7 @@
                   }
                 },
                 {
-                  "name": "to_uppercase",
+                  "name": ".to_uppercase",
                   "site": {
                     "end": {
                       "col": 33,
@@ -860,7 +860,7 @@
             {
               "calls": [
                 {
-                  "name": "to_owned",
+                  "name": ".to_owned",
                   "site": {
                     "end": {
                       "col": 23,
@@ -946,7 +946,7 @@
             {
               "calls": [
                 {
-                  "name": "shout",
+                  "name": ".shout",
                   "site": {
                     "end": {
                       "col": 19,
@@ -1093,7 +1093,7 @@
             {
               "calls": [
                 {
-                  "name": "name",
+                  "name": ".name",
                   "site": {
                     "end": {
                       "col": 18,
@@ -1143,7 +1143,7 @@
             {
               "calls": [
                 {
-                  "name": "clone",
+                  "name": ".clone",
                   "site": {
                     "end": {
                       "col": 19,
@@ -1273,7 +1273,7 @@
             {
               "calls": [
                 {
-                  "name": "push",
+                  "name": ".push",
                   "site": {
                     "end": {
                       "col": 15,

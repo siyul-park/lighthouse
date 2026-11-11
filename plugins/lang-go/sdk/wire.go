@@ -424,8 +424,11 @@ type Signature struct {
 
 // StepCall: A call in a step.
 type StepCall struct {
-	// The callee as written, without arguments: `fmt.Errorf`, `build`,
-	// `foo::bar`, `unwrap`, `format!`; empty when the callee has no name.
+	// The callee, qualified, without arguments. Go: `importpath.Func`,
+	// `importpath.Type.Method` (pointer stripped; `error.Error`; `.Method` on a
+	// type parameter or unnamed type), `importpath.Var` for a function value of
+	// another package, else as written. Rust: a path as written (`foo::bar`,
+	// `tracing::info!`), a method as `.method`. Empty when it has no name.
 	Name string `json:"name"`
 	// The identifier that names the callee, as the `site` of the `calls` edge
 	// to a project callee is.

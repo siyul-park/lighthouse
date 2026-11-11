@@ -464,7 +464,7 @@
             {
               "calls": [
                 {
-                  "name": "run",
+                  "name": ".run",
                   "site": {
                     "end": {
                       "col": 10,
@@ -512,7 +512,7 @@
             {
               "calls": [
                 {
-                  "name": "tick",
+                  "name": ".tick",
                   "site": {
                     "end": {
                       "col": 11,
@@ -560,7 +560,7 @@
             {
               "calls": [
                 {
-                  "name": "once",
+                  "name": ".once",
                   "site": {
                     "end": {
                       "col": 11,
@@ -610,7 +610,7 @@
             {
               "calls": [
                 {
-                  "name": "tick",
+                  "name": ".tick",
                   "site": {
                     "end": {
                       "col": 11,
@@ -678,7 +678,7 @@
             {
               "calls": [
                 {
-                  "name": "register",
+                  "name": ".register",
                   "site": {
                     "end": {
                       "col": 15,

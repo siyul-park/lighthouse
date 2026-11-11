@@ -262,7 +262,7 @@
             {
               "calls": [
                 {
-                  "name": "id",
+                  "name": ".id",
                   "site": {
                     "end": {
                       "col": 14,

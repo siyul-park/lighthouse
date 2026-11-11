@@ -297,7 +297,7 @@
             {
               "calls": [
                 {
-                  "name": "Generated",
+                  "name": "example.com/generated.Generated",
                   "site": {
                     "end": {
                       "col": 25,

@@ -15,6 +15,20 @@
             }
           },
           "text": "/// One step of every kind."
+        },
+        {
+          "attached_to": "steps::logged#function",
+          "span": {
+            "end": {
+              "col": 59,
+              "line": 81
+            },
+            "start": {
+              "col": 1,
+              "line": 81
+            }
+          },
+          "text": "/// Calls through a multi-segment macro path and a method."
         }
       ],
       "edges": [
@@ -271,6 +285,32 @@
           "kind": "implements",
           "resolution": "syntactic",
           "to": "steps::Second#interface"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::logged#function"
+        },
+        {
+          "from": {
+            "symbol": "steps::logged#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 84
+            },
+            "start": {
+              "col": 5,
+              "line": 84
+            }
+          },
+          "to": "steps::helper#function"
         }
       ],
       "file": {
@@ -436,7 +476,7 @@
             {
               "calls": [
                 {
-                  "name": "is_empty",
+                  "name": ".is_empty",
                   "site": {
                     "end": {
                       "col": 19,
@@ -597,7 +637,7 @@
             {
               "calls": [
                 {
-                  "name": "len",
+                  "name": ".len",
                   "site": {
                     "end": {
                       "col": 47,
@@ -712,7 +752,7 @@
                   }
                 },
                 {
-                  "name": "checked_add",
+                  "name": ".checked_add",
                   "site": {
                     "end": {
                       "col": 30,
@@ -725,7 +765,7 @@
                   }
                 },
                 {
-                  "name": "ok_or",
+                  "name": ".ok_or",
                   "site": {
                     "end": {
                       "col": 39,
@@ -797,7 +837,7 @@
             {
               "calls": [
                 {
-                  "name": "len",
+                  "name": ".len",
                   "site": {
                     "end": {
                       "col": 18,
@@ -865,7 +905,7 @@
             {
               "calls": [
                 {
-                  "name": "to_vec",
+                  "name": ".to_vec",
                   "site": {
                     "end": {
                       "col": 22,
@@ -1020,6 +1060,100 @@
           "symbol": "steps::B::Second::run#method",
           "tokens": 3,
           "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              }
+            ],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
+          "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "tracing::info!",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 83
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 83
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 83
+                },
+                "start": {
+                  "col": 5,
+                  "line": 83
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 84
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 84
+                    }
+                  }
+                },
+                {
+                  "name": ".abs",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 84
+                    },
+                    "start": {
+                      "col": 15,
+                      "line": 84
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 20,
+                  "line": 84
+                },
+                "start": {
+                  "col": 5,
+                  "line": 84
+                }
+              }
+            }
+          ],
+          "symbol": "steps::logged#function",
+          "tokens": 20,
+          "top_level": 2
         }
       ],
       "modules": [
@@ -1408,6 +1542,34 @@
             "start": {
               "col": 5,
               "line": 76
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Calls through a multi-segment macro path and a method.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 85
+            },
+            "start": {
+              "col": 1,
+              "line": 81
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::logged#function",
+          "kind": "function",
+          "name": "logged",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 85
+            },
+            "start": {
+              "col": 1,
+              "line": 82
             }
           },
           "visibility": "public"

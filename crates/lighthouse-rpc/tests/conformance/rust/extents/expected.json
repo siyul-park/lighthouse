@@ -464,7 +464,7 @@
                   }
                 },
                 {
-                  "name": "count",
+                  "name": ".count",
                   "site": {
                     "end": {
                       "col": 38,

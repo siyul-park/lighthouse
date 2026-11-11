@@ -662,7 +662,7 @@
             {
               "calls": [
                 {
-                  "name": "double",
+                  "name": ".double",
                   "site": {
                     "end": {
                       "col": 20,
@@ -764,7 +764,7 @@
             {
               "calls": [
                 {
-                  "name": "read",
+                  "name": ".read",
                   "site": {
                     "end": {
                       "col": 18,
@@ -854,7 +854,7 @@
             {
               "calls": [
                 {
-                  "name": "load",
+                  "name": ".load",
                   "site": {
                     "end": {
                       "col": 18,
@@ -996,7 +996,7 @@
             {
               "calls": [
                 {
-                  "name": "into_iter",
+                  "name": ".into_iter",
                   "site": {
                     "end": {
                       "col": 20,
@@ -1009,7 +1009,7 @@
                   }
                 },
                 {
-                  "name": "map",
+                  "name": ".map",
                   "site": {
                     "end": {
                       "col": 26,
@@ -1022,7 +1022,7 @@
                   }
                 },
                 {
-                  "name": "collect",
+                  "name": ".collect",
                   "site": {
                     "end": {
                       "col": 42,
@@ -1070,7 +1070,7 @@
             {
               "calls": [
                 {
-                  "name": "double",
+                  "name": ".double",
                   "site": {
                     "end": {
                       "col": 13,
@@ -1237,7 +1237,7 @@
             {
               "calls": [
                 {
-                  "name": "bump",
+                  "name": ".bump",
                   "site": {
                     "end": {
                       "col": 11,
@@ -1313,7 +1313,7 @@
             {
               "calls": [
                 {
-                  "name": "bump",
+                  "name": ".bump",
                   "site": {
                     "end": {
                       "col": 11,

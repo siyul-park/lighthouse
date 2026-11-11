@@ -578,7 +578,7 @@
             {
               "calls": [
                 {
-                  "name": "Err",
+                  "name": "context.Context.Err",
                   "site": {
                     "end": {
                       "col": 68,
@@ -1074,7 +1074,7 @@
             {
               "calls": [
                 {
-                  "name": "Error",
+                  "name": "example.com/events.Custom.Error",
                   "site": {
                     "end": {
                       "col": 17,
@@ -2963,7 +2963,7 @@
             {
               "calls": [
                 {
-                  "name": "Close",
+                  "name": "example.com/events.Base.Close",
                   "site": {
                     "end": {
                       "col": 54,
@@ -3052,7 +3052,7 @@
             {
               "calls": [
                 {
-                  "name": "Name",
+                  "name": "example.com/events.namer.Name",
                   "site": {
                     "end": {
                       "col": 41,
@@ -3100,7 +3100,7 @@
             {
               "calls": [
                 {
-                  "name": "Use",
+                  "name": "example.com/events.Use",
                   "site": {
                     "end": {
                       "col": 32,

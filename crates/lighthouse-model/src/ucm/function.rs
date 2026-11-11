@@ -64,7 +64,7 @@ pub struct Step {
     pub guard: bool,
 }
 
-/// A call in a step: the callee as written and where its name is.
+/// A call in a step: the qualified callee and where its name is.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StepCall {
     pub name: String,

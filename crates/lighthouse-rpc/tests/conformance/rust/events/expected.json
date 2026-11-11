@@ -205,7 +205,7 @@
             {
               "calls": [
                 {
-                  "name": "first",
+                  "name": ".first",
                   "site": {
                     "end": {
                       "col": 16,
@@ -218,7 +218,7 @@
                   }
                 },
                 {
-                  "name": "copied",
+                  "name": ".copied",
                   "site": {
                     "end": {
                       "col": 25,
@@ -231,7 +231,7 @@
                   }
                 },
                 {
-                  "name": "unwrap",
+                  "name": ".unwrap",
                   "site": {
                     "end": {
                       "col": 34,
@@ -301,7 +301,7 @@
             {
               "calls": [
                 {
-                  "name": "parse",
+                  "name": ".parse",
                   "site": {
                     "end": {
                       "col": 17,
@@ -314,7 +314,7 @@
                   }
                 },
                 {
-                  "name": "expect",
+                  "name": ".expect",
                   "site": {
                     "end": {
                       "col": 36,
@@ -629,7 +629,7 @@
             {
               "calls": [
                 {
-                  "name": "unwrap",
+                  "name": ".unwrap",
                   "site": {
                     "end": {
                       "col": 30,
@@ -736,7 +736,7 @@
             {
               "calls": [
                 {
-                  "name": "unwrap",
+                  "name": ".unwrap",
                   "site": {
                     "end": {
                       "col": 23,
@@ -805,7 +805,7 @@
             {
               "calls": [
                 {
-                  "name": "unwrap_err",
+                  "name": ".unwrap_err",
                   "site": {
                     "end": {
                       "col": 17,
@@ -853,7 +853,7 @@
             {
               "calls": [
                 {
-                  "name": "value",
+                  "name": ".value",
                   "site": {
                     "end": {
                       "col": 16,
@@ -901,7 +901,7 @@
             {
               "calls": [
                 {
-                  "name": "map",
+                  "name": ".map",
                   "site": {
                     "end": {
                       "col": 16,

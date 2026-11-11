@@ -301,7 +301,7 @@
             {
               "calls": [
                 {
-                  "name": "Read",
+                  "name": "example.com/aliases.Store.Read",
                   "site": {
                     "end": {
                       "col": 39,

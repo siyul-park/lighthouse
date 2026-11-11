@@ -87,7 +87,7 @@
             {
               "calls": [
                 {
-                  "name": "to_owned",
+                  "name": ".to_owned",
                   "site": {
                     "end": {
                       "col": 25,
@@ -138,7 +138,7 @@
             {
               "calls": [
                 {
-                  "name": "to_owned",
+                  "name": ".to_owned",
                   "site": {
                     "end": {
                       "col": 23,

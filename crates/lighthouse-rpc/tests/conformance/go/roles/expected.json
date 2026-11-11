@@ -540,7 +540,7 @@
             {
               "calls": [
                 {
-                  "name": "check",
+                  "name": "example.com/roles.check",
                   "site": {
                     "end": {
                       "col": 37,
@@ -553,7 +553,7 @@
                   }
                 },
                 {
-                  "name": "newFixture",
+                  "name": "example.com/roles.newFixture",
                   "site": {
                     "end": {
                       "col": 51,
@@ -566,7 +566,7 @@
                   }
                 },
                 {
-                  "name": "label",
+                  "name": "example.com/roles.fixture.label",
                   "site": {
                     "end": {
                       "col": 59,
@@ -615,7 +615,7 @@
             {
               "calls": [
                 {
-                  "name": "measure",
+                  "name": "example.com/roles.measure",
                   "site": {
                     "end": {
                       "col": 44,
@@ -666,7 +666,7 @@
             {
               "calls": [
                 {
-                  "name": "assertGreeting",
+                  "name": "example.com/roles.assertGreeting",
                   "site": {
                     "end": {
                       "col": 55,
@@ -679,7 +679,7 @@
                   }
                 },
                 {
-                  "name": "Greet",
+                  "name": "example.com/roles.Greet",
                   "site": {
                     "end": {
                       "col": 64,
@@ -736,7 +736,7 @@
             {
               "calls": [
                 {
-                  "name": "Helper",
+                  "name": "testing.TB.Helper",
                   "site": {
                     "end": {
                       "col": 11,
@@ -764,7 +764,7 @@
             {
               "calls": [
                 {
-                  "name": "Fatal",
+                  "name": "testing.TB.Fatal",
                   "site": {
                     "end": {
                       "col": 11,
@@ -813,7 +813,7 @@
             {
               "calls": [
                 {
-                  "name": "Greet",
+                  "name": "example.com/roles.Greet",
                   "site": {
                     "end": {
                       "col": 39,

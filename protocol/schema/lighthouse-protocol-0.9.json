@@ -1755,7 +1755,7 @@
       "description": "A call in a step.",
       "properties": {
         "name": {
-          "description": "The callee as written, without arguments: `fmt.Errorf`, `build`,\n`foo::bar`, `unwrap`, `format!`; empty when the callee has no name.",
+          "description": "The callee, qualified, without arguments. Go: `importpath.Func`,\n`importpath.Type.Method` (pointer stripped; `error.Error`; `.Method` on a\ntype parameter or unnamed type), `importpath.Var` for a function value of\nanother package, else as written. Rust: a path as written (`foo::bar`,\n`tracing::info!`), a method as `.method`. Empty when it has no name.",
           "type": "string"
         },
         "site": {

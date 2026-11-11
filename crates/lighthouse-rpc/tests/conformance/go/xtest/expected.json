@@ -76,7 +76,7 @@
             {
               "calls": [
                 {
-                  "name": "helper",
+                  "name": "example.com/xtest/pkg.helper",
                   "site": {
                     "end": {
                       "col": 11,
@@ -89,7 +89,7 @@
                   }
                 },
                 {
-                  "name": "Fatal",
+                  "name": "testing.T.Fatal",
                   "site": {
                     "end": {
                       "col": 10,
@@ -247,7 +247,7 @@
             {
               "calls": [
                 {
-                  "name": "helper",
+                  "name": "example.com/xtest/pkg.helper",
                   "site": {
                     "end": {
                       "col": 31,
@@ -471,7 +471,7 @@
             {
               "calls": [
                 {
-                  "name": "pkg.Run",
+                  "name": "example.com/xtest/pkg.Run",
                   "site": {
                     "end": {
                       "col": 12,
@@ -484,7 +484,7 @@
                   }
                 },
                 {
-                  "name": "Fatal",
+                  "name": "testing.T.Fatal",
                   "site": {
                     "end": {
                       "col": 10,

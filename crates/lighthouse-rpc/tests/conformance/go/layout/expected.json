@@ -168,7 +168,7 @@
                   }
                 },
                 {
-                  "name": "helpers.Count",
+                  "name": "example.com/layout/internal/text.Count",
                   "site": {
                     "end": {
                       "col": 57,
@@ -222,7 +222,7 @@
                   }
                 },
                 {
-                  "name": "Greeting",
+                  "name": "example.com/layout/cmd/app.Greeting",
                   "site": {
                     "end": {
                       "col": 35,

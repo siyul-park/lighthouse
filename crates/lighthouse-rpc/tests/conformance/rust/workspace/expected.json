@@ -129,7 +129,7 @@
             {
               "calls": [
                 {
-                  "name": "size",
+                  "name": ".size",
                   "site": {
                     "end": {
                       "col": 15,

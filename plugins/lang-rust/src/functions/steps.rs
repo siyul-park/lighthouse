@@ -34,7 +34,7 @@ pub(super) struct Gain {
 impl Walker<'_> {
     pub(super) fn tally_method(&mut self, m: &ExprMethodCall) {
         let call = StepCall {
-            name: m.method.to_string(),
+            name: format!(".{}", m.method),
             site: ident_span(self.file, &m.method),
         };
         self.tally.calls.push(call);
@@ -48,8 +48,14 @@ impl Walker<'_> {
             self.tally.literals += 1;
             return;
         }
+        let path: Vec<String> = m
+            .path
+            .segments
+            .iter()
+            .map(|s| s.ident.to_string())
+            .collect();
         let call = StepCall {
-            name: format!("{}!", last.ident),
+            name: format!("{}!", path.join("::")),
             site: ident_span(self.file, &last.ident),
         };
         self.tally.calls.push(call);

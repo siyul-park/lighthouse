@@ -270,7 +270,7 @@
             {
               "calls": [
                 {
-                  "name": "Foo",
+                  "name": "example.com/excludedtests.Foo",
                   "site": {
                     "end": {
                       "col": 8,
@@ -283,7 +283,7 @@
                   }
                 },
                 {
-                  "name": "Fatal",
+                  "name": "testing.T.Fatal",
                   "site": {
                     "end": {
                       "col": 10,

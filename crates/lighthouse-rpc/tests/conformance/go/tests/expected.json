@@ -438,7 +438,7 @@
             {
               "calls": [
                 {
-                  "name": "Run",
+                  "name": "testing.T.Run",
                   "site": {
                     "end": {
                       "col": 8,
@@ -451,7 +451,7 @@
                   }
                 },
                 {
-                  "name": "Add",
+                  "name": "example.com/testcases.Add",
                   "site": {
                     "end": {
                       "col": 10,
@@ -464,7 +464,7 @@
                   }
                 },
                 {
-                  "name": "Fatal",
+                  "name": "testing.T.Fatal",
                   "site": {
                     "end": {
                       "col": 12,
@@ -514,7 +514,7 @@
             {
               "calls": [
                 {
-                  "name": "Run",
+                  "name": "testing.T.Run",
                   "site": {
                     "end": {
                       "col": 7,
@@ -527,7 +527,7 @@
                   }
                 },
                 {
-                  "name": "Run",
+                  "name": "testing.T.Run",
                   "site": {
                     "end": {
                       "col": 8,
@@ -540,7 +540,7 @@
                   }
                 },
                 {
-                  "name": "Double",
+                  "name": "example.com/testcases.Double",
                   "site": {
                     "end": {
                       "col": 49,
@@ -591,7 +591,7 @@
             {
               "calls": [
                 {
-                  "name": "helper",
+                  "name": "example.com/testcases.helper",
                   "site": {
                     "end": {
                       "col": 38,
@@ -649,7 +649,7 @@
             {
               "calls": [
                 {
-                  "name": "Add",
+                  "name": "example.com/testcases.Add",
                   "site": {
                     "end": {
                       "col": 36,
@@ -703,7 +703,7 @@
             {
               "calls": [
                 {
-                  "name": "Add",
+                  "name": "example.com/testcases.Add",
                   "site": {
                     "end": {
                       "col": 6,
@@ -746,7 +746,7 @@
             {
               "calls": [
                 {
-                  "name": "Double",
+                  "name": "example.com/testcases.Double",
                   "site": {
                     "end": {
                       "col": 34,

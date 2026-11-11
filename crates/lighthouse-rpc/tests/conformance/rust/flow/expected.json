@@ -860,7 +860,7 @@
             {
               "calls": [
                 {
-                  "name": "iter",
+                  "name": ".iter",
                   "site": {
                     "end": {
                       "col": 11,
@@ -873,7 +873,7 @@
                   }
                 },
                 {
-                  "name": "filter",
+                  "name": ".filter",
                   "site": {
                     "end": {
                       "col": 16,
@@ -886,7 +886,7 @@
                   }
                 },
                 {
-                  "name": "count",
+                  "name": ".count",
                   "site": {
                     "end": {
                       "col": 15,
@@ -940,7 +940,7 @@
             {
               "calls": [
                 {
-                  "name": "parse",
+                  "name": ".parse",
                   "site": {
                     "end": {
                       "col": 20,
@@ -1132,7 +1132,7 @@
             {
               "calls": [
                 {
-                  "name": "walk",
+                  "name": ".walk",
                   "site": {
                     "end": {
                       "col": 22,

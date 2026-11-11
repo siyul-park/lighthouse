@@ -555,7 +555,7 @@
             {
               "calls": [
                 {
-                  "name": "Log",
+                  "name": "example.com/embedded.Service.Log",
                   "site": {
                     "end": {
                       "col": 7,
@@ -584,7 +584,7 @@
             {
               "calls": [
                 {
-                  "name": "Close",
+                  "name": "example.com/embedded.Service.Close",
                   "site": {
                     "end": {
                       "col": 16,
@@ -714,7 +714,7 @@
             {
               "calls": [
                 {
-                  "name": "Close",
+                  "name": "example.com/embedded.LogCloser.Close",
                   "site": {
                     "end": {
                       "col": 17,

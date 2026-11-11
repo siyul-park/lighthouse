@@ -522,8 +522,8 @@ or struct expression or `vec!`); `nested` the statements strictly inside the ste
 `guard` an `if` with no `else` whose body only jumps. `calls` lists the calls of the
 step as `{ name, site }` in source order, a call being what a call expression names
 other than a conversion, a builtin or (Rust) a tuple struct or variant constructor,
-and every method call and macro but `vec!`: `name` is the callee as written without
-arguments (`fmt.Errorf`, `build`, `foo::bar`, `format!`, empty when it is not named)
+and every method call and macro but `vec!`: `name` is the qualified callee: Go `pkg.Func`, `pkg.Type.Method`
+(`error.Error`; `.Method` on a type parameter), `pkg.Var`; Rust `foo::bar`, `tracing::info!`, `.unwrap`
 and `site` the span of the identifier that names it, the `site` of the `calls` edge to
 a project callee. A step's `kind` is `assign` (an assignment, a definition, `++`, a
 `let` with a value), `declare` (Go `var`, `const`, `type`; a `let` without a value),

@@ -201,7 +201,7 @@
             {
               "calls": [
                 {
-                  "name": "iter",
+                  "name": ".iter",
                   "site": {
                     "end": {
                       "col": 16,
@@ -214,7 +214,7 @@
                   }
                 },
                 {
-                  "name": "sum",
+                  "name": ".sum",
                   "site": {
                     "end": {
                       "col": 22,

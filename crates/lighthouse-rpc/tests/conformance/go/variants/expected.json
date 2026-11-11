@@ -211,7 +211,7 @@
             {
               "calls": [
                 {
-                  "name": "Enter",
+                  "name": "example.com/variants.Enter",
                   "site": {
                     "end": {
                       "col": 10,
@@ -224,7 +224,7 @@
                   }
                 },
                 {
-                  "name": "Fatal",
+                  "name": "testing.T.Fatal",
                   "site": {
                     "end": {
                       "col": 10,

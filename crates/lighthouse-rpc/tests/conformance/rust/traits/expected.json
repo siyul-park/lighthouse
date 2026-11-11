@@ -387,7 +387,7 @@
                   }
                 },
                 {
-                  "name": "area",
+                  "name": ".area",
                   "site": {
                     "end": {
                       "col": 32,
@@ -479,7 +479,7 @@
             {
               "calls": [
                 {
-                  "name": "describe",
+                  "name": ".describe",
                   "site": {
                     "end": {
                       "col": 19,
@@ -533,7 +533,7 @@
             {
               "calls": [
                 {
-                  "name": "area",
+                  "name": ".area",
                   "site": {
                     "end": {
                       "col": 15,
@@ -587,7 +587,7 @@
             {
               "calls": [
                 {
-                  "name": "area",
+                  "name": ".area",
                   "site": {
                     "end": {
                       "col": 15,
@@ -641,7 +641,7 @@
             {
               "calls": [
                 {
-                  "name": "area",
+                  "name": ".area",
                   "site": {
                     "end": {
                       "col": 15,
@@ -744,7 +744,7 @@
             {
               "calls": [
                 {
-                  "name": "area",
+                  "name": ".area",
                   "site": {
                     "end": {
                       "col": 24,
