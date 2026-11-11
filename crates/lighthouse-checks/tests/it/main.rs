@@ -30,6 +30,7 @@ mod rules;
 mod rust;
 mod split_facts;
 mod stability;
+mod step_facts;
 mod support;
 mod testing_rules;
 mod unit_facts;

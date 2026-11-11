@@ -19,6 +19,7 @@ use crate::{
         cohesion::types,
         cycle::cycles,
         effective::{Takers, takers},
+        height::heights,
         homonyms::names,
         imports::imports,
         owned::owned,
@@ -50,6 +51,7 @@ pub const PLACEMENT: &str = "placement";
 pub const REACH: &str = "reach";
 pub const STABILITY: &str = "stability";
 pub const TESTED: &str = "tested";
+pub const HEIGHT: &str = "height";
 pub const CREDITED: &str = "credited";
 
 /// What a node of a graph reaches, with how many nodes the graph has.
@@ -95,6 +97,9 @@ pub trait Indexes {
     fn reach(&self, id: &SymbolId) -> Option<Reached>;
     /// What a module reaches in the graph of modules.
     fn stability(&self, module: &str) -> Option<Reached>;
+    /// The call-graph height of a function or method: how many calls deep the
+    /// project goes below it.
+    fn height(&self, id: &SymbolId) -> Option<u32>;
     /// Whether some test module tests `module` or one that holds it.
     fn tested(&self, module: &str) -> bool;
     /// The tests of `modules` by the part of their names after `prefix`.
@@ -124,6 +129,7 @@ pub struct Computed<'a> {
     modules: OnceLock<System>,
     symbols: OnceLock<System>,
     tested: OnceLock<BTreeSet<String>>,
+    heights: OnceLock<BTreeMap<SymbolId, Fact>>,
     credited: Mutex<BTreeMap<String, Arc<Credited>>>,
 }
 
@@ -144,6 +150,7 @@ impl<'a> Computed<'a> {
             modules: OnceLock::new(),
             symbols: OnceLock::new(),
             tested: OnceLock::new(),
+            heights: OnceLock::new(),
             credited: Mutex::default(),
         }
     }
@@ -219,6 +226,11 @@ impl Indexes for Computed<'_> {
         Reached::of(system, module)
     }
 
+    fn height(&self, id: &SymbolId) -> Option<u32> {
+        let index = self.heights.get_or_init(|| heights(self.model));
+        as_height(index.get(id))
+    }
+
     fn tested(&self, module: &str) -> bool {
         let roots = self.tested.get_or_init(|| tested(self.model));
         roots.iter().any(|root| contains(root, module))
@@ -275,6 +287,12 @@ impl Computed<'_> {
             SPLIT => Arc::new(self.split(&id)),
             PLACEMENT => Arc::new(self.placement(&id)),
             REACH => Arc::new(self.reach(&id)),
+            HEIGHT => Arc::new(
+                self.heights
+                    .get_or_init(|| heights(self.model))
+                    .get(&id)
+                    .cloned(),
+            ),
             _ => return None,
         })
     }
@@ -402,6 +420,10 @@ impl Indexes for Queried<'_> {
         self.pull(STABILITY, module)
     }
 
+    fn height(&self, id: &SymbolId) -> Option<u32> {
+        as_height(self.pull::<Option<Fact>>(HEIGHT, id.as_str()).as_ref())
+    }
+
     fn tested(&self, module: &str) -> bool {
         self.pull(TESTED, module)
     }
@@ -434,4 +456,12 @@ pub fn credit_of(key: &str) -> (&str, Vec<String>) {
         parts.next().unwrap_or_default(),
         parts.map(str::to_owned).collect(),
     )
+}
+
+/// The height a [`Fact::Int`] holds.
+fn as_height(fact: Option<&Fact>) -> Option<u32> {
+    match fact? {
+        Fact::Int(h) => u32::try_from(*h).ok(),
+        _ => None,
+    }
 }

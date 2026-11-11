@@ -402,6 +402,7 @@ command check is global too, and a rule that reports at another symbol):
 | Fact | Decisions |
 | --- | --- |
 | `unit` | `design/complexity` |
+| `steps_level`, `abstraction_mix` | none yet (they read the call-graph height of the whole project) |
 | `homonyms` | `design/consistent-terms` |
 | `parent` | `design/no-conjoined-modules` |
 | `forwards_only`, `forward_target`, `implementers` | `design/no-redundant-symbol` |

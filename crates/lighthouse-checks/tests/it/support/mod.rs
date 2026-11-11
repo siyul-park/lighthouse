@@ -10,7 +10,7 @@ use lighthouse_model::{
     Position, Span,
     ucm::{
         Comment, Edge, EdgeKind, File, Flow, Fragment, FunctionSummary, Module, Node, Place,
-        Resolution, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
+        Resolution, Step, Symbol, SymbolId, SymbolKind, Target, TestCase, TestStyle, Visibility,
     },
 };
 use lighthouse_plugin::{
@@ -218,6 +218,17 @@ impl World {
             implements: None,
             steps: Vec::new(),
         });
+    }
+
+    /// The top-level statements of a function with a summary.
+    pub fn steps(&mut self, symbol: &Symbol, steps: Vec<Step>) {
+        let summary = self
+            .summaries
+            .iter_mut()
+            .find(|s| s.symbol == symbol.id)
+            .unwrap();
+        summary.top_level = u32::try_from(steps.len()).unwrap();
+        summary.steps = steps;
     }
 
     pub fn edge(&mut self, kind: EdgeKind, from: &Symbol, to: &Symbol) {

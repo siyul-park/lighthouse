@@ -27,6 +27,7 @@ use crate::{
         comment_subject,
         cycle::cycles,
         effective::{Takers, takers},
+        height::heights,
         homonyms::names,
         imports::imports,
         owned::owned,
@@ -37,8 +38,8 @@ use crate::{
     },
     fact::{Built, COMMENT, FACT, Fact, Facts, class_of, fact_of, subject_of},
     indexes::{
-        CREDITED, CYCLES, IMPORTS, Indexes, NAMES, OWNED, PARENTS, PLACEMENT, Queried, REACH,
-        Reached, SPLIT, STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
+        CREDITED, CYCLES, HEIGHT, IMPORTS, Indexes, NAMES, OWNED, PARENTS, PLACEMENT, Queried,
+        REACH, Reached, SPLIT, STABILITY, TAKERS, TESTED, TYPES, USERS, credit_of,
     },
     metrics::{MEASURES, Measures, propagation},
     naming::{Credited, credited},
@@ -78,6 +79,7 @@ pub enum Aggregate {
     Modules(propagation::System),
     Symbols(propagation::System),
     Tested(BTreeSet<String>),
+    Heights(BTreeMap<SymbolId, Fact>),
 }
 
 /// What an index says of one key.
@@ -108,6 +110,7 @@ pub enum Sort {
     Modules,
     Symbols,
     Tested,
+    Heights,
 }
 
 impl Sort {
@@ -126,6 +129,7 @@ impl Sort {
             STABILITY => Self::Modules,
             REACH => Self::Symbols,
             TESTED => Self::Tested,
+            HEIGHT => Self::Heights,
             _ => return None,
         })
     }
@@ -243,6 +247,7 @@ fn aggregate(graph: &Graph, sort: &Sort) -> Result<Aggregate, Error> {
         Sort::Modules => Aggregate::Modules(propagation::modules(model)),
         Sort::Symbols => Aggregate::Symbols(propagation::symbols(model)),
         Sort::Tested => Aggregate::Tested(tested(model)),
+        Sort::Heights => Aggregate::Heights(heights(model)),
     };
     view.failure().map_or(Ok(found), Err)
 }
@@ -288,6 +293,7 @@ fn index(graph: &Graph, (name, key): &(String, String)) -> Result<Entry, Error> 
         }
         (STABILITY, Aggregate::Modules(system)) => Entry::Reached(Reached::of(system, key)),
         (REACH, Aggregate::Symbols(system)) => Entry::Reached(Reached::of(system, key)),
+        (HEIGHT, Aggregate::Heights(map)) => Entry::Fact(id().and_then(|id| map.get(&id).cloned())),
         (TESTED, Aggregate::Tested(roots)) => {
             Entry::Bool(roots.iter().any(|root| contains(root, key)))
         }

@@ -35,6 +35,7 @@ mod file_facts;
 mod file_uses;
 mod forward;
 mod gap;
+pub mod height;
 pub(crate) mod homonyms;
 pub(crate) mod imports;
 pub(crate) mod owned;
@@ -44,6 +45,7 @@ pub(crate) mod placement;
 mod role;
 pub(crate) mod split;
 mod stability;
+mod steps;
 mod style;
 mod unit;
 mod widths;
@@ -400,6 +402,18 @@ impl<'a> Builder<'a> {
         }
         if needs.field("unit") {
             map.insert("unit".to_owned(), self.unit(symbol, summary));
+        }
+        if needs.field("steps_level") || needs.field("abstraction_mix") {
+            let levels = self.steps_level(symbol);
+            if needs.field("abstraction_mix") {
+                map.insert(
+                    "abstraction_mix".to_owned(),
+                    self.abstraction_mix(symbol, &levels),
+                );
+            }
+            if needs.field("steps_level") {
+                map.insert("steps_level".to_owned(), levels);
+            }
         }
         if needs.field("reach") {
             map.insert("reach".to_owned(), self.reach(symbol));

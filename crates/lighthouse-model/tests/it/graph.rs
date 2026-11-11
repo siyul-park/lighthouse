@@ -44,3 +44,17 @@ fn graph_components_numbers_sinks_first_and_survives_a_deep_graph() {
     assert_eq!(count, depth as usize);
     assert_eq!(scc[0], depth - 1);
 }
+
+#[test]
+fn a_node_is_one_higher_than_the_tallest_node_below_it_and_a_cycle_shares_a_height() {
+    // 0 -> 1 <-> 2 -> 3; 4 stands alone.
+    let graph = Graph::new(5, [(0, 1), (1, 2), (2, 1), (2, 3)]);
+    assert_eq!(graph.heights(&[false; 5]), [2, 1, 1, 0, 0]);
+}
+
+#[test]
+fn a_transparent_node_has_the_height_of_what_it_leads_to() {
+    // 0 -> 1 (transparent) -> 2 -> 3
+    let graph = Graph::new(4, [(0, 1), (1, 2), (2, 3)]);
+    assert_eq!(graph.heights(&[false, true, false, false]), [2, 1, 1, 0]);
+}

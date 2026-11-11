@@ -95,6 +95,32 @@ impl Graph {
         (walk.scc, walk.count as usize)
     }
 
+    /// The height of each node: 0 for a node with no edge out of its component,
+    /// else 1 plus the greatest height below it. A cycle shares one height. A
+    /// `transparent` node (flagged by index) stands for what it leads to: a
+    /// component of such nodes alone has the greatest height below it, not one
+    /// more.
+    pub fn heights(&self, transparent: &[bool]) -> Vec<u32> {
+        let (scc, count) = self.components();
+        let mut members = vec![Vec::new(); count];
+        for (v, &c) in (0..).zip(&scc) {
+            members[c as usize].push(v);
+        }
+        let mut height = vec![0u32; count];
+        for (c, nodes) in members.iter().enumerate() {
+            let below = nodes
+                .iter()
+                .flat_map(|&v| &self.succ[v as usize])
+                .map(|&w| scc[w as usize] as usize)
+                .filter(|&d| d != c)
+                .map(|d| height[d])
+                .max();
+            let pass = nodes.iter().all(|&v| transparent[v as usize]);
+            height[c] = below.map_or(0, |h| if pass { h } else { h + 1 });
+        }
+        scc.iter().map(|&c| height[c as usize]).collect()
+    }
+
     /// How many nodes each node reaches, itself left out: a bitset per
     /// component, the union of its members and of the components they lead
     /// to, which are all numbered lower.
