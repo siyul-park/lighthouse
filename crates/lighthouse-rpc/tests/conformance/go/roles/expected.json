@@ -52,6 +52,23 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 53,
+                  "line": 4
+                },
+                "start": {
+                  "col": 34,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": ".::Greet#function",
           "tokens": 6,
           "top_level": 1
@@ -446,6 +463,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 56,
+                  "line": 11
+                },
+                "start": {
+                  "col": 29,
+                  "line": 11
+                }
+              }
+            }
+          ],
           "symbol": ".::newFixture#function",
           "tokens": 9,
           "top_level": 1
@@ -470,6 +503,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 13
+                },
+                "start": {
+                  "col": 35,
+                  "line": 13
+                }
+              }
+            }
+          ],
           "symbol": ".::fixture::label#method",
           "tokens": 6,
           "top_level": 1
@@ -488,6 +536,62 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "check",
+                  "site": {
+                    "end": {
+                      "col": 37,
+                      "line": 15
+                    },
+                    "start": {
+                      "col": 32,
+                      "line": 15
+                    }
+                  }
+                },
+                {
+                  "name": "newFixture",
+                  "site": {
+                    "end": {
+                      "col": 51,
+                      "line": 15
+                    },
+                    "start": {
+                      "col": 41,
+                      "line": 15
+                    }
+                  }
+                },
+                {
+                  "name": "label",
+                  "site": {
+                    "end": {
+                      "col": 59,
+                      "line": 15
+                    },
+                    "start": {
+                      "col": 54,
+                      "line": 15
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 62,
+                  "line": 15
+                },
+                "start": {
+                  "col": 32,
+                  "line": 15
+                }
+              }
+            }
+          ],
           "symbol": ".::TestGreet#test",
           "tokens": 14,
           "top_level": 1
@@ -507,6 +611,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "measure",
+                  "site": {
+                    "end": {
+                      "col": 44,
+                      "line": 17
+                    },
+                    "start": {
+                      "col": 37,
+                      "line": 17
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 47,
+                  "line": 17
+                },
+                "start": {
+                  "col": 37,
+                  "line": 17
+                }
+              }
+            }
+          ],
           "symbol": ".::BenchmarkGreet#test",
           "tokens": 6,
           "top_level": 1
@@ -528,6 +662,49 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assertGreeting",
+                  "site": {
+                    "end": {
+                      "col": 55,
+                      "line": 19
+                    },
+                    "start": {
+                      "col": 41,
+                      "line": 19
+                    }
+                  }
+                },
+                {
+                  "name": "Greet",
+                  "site": {
+                    "end": {
+                      "col": 64,
+                      "line": 19
+                    },
+                    "start": {
+                      "col": 59,
+                      "line": 19
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 71,
+                  "line": 19
+                },
+                "start": {
+                  "col": 41,
+                  "line": 19
+                }
+              }
+            }
+          ],
           "symbol": ".::check#function",
           "tokens": 11,
           "top_level": 1
@@ -555,6 +732,65 @@
             "results": []
           },
           "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 22
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 13,
+                  "line": 22
+                },
+                "start": {
+                  "col": 2,
+                  "line": 22
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "Fatal",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 24
+                    },
+                    "start": {
+                      "col": 6,
+                      "line": 24
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 25
+                },
+                "start": {
+                  "col": 2,
+                  "line": 23
+                }
+              }
+            }
+          ],
           "symbol": ".::assertGreeting#function",
           "tokens": 19,
           "top_level": 2
@@ -573,6 +809,38 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Greet",
+                  "site": {
+                    "end": {
+                      "col": 39,
+                      "line": 28
+                    },
+                    "start": {
+                      "col": 34,
+                      "line": 28
+                    }
+                  }
+                }
+              ],
+              "indexing": 1,
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 49,
+                  "line": 28
+                },
+                "start": {
+                  "col": 30,
+                  "line": 28
+                }
+              }
+            }
+          ],
           "symbol": ".::measure#function",
           "tokens": 11,
           "top_level": 1

@@ -57,6 +57,7 @@ fn symbol(text: &str, name: &str, from: u32, to: u32) -> (Symbol, Place) {
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     };
     (symbol, place)

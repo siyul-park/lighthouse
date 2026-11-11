@@ -417,6 +417,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 23,
+                  "line": 39
+                },
+                "start": {
+                  "col": 2,
+                  "line": 39
+                }
+              }
+            }
+          ],
           "symbol": ".::Service::Run#method",
           "tokens": 8,
           "top_level": 1
@@ -435,6 +451,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 45
+                },
+                "start": {
+                  "col": 21,
+                  "line": 45
+                }
+              }
+            }
+          ],
           "symbol": ".::helper#function",
           "tokens": 4,
           "top_level": 1

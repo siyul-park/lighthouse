@@ -178,6 +178,7 @@ fn declared(name: &str, lines: (u32, u32)) -> (Symbol, Place) {
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     };
     (symbol, place)

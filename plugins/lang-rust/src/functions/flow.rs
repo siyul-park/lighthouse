@@ -178,7 +178,7 @@ fn is_return(body: &Expr) -> bool {
 }
 
 /// A block of one `return`, `break`, `continue` or `panic!`.
-fn only_jumps(block: &syn::Block) -> bool {
+pub(super) fn only_jumps(block: &syn::Block) -> bool {
     match block.stmts.as_slice() {
         [Stmt::Expr(e, _)] => {
             matches!(e, Expr::Return(_) | Expr::Break(_) | Expr::Continue(_))

@@ -72,6 +72,51 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 6
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 6
+                    }
+                  }
+                },
+                {
+                  "name": "Fatal",
+                  "site": {
+                    "end": {
+                      "col": 10,
+                      "line": 7
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 7
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 8
+                },
+                "start": {
+                  "col": 2,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": "pkg::TestHelper#test",
           "tokens": 16,
           "top_level": 1
@@ -198,6 +243,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 31,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 25,
+                      "line": 4
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 4
+                },
+                "start": {
+                  "col": 18,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": "pkg::Run#function",
           "tokens": 6,
           "top_level": 1
@@ -216,6 +291,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 29,
+                  "line": 6
+                },
+                "start": {
+                  "col": 21,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": "pkg::helper#function",
           "tokens": 4,
           "top_level": 1
@@ -376,6 +467,51 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "pkg.Run",
+                  "site": {
+                    "end": {
+                      "col": 12,
+                      "line": 10
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 10
+                    }
+                  }
+                },
+                {
+                  "name": "Fatal",
+                  "site": {
+                    "end": {
+                      "col": 10,
+                      "line": 11
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 11
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 12
+                },
+                "start": {
+                  "col": 2,
+                  "line": 10
+                }
+              }
+            }
+          ],
           "symbol": "pkg[test]::TestRun#test",
           "tokens": 18,
           "top_level": 1

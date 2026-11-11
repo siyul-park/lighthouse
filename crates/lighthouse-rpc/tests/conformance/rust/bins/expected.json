@@ -62,6 +62,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "api",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 4
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 11,
+                  "line": 4
+                },
+                "start": {
+                  "col": 5,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": "bins[bin:tool]::main#function",
           "tokens": 6,
           "top_level": 1
@@ -147,6 +177,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "bins::api",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 2
+                    },
+                    "start": {
+                      "col": 19,
+                      "line": 2
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "bins[bin:bins]/cli::run#function",
           "tokens": 11,
           "top_level": 1
@@ -237,6 +297,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 3
+                },
+                "start": {
+                  "col": 5,
+                  "line": 3
+                }
+              }
+            }
+          ],
           "symbol": "bins::api#function",
           "tokens": 3,
           "top_level": 1
@@ -341,6 +417,78 @@
           "params": 0,
           "returns": 0,
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "println!",
+                  "site": {
+                    "end": {
+                      "col": 12,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 4
+                    }
+                  }
+                },
+                {
+                  "name": "bins::api",
+                  "site": {
+                    "end": {
+                      "col": 29,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 26,
+                      "line": 4
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 4
+                },
+                "start": {
+                  "col": 5,
+                  "line": 4
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "cli::run",
+                  "site": {
+                    "end": {
+                      "col": 13,
+                      "line": 5
+                    },
+                    "start": {
+                      "col": 10,
+                      "line": 5
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 5
+                },
+                "start": {
+                  "col": 5,
+                  "line": 5
+                }
+              }
+            }
+          ],
           "symbol": "bins[bin:bins]::main#function",
           "tokens": 20,
           "top_level": 2

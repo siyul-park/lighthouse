@@ -385,6 +385,23 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "if",
+              "literals": 5,
+              "nested": 3,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 15
+                },
+                "start": {
+                  "col": 2,
+                  "line": 9
+                }
+              }
+            }
+          ],
           "symbol": ".::chain#function",
           "tokens": 24,
           "top_level": 1
@@ -425,6 +442,51 @@
             ]
           },
           "statements": 7,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 12,
+                  "line": 19
+                },
+                "start": {
+                  "col": 2,
+                  "line": 19
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "literals": 3,
+              "nested": 4,
+              "operators": 4,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 28
+                },
+                "start": {
+                  "col": 1,
+                  "line": 20
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 29
+                },
+                "start": {
+                  "col": 2,
+                  "line": 29
+                }
+              }
+            }
+          ],
           "symbol": ".::labeled#function",
           "tokens": 48,
           "top_level": 3
@@ -459,6 +521,24 @@
             ]
           },
           "statements": 9,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 2,
+              "nested": 8,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 42
+                },
+                "start": {
+                  "col": 2,
+                  "line": 33
+                }
+              }
+            }
+          ],
           "symbol": ".::selects#function",
           "tokens": 32,
           "top_level": 1
@@ -491,6 +571,54 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "guard": true,
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 48
+                },
+                "start": {
+                  "col": 2,
+                  "line": 46
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "fact",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 49
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 49
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 22,
+                  "line": 49
+                },
+                "start": {
+                  "col": 2,
+                  "line": 49
+                }
+              }
+            }
+          ],
           "symbol": ".::fact#function",
           "tokens": 19,
           "top_level": 2
@@ -529,6 +657,66 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "guard": true,
+              "kind": "if",
+              "literals": 1,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 55
+                },
+                "start": {
+                  "col": 2,
+                  "line": 53
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "Sum",
+                  "site": {
+                    "end": {
+                      "col": 29,
+                      "line": 56
+                    },
+                    "start": {
+                      "col": 26,
+                      "line": 56
+                    }
+                  }
+                },
+                {
+                  "name": "Sum",
+                  "site": {
+                    "end": {
+                      "col": 45,
+                      "line": 56
+                    },
+                    "start": {
+                      "col": 42,
+                      "line": 56
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 47,
+                  "line": 56
+                },
+                "start": {
+                  "col": 2,
+                  "line": 56
+                }
+              }
+            }
+          ],
           "symbol": ".::Tree::Sum#method",
           "tokens": 30,
           "top_level": 2
@@ -558,6 +746,23 @@
             ]
           },
           "statements": 7,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 6,
+              "nested": 6,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 67
+                },
+                "start": {
+                  "col": 2,
+                  "line": 60
+                }
+              }
+            }
+          ],
           "symbol": ".::name#function",
           "tokens": 22,
           "top_level": 1
@@ -586,6 +791,24 @@
             ]
           },
           "statements": 6,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 3,
+              "nested": 5,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 77
+                },
+                "start": {
+                  "col": 2,
+                  "line": 71
+                }
+              }
+            }
+          ],
           "symbol": ".::mixed#function",
           "tokens": 17,
           "top_level": 1
@@ -643,6 +866,36 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "guard": true,
+              "kind": "if",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 83
+                },
+                "start": {
+                  "col": 2,
+                  "line": 81
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 23,
+                  "line": 84
+                },
+                "start": {
+                  "col": 2,
+                  "line": 84
+                }
+              }
+            }
+          ],
           "symbol": ".::logic#function",
           "tokens": 23,
           "top_level": 2
@@ -674,6 +927,24 @@
             ]
           },
           "statements": 6,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 2,
+              "nested": 5,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 96
+                },
+                "start": {
+                  "col": 2,
+                  "line": 88
+                }
+              }
+            }
+          ],
           "symbol": ".::closures#function",
           "tokens": 31,
           "top_level": 1
@@ -706,6 +977,51 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "guard": true,
+              "kind": "if",
+              "literals": 1,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 102
+                },
+                "start": {
+                  "col": 2,
+                  "line": 100
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 5,
+                  "line": 103
+                },
+                "start": {
+                  "col": 2,
+                  "line": 103
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 105
+                },
+                "start": {
+                  "col": 1,
+                  "line": 104
+                }
+              }
+            }
+          ],
           "symbol": ".::jump#function",
           "tokens": 16,
           "top_level": 3
@@ -735,6 +1051,37 @@
             ]
           },
           "statements": 6,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 2,
+              "nested": 4,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 114
+                },
+                "start": {
+                  "col": 2,
+                  "line": 109
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 115
+                },
+                "start": {
+                  "col": 2,
+                  "line": 115
+                }
+              }
+            }
+          ],
           "symbol": ".::typed#function",
           "tokens": 22,
           "top_level": 2
@@ -761,6 +1108,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "inner",
+                  "site": {
+                    "end": {
+                      "col": 49,
+                      "line": 118
+                    },
+                    "start": {
+                      "col": 44,
+                      "line": 118
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 61,
+                  "line": 118
+                },
+                "start": {
+                  "col": 37,
+                  "line": 118
+                }
+              }
+            }
+          ],
           "symbol": ".::wrap#function",
           "tokens": 10,
           "top_level": 1
@@ -786,6 +1163,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "inner",
+                  "site": {
+                    "end": {
+                      "col": 42,
+                      "line": 120
+                    },
+                    "start": {
+                      "col": 37,
+                      "line": 120
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 120
+                },
+                "start": {
+                  "col": 30,
+                  "line": 120
+                }
+              }
+            }
+          ],
           "symbol": ".::reorder#function",
           "tokens": 9,
           "top_level": 1
@@ -811,6 +1218,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 58,
+                  "line": 122
+                },
+                "start": {
+                  "col": 38,
+                  "line": 122
+                }
+              }
+            }
+          ],
           "symbol": ".::inner#function",
           "tokens": 9,
           "top_level": 1
@@ -838,6 +1261,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "child",
+                  "site": {
+                    "end": {
+                      "col": 46,
+                      "line": 124
+                    },
+                    "start": {
+                      "col": 41,
+                      "line": 124
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 124
+                },
+                "start": {
+                  "col": 32,
+                  "line": 124
+                }
+              }
+            }
+          ],
           "symbol": ".::Tree::left0#method",
           "tokens": 8,
           "top_level": 1
@@ -864,6 +1317,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 45,
+                  "line": 126
+                },
+                "start": {
+                  "col": 32,
+                  "line": 126
+                }
+              }
+            }
+          ],
           "symbol": ".::Tree::child#method",
           "tokens": 6,
           "top_level": 1

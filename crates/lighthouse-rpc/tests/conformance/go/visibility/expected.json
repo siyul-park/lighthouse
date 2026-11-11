@@ -196,6 +196,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 43,
+                  "line": 12
+                },
+                "start": {
+                  "col": 27,
+                  "line": 12
+                }
+              }
+            }
+          ],
           "symbol": ".::Exported#function",
           "tokens": 6,
           "top_level": 1
@@ -230,6 +246,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 17
+                },
+                "start": {
+                  "col": 33,
+                  "line": 17
+                }
+              }
+            }
+          ],
           "symbol": ".::Public::Show#method",
           "tokens": 6,
           "top_level": 1

@@ -99,6 +99,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "shared::shared",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 2
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 2
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "app::run#function",
           "tokens": 9,
           "top_level": 1
@@ -109,6 +140,63 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 9
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 9
+                    }
+                  }
+                },
+                {
+                  "name": "super::run",
+                  "site": {
+                    "end": {
+                      "col": 30,
+                      "line": 9
+                    },
+                    "start": {
+                      "col": 27,
+                      "line": 9
+                    }
+                  }
+                },
+                {
+                  "name": "fixtures::sample",
+                  "site": {
+                    "end": {
+                      "col": 51,
+                      "line": 9
+                    },
+                    "start": {
+                      "col": 45,
+                      "line": 9
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 55,
+                  "line": 9
+                },
+                "start": {
+                  "col": 9,
+                  "line": 9
+                }
+              }
+            }
+          ],
           "symbol": "app/tests::adds#test",
           "tokens": 19,
           "top_level": 1
@@ -242,6 +330,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "unwrap",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 2
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 2
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "fixtures::sample#function",
           "tokens": 10,
           "top_level": 1
@@ -318,6 +437,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "shared::shared#function",
           "tokens": 3,
           "top_level": 1

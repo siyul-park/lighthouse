@@ -45,7 +45,7 @@ struct Lang {
 const GO: Lang = Lang {
     id: "go",
     exts: &[".go"],
-    min_cases: 18,
+    min_cases: 19,
     plugin: lighthouse_test_support::lang_go,
     probe: ("plain.go", || json!({ "go": { "tagz": [] } })),
     manifest_id: "lang-go",
@@ -58,20 +58,27 @@ const GO: Lang = Lang {
         "reference-sites",
         "overlays",
         "source-ast",
+        "steps",
     ],
 };
 
 const RUST: Lang = Lang {
     id: "rust",
     exts: &[".rs"],
-    min_cases: 15,
+    min_cases: 16,
     plugin: || Some(lighthouse_test_support::lang_rust()),
     probe: ("src/plain.rs", || json!({ "rust": { "nope": 1 } })),
     manifest_id: "lang-rust",
     globs: &["**/*.rs"],
     test_globs: &["**/tests/**/*.rs", "**/tests.rs", "**/benches/**/*.rs"],
     constructor_prefixes: &["new"],
-    capabilities: &["extent", "reference-sites", "overlays", "source-ast"],
+    capabilities: &[
+        "extent",
+        "reference-sites",
+        "overlays",
+        "source-ast",
+        "steps",
+    ],
 };
 
 const TYPESCRIPT: Lang = Lang {
@@ -298,6 +305,32 @@ fn together(mut result: Value) -> Value {
     out
 }
 
+/// The steps of a function are its top-level statements, and with what is
+/// nested in them its statements; a language without the capability has none.
+fn steps_add_up(lang: &Lang, answer: &Value) {
+    let declares = lang.capabilities.contains(&"steps");
+    for fragment in answer["fragments"].as_array().into_iter().flatten() {
+        for function in fragment["functions"].as_array().into_iter().flatten() {
+            let steps = function["steps"].as_array().cloned().unwrap_or_default();
+            if !declares {
+                assert!(steps.is_empty(), "{} reports steps", lang.id);
+                continue;
+            }
+            let count = |key: &str| function[key].as_u64().unwrap_or(0);
+            let nested: u64 = steps
+                .iter()
+                .map(|s| s["nested"].as_u64().unwrap_or(0))
+                .sum();
+            assert_eq!(steps.len() as u64, count("top_level"), "{function}");
+            assert_eq!(
+                steps.len() as u64 + nested,
+                count("statements"),
+                "{function}"
+            );
+        }
+    }
+}
+
 fn golden(lang: &Lang) {
     let Some(dir) = (lang.plugin)() else {
         return;
@@ -323,6 +356,7 @@ fn golden(lang: &Lang) {
             plugin.initialize(&root);
             let actual = index(&mut plugin, &root, lang.id, &options, &sources);
             assert_eq!(plugin.finish(), Some(0));
+            steps_add_up(lang, &actual);
             let name = if variant.is_empty() {
                 "expected.json".to_owned()
             } else {

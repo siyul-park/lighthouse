@@ -244,6 +244,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 42,
+                  "line": 7
+                },
+                "start": {
+                  "col": 32,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": "impl::File::Close#method",
           "tokens": 4,
           "top_level": 1

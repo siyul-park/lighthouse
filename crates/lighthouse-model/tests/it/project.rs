@@ -23,6 +23,7 @@ fn symbol(module: &str, name: &str) -> Symbol {
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     }
 }
@@ -145,6 +146,8 @@ fn summary(symbol: &Symbol, forwards_to: Option<Target>) -> FunctionSummary {
         manual_assertions: 0,
         constructs: false,
         configures: None,
+        implements: None,
+        steps: Vec::new(),
     }
 }
 

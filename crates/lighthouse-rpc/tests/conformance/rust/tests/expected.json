@@ -77,6 +77,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 6
+                },
+                "start": {
+                  "col": 5,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": "tests::add#function",
           "tokens": 5,
           "top_level": 1
@@ -102,6 +118,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 11
+                },
+                "start": {
+                  "col": 5,
+                  "line": 11
+                }
+              }
+            }
+          ],
           "symbol": "tests::sub#function",
           "tokens": 5,
           "top_level": 1
@@ -234,6 +266,50 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 5
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 5
+                    }
+                  }
+                },
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 5
+                    },
+                    "start": {
+                      "col": 16,
+                      "line": 5
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 3,
+              "span": {
+                "end": {
+                  "col": 30,
+                  "line": 5
+                },
+                "start": {
+                  "col": 5,
+                  "line": 5
+                }
+              }
+            }
+          ],
           "symbol": "tests/tests::adds_two_numbers#test",
           "tokens": 15,
           "top_level": 1
@@ -329,6 +405,50 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 3
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 3
+                    }
+                  }
+                },
+                {
+                  "name": "tests::sub",
+                  "site": {
+                    "end": {
+                      "col": 26,
+                      "line": 3
+                    },
+                    "start": {
+                      "col": 23,
+                      "line": 3
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 3,
+              "span": {
+                "end": {
+                  "col": 37,
+                  "line": 3
+                },
+                "start": {
+                  "col": 5,
+                  "line": 3
+                }
+              }
+            }
+          ],
           "symbol": "tests[test:it]::subtracts_two_numbers#test",
           "tokens": 17,
           "top_level": 1

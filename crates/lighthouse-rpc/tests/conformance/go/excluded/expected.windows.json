@@ -48,6 +48,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 38,
+                  "line": 3
+                },
+                "start": {
+                  "col": 22,
+                  "line": 3
+                }
+              }
+            }
+          ],
           "symbol": ".::Name#function",
           "tokens": 4,
           "top_level": 1

@@ -34,6 +34,7 @@ fn symbol(name: &str, kind: SymbolKind, owner: Option<&Symbol>, _line: u32) -> S
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     }
 }

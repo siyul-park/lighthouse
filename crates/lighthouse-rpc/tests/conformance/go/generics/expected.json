@@ -340,6 +340,21 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 66,
+                  "line": 14
+                },
+                "start": {
+                  "col": 35,
+                  "line": 14
+                }
+              }
+            }
+          ],
           "symbol": ".::Stack::Push#method",
           "tokens": 14,
           "top_level": 1
@@ -364,6 +379,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 51,
+                  "line": 17
+                },
+                "start": {
+                  "col": 32,
+                  "line": 17
+                }
+              }
+            }
+          ],
           "symbol": ".::Stack::Len#method",
           "tokens": 9,
           "top_level": 1
@@ -394,6 +424,64 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 21
+                },
+                "start": {
+                  "col": 2,
+                  "line": 21
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "f",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 23
+                    },
+                    "start": {
+                      "col": 21,
+                      "line": 23
+                    }
+                  }
+                }
+              ],
+              "kind": "loop",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 24
+                },
+                "start": {
+                  "col": 2,
+                  "line": 22
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 12,
+                  "line": 25
+                },
+                "start": {
+                  "col": 2,
+                  "line": 25
+                }
+              }
+            }
+          ],
           "symbol": ".::Map#function",
           "tokens": 39,
           "top_level": 3
@@ -421,6 +509,49 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "declare",
+              "span": {
+                "end": {
+                  "col": 13,
+                  "line": 30
+                },
+                "start": {
+                  "col": 2,
+                  "line": 30
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "nested": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 33
+                },
+                "start": {
+                  "col": 2,
+                  "line": 31
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 34
+                },
+                "start": {
+                  "col": 2,
+                  "line": 34
+                }
+              }
+            }
+          ],
           "symbol": ".::Sum#function",
           "tokens": 19,
           "top_level": 3
@@ -443,6 +574,37 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Map",
+                  "site": {
+                    "end": {
+                      "col": 12,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 38
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 70,
+                  "line": 38
+                },
+                "start": {
+                  "col": 2,
+                  "line": 38
+                }
+              }
+            }
+          ],
           "symbol": ".::lengths#function",
           "tokens": 26,
           "top_level": 1
@@ -461,6 +623,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Sum",
+                  "site": {
+                    "end": {
+                      "col": 34,
+                      "line": 41
+                    },
+                    "start": {
+                      "col": 31,
+                      "line": 41
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 44,
+                  "line": 41
+                },
+                "start": {
+                  "col": 24,
+                  "line": 41
+                }
+              }
+            }
+          ],
           "symbol": ".::total#function",
           "tokens": 9,
           "top_level": 1
@@ -479,6 +672,79 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 20,
+                  "line": 44
+                },
+                "start": {
+                  "col": 2,
+                  "line": 44
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "Push",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 45
+                    },
+                    "start": {
+                      "col": 4,
+                      "line": 45
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 11,
+                  "line": 45
+                },
+                "start": {
+                  "col": 2,
+                  "line": 45
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "Len",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 46
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 46
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 46
+                },
+                "start": {
+                  "col": 2,
+                  "line": 46
+                }
+              }
+            }
+          ],
           "symbol": ".::fill#function",
           "tokens": 23,
           "top_level": 3

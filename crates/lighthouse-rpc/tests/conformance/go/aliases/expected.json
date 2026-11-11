@@ -205,6 +205,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 47,
+                  "line": 16
+                },
+                "start": {
+                  "col": 29,
+                  "line": 16
+                }
+              }
+            }
+          ],
           "symbol": ".::Store::Read#method",
           "tokens": 9,
           "top_level": 1
@@ -227,6 +242,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "h",
+                  "site": {
+                    "end": {
+                      "col": 37,
+                      "line": 18
+                    },
+                    "start": {
+                      "col": 36,
+                      "line": 18
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 42,
+                  "line": 18
+                },
+                "start": {
+                  "col": 29,
+                  "line": 18
+                }
+              }
+            }
+          ],
           "symbol": ".::use#function",
           "tokens": 7,
           "top_level": 1
@@ -251,6 +297,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Read",
+                  "site": {
+                    "end": {
+                      "col": 39,
+                      "line": 20
+                    },
+                    "start": {
+                      "col": 35,
+                      "line": 20
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 41,
+                  "line": 20
+                },
+                "start": {
+                  "col": 26,
+                  "line": 20
+                }
+              }
+            }
+          ],
           "symbol": ".::count#function",
           "tokens": 8,
           "top_level": 1

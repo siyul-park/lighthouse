@@ -6,10 +6,11 @@ mod edges;
 pub(crate) mod events;
 mod flow;
 pub(crate) mod signature;
+mod steps;
 
 use std::collections::{HashMap, HashSet};
 
-use lighthouse_protocol::{EdgeKind, Flow, FlowKind, Resolution, Span, SymbolKind};
+use lighthouse_protocol::{EdgeKind, Flow, FlowKind, Resolution, Span, Step, SymbolKind};
 use syn::{
     BinOp, Block, Expr, ExprCall, ExprClosure, ExprIf, ExprMatch, ExprMethodCall, ExprPath,
     ExprStruct, Item, Local, Member, Pat, Stmt, UnOp,
@@ -17,6 +18,7 @@ use syn::{
 };
 
 use flow::is_logic;
+use steps::counts_as_operator;
 
 use crate::{
     extent::{ident_span, span_of},
@@ -47,6 +49,8 @@ pub struct Facts {
     /// own.
     pub nested: Vec<syn::ItemFn>,
     pub forwards_to: Option<String>,
+    /// The top-level statements of the body.
+    pub steps: Vec<Step>,
 }
 
 /// A use at one place: the identifier that names the target.
@@ -100,18 +104,13 @@ struct Walker<'i> {
     seen: HashSet<(EdgeKind, String, bool)>,
     nested: Vec<syn::ItemFn>,
     tails: HashSet<*const ExprMatch>,
+    tally: steps::Tally,
+    steps: Vec<Step>,
 }
 
 impl<'ast> Visit<'ast> for Walker<'_> {
     fn visit_block(&mut self, block: &'ast Block) {
-        self.scopes.push(Scope::default());
-        self.register_items(block);
-        let statements = block
-            .stmts
-            .iter()
-            .filter(|s| !matches!(s, Stmt::Item(_)))
-            .count();
-        self.count += u32::try_from(statements).unwrap_or(u32::MAX);
+        self.open(block);
         for stmt in &block.stmts {
             self.visit_stmt(stmt);
         }
@@ -149,6 +148,31 @@ impl<'ast> Visit<'ast> for Walker<'_> {
         }
     }
 
+    fn visit_expr_binary(&mut self, b: &'ast syn::ExprBinary) {
+        self.tally.operators += u32::from(counts_as_operator(&b.op));
+        visit::visit_expr_binary(self, b);
+    }
+
+    fn visit_expr_unary(&mut self, u: &'ast syn::ExprUnary) {
+        self.tally.operators += u32::from(matches!(u.op, UnOp::Neg(_)));
+        visit::visit_expr_unary(self, u);
+    }
+
+    fn visit_expr_index(&mut self, i: &'ast syn::ExprIndex) {
+        self.tally.indexing += 1;
+        visit::visit_expr_index(self, i);
+    }
+
+    fn visit_expr_array(&mut self, a: &'ast syn::ExprArray) {
+        self.tally.literals += 1;
+        visit::visit_expr_array(self, a);
+    }
+
+    fn visit_expr_repeat(&mut self, r: &'ast syn::ExprRepeat) {
+        self.tally.literals += 1;
+        visit::visit_expr_repeat(self, r);
+    }
+
     fn visit_type_path(&mut self, tp: &'ast syn::TypePath) {
         if tp.qself.is_none()
             && !tp.path.is_ident("Self")
@@ -178,7 +202,15 @@ impl<'ast> Visit<'ast> for Walker<'_> {
         visit::visit_expr_path(self, p);
     }
 
+    fn visit_expr_lit(&mut self, l: &'ast syn::ExprLit) {
+        if !matches!(l.lit, syn::Lit::Bool(_)) {
+            self.tally.literals += 1;
+        }
+        visit::visit_expr_lit(self, l);
+    }
+
     fn visit_macro(&mut self, m: &'ast syn::Macro) {
+        self.tally_macro(m);
         let Some(arguments) = macros::arguments(m) else {
             self.unread_macros += 1;
             return;
@@ -190,6 +222,18 @@ impl<'ast> Visit<'ast> for Walker<'_> {
 }
 
 impl<'i> Walker<'i> {
+    /// Enters a block: its scope, the items it declares and its statements.
+    fn open(&mut self, block: &Block) {
+        self.scopes.push(Scope::default());
+        self.register_items(block);
+        let statements = block
+            .stmts
+            .iter()
+            .filter(|s| !matches!(s, Stmt::Item(_)))
+            .count();
+        self.count += u32::try_from(statements).unwrap_or(u32::MAX);
+    }
+
     fn mark_tail(&mut self, block: &Block) {
         if !self.returns_value {
             return;
@@ -441,6 +485,8 @@ impl<'i> Walker<'i> {
             seen: HashSet::new(),
             nested: Vec::new(),
             tails: HashSet::new(),
+            tally: steps::Tally::default(),
+            steps: Vec::new(),
         }
     }
 }
@@ -462,7 +508,7 @@ pub fn analyze(
     let mut walker = Walker::new(idx, file, home, sig);
     walker.mark_tail(block);
     walker.bind_params(sig);
-    walker.visit_block(block);
+    walker.visit_body(block);
     let forwards_to = walker.forwards(sig, block);
     Facts {
         uses: walker.uses,
@@ -473,6 +519,7 @@ pub fn analyze(
         statements: walker.count,
         nested: walker.nested,
         forwards_to,
+        steps: walker.steps,
     }
 }
 

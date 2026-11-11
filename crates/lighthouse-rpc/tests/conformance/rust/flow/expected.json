@@ -302,6 +302,23 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "if",
+              "literals": 5,
+              "nested": 3,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 8
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "flow::branches#function",
           "tokens": 21,
           "top_level": 1
@@ -331,6 +348,24 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 3,
+              "nested": 3,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 16
+                },
+                "start": {
+                  "col": 5,
+                  "line": 12
+                }
+              }
+            }
+          ],
           "symbol": "flow::guarded#function",
           "tokens": 30,
           "top_level": 1
@@ -360,6 +395,23 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 5,
+              "nested": 3,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 24
+                },
+                "start": {
+                  "col": 5,
+                  "line": 20
+                }
+              }
+            }
+          ],
           "symbol": "flow::dispatcher#function",
           "tokens": 18,
           "top_level": 1
@@ -389,6 +441,23 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 3,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 31
+                },
+                "start": {
+                  "col": 5,
+                  "line": 28
+                }
+              }
+            }
+          ],
           "symbol": "flow::explicit_returns#function",
           "tokens": 16,
           "top_level": 1
@@ -413,6 +482,51 @@
             "results": []
           },
           "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "touch",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 36
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 36
+                    }
+                  }
+                },
+                {
+                  "name": "touch",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 37
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 37
+                    }
+                  }
+                }
+              ],
+              "kind": "switch",
+              "literals": 1,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 38
+                },
+                "start": {
+                  "col": 5,
+                  "line": 35
+                }
+              }
+            }
+          ],
           "symbol": "flow::side_effects#function",
           "tokens": 18,
           "top_level": 1
@@ -451,6 +565,38 @@
             ]
           },
           "statements": 5,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "touch",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 46
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 46
+                    }
+                  }
+                }
+              ],
+              "kind": "switch",
+              "literals": 3,
+              "nested": 4,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 50
+                },
+                "start": {
+                  "col": 5,
+                  "line": 44
+                }
+              }
+            }
+          ],
           "symbol": "flow::statements_in_arms#function",
           "tokens": 19,
           "top_level": 1
@@ -478,6 +624,36 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 1,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 7,
+                  "line": 56
+                },
+                "start": {
+                  "col": 5,
+                  "line": 54
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 57
+                },
+                "start": {
+                  "col": 5,
+                  "line": 57
+                }
+              }
+            }
+          ],
           "symbol": "flow::let_else#function",
           "tokens": 17,
           "top_level": 2
@@ -509,6 +685,23 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "kind": "if",
+              "literals": 1,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 40,
+                  "line": 61
+                },
+                "start": {
+                  "col": 5,
+                  "line": 61
+                }
+              }
+            }
+          ],
           "symbol": "flow::if_let#function",
           "tokens": 17,
           "top_level": 1
@@ -557,6 +750,81 @@
             ]
           },
           "statements": 11,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 23,
+                  "line": 65
+                },
+                "start": {
+                  "col": 5,
+                  "line": 65
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "literals": 2,
+              "nested": 4,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 73
+                },
+                "start": {
+                  "col": 5,
+                  "line": 66
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "literals": 2,
+              "nested": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 76
+                },
+                "start": {
+                  "col": 5,
+                  "line": 74
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 79
+                },
+                "start": {
+                  "col": 5,
+                  "line": 77
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 17,
+                  "line": 80
+                },
+                "start": {
+                  "col": 5,
+                  "line": 80
+                }
+              }
+            }
+          ],
           "symbol": "flow::loops#function",
           "tokens": 56,
           "top_level": 5
@@ -588,6 +856,64 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "iter",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 84
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 84
+                    }
+                  }
+                },
+                {
+                  "name": "filter",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 85
+                    },
+                    "start": {
+                      "col": 10,
+                      "line": 85
+                    }
+                  }
+                },
+                {
+                  "name": "count",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 92
+                    },
+                    "start": {
+                      "col": 10,
+                      "line": 92
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "nested": 3,
+              "span": {
+                "end": {
+                  "col": 17,
+                  "line": 92
+                },
+                "start": {
+                  "col": 5,
+                  "line": 84
+                }
+              }
+            }
+          ],
           "symbol": "flow::closures#function",
           "tokens": 33,
           "top_level": 1
@@ -610,6 +936,49 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "parse",
+                  "site": {
+                    "end": {
+                      "col": 20,
+                      "line": 96
+                    },
+                    "start": {
+                      "col": 15,
+                      "line": 96
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 31,
+                  "line": 96
+                },
+                "start": {
+                  "col": 5,
+                  "line": 96
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 97
+                },
+                "start": {
+                  "col": 5,
+                  "line": 97
+                }
+              }
+            }
+          ],
           "symbol": "flow::question#function",
           "tokens": 20,
           "top_level": 2
@@ -649,6 +1018,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 101
+                },
+                "start": {
+                  "col": 5,
+                  "line": 101
+                }
+              }
+            }
+          ],
           "symbol": "flow::logic#function",
           "tokens": 9,
           "top_level": 1
@@ -684,6 +1068,39 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "factorial",
+                  "site": {
+                    "end": {
+                      "col": 41,
+                      "line": 105
+                    },
+                    "start": {
+                      "col": 32,
+                      "line": 105
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "literals": 3,
+              "nested": 2,
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 50,
+                  "line": 105
+                },
+                "start": {
+                  "col": 5,
+                  "line": 105
+                }
+              }
+            }
+          ],
           "symbol": "flow::factorial#function",
           "tokens": 20,
           "top_level": 1
@@ -711,6 +1128,39 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "walk",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 113
+                    },
+                    "start": {
+                      "col": 18,
+                      "line": 113
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 114
+                },
+                "start": {
+                  "col": 9,
+                  "line": 112
+                }
+              }
+            }
+          ],
           "symbol": "flow::Walker::walk#method",
           "tokens": 17,
           "top_level": 1
@@ -729,6 +1179,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "inner",
+                  "site": {
+                    "end": {
+                      "col": 10,
+                      "line": 122
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 122
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 12,
+                  "line": 122
+                },
+                "start": {
+                  "col": 5,
+                  "line": 122
+                }
+              }
+            }
+          ],
           "symbol": "flow::outer#function",
           "tokens": 14,
           "top_level": 1
@@ -747,6 +1227,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 120
+                },
+                "start": {
+                  "col": 9,
+                  "line": 120
+                }
+              }
+            }
+          ],
           "symbol": "flow::outer::inner#function",
           "tokens": 3,
           "top_level": 1
@@ -774,6 +1270,36 @@
             ]
           },
           "statements": 5,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 2,
+              "nested": 3,
+              "span": {
+                "end": {
+                  "col": 7,
+                  "line": 128
+                },
+                "start": {
+                  "col": 5,
+                  "line": 126
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 12,
+                  "line": 129
+                },
+                "start": {
+                  "col": 5,
+                  "line": 129
+                }
+              }
+            }
+          ],
           "symbol": "flow::asyncs#function",
           "tokens": 21,
           "top_level": 2

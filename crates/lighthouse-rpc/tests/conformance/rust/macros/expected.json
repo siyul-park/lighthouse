@@ -187,6 +187,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 8
+                },
+                "start": {
+                  "col": 5,
+                  "line": 8
+                }
+              }
+            }
+          ],
           "symbol": "macros::helper#function",
           "tokens": 3,
           "top_level": 1
@@ -205,6 +221,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 12
+                },
+                "start": {
+                  "col": 5,
+                  "line": 12
+                }
+              }
+            }
+          ],
           "symbol": "macros::other#function",
           "tokens": 3,
           "top_level": 1
@@ -223,6 +255,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 16
+                },
+                "start": {
+                  "col": 5,
+                  "line": 16
+                }
+              }
+            }
+          ],
           "symbol": "macros::hidden#function",
           "tokens": 3,
           "top_level": 1
@@ -241,6 +289,149 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 20
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 20
+                    }
+                  }
+                },
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 20
+                    },
+                    "start": {
+                      "col": 16,
+                      "line": 20
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 29,
+                  "line": 20
+                },
+                "start": {
+                  "col": 5,
+                  "line": 20
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "other",
+                  "site": {
+                    "end": {
+                      "col": 30,
+                      "line": 21
+                    },
+                    "start": {
+                      "col": 25,
+                      "line": 21
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 37,
+                  "line": 21
+                },
+                "start": {
+                  "col": 5,
+                  "line": 21
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "println!",
+                  "site": {
+                    "end": {
+                      "col": 12,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 22
+                    }
+                  }
+                },
+                {
+                  "name": "other",
+                  "site": {
+                    "end": {
+                      "col": 25,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 22
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 29,
+                  "line": 22
+                },
+                "start": {
+                  "col": 5,
+                  "line": 22
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "len",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 23
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 23
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 26,
+                  "line": 23
+                },
+                "start": {
+                  "col": 5,
+                  "line": 23
+                }
+              }
+            }
+          ],
           "symbol": "macros::std_macros#function",
           "tokens": 42,
           "top_level": 4
@@ -259,6 +450,49 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "double!",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 27
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 27
+                    }
+                  }
+                },
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 27
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 27
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 22,
+                  "line": 27
+                },
+                "start": {
+                  "col": 5,
+                  "line": 27
+                }
+              }
+            }
+          ],
           "symbol": "macros::user_macro#function",
           "tokens": 9,
           "top_level": 1
@@ -269,6 +503,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "custom!",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 31
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 31
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 31,
+                  "line": 31
+                },
+                "start": {
+                  "col": 5,
+                  "line": 31
+                }
+              }
+            }
+          ],
           "symbol": "macros::unreadable_macro#function",
           "tokens": 11,
           "top_level": 1
@@ -290,6 +554,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 43
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 43
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 43
+                },
+                "start": {
+                  "col": 5,
+                  "line": 43
+                }
+              }
+            }
+          ],
           "symbol": "macros::entry#function",
           "tokens": 6,
           "top_level": 1

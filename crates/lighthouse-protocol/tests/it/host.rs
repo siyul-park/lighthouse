@@ -222,7 +222,7 @@ fn serve_answers_the_handshake_and_an_index_request_until_exit() {
             1,
             INITIALIZE,
             json!({
-                "protocolVersion": "0.8",
+                "protocolVersion": "0.9",
                 "clientInfo": { "name": "t", "version": "0" },
                 "workspaceFolders": [{ "uri": "file:///p/", "name": "p" }],
             }),

@@ -589,6 +589,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Vec::new",
+                  "site": {
+                    "end": {
+                      "col": 28,
+                      "line": 15
+                    },
+                    "start": {
+                      "col": 25,
+                      "line": 15
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 17
+                },
+                "start": {
+                  "col": 9,
+                  "line": 14
+                }
+              }
+            }
+          ],
           "symbol": "impls::Stack::new#method",
           "tokens": 15,
           "top_level": 1
@@ -607,6 +638,64 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "check",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 21
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 21
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 22,
+                  "line": 21
+                },
+                "start": {
+                  "col": 9,
+                  "line": 21
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "push",
+                  "site": {
+                    "end": {
+                      "col": 24,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 22
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 31,
+                  "line": 22
+                },
+                "start": {
+                  "col": 9,
+                  "line": 22
+                }
+              }
+            }
+          ],
           "symbol": "impls::Stack::push#method",
           "tokens": 17,
           "top_level": 2
@@ -617,6 +706,21 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 28,
+                  "line": 26
+                },
+                "start": {
+                  "col": 9,
+                  "line": 26
+                }
+              }
+            }
+          ],
           "symbol": "impls::Stack::check#method",
           "tokens": 9,
           "top_level": 1
@@ -640,6 +744,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "write!",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 32
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 32
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 38,
+                  "line": 32
+                },
+                "start": {
+                  "col": 9,
+                  "line": 32
+                }
+              }
+            }
+          ],
           "symbol": "impls::Stack::Display::fmt#method",
           "tokens": 13,
           "top_level": 1
@@ -658,6 +793,49 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "name",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 42
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 42
+                    }
+                  }
+                },
+                {
+                  "name": "to_uppercase",
+                  "site": {
+                    "end": {
+                      "col": 33,
+                      "line": 42
+                    },
+                    "start": {
+                      "col": 21,
+                      "line": 42
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 35,
+                  "line": 42
+                },
+                "start": {
+                  "col": 9,
+                  "line": 42
+                }
+              }
+            }
+          ],
           "symbol": "impls::Named::shout#method",
           "tokens": 11,
           "top_level": 1
@@ -665,6 +843,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "impls::Named::name#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -677,6 +856,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "to_owned",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 54
+                    },
+                    "start": {
+                      "col": 15,
+                      "line": 54
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 54
+                },
+                "start": {
+                  "col": 9,
+                  "line": 54
+                }
+              }
+            }
+          ],
           "symbol": "impls::Dog::Named::name#method",
           "tokens": 7,
           "top_level": 1
@@ -684,6 +894,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "impls::Aged::name#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -696,6 +907,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 60
+                },
+                "start": {
+                  "col": 9,
+                  "line": 60
+                }
+              }
+            }
+          ],
           "symbol": "impls::Dog::Aged::name#method",
           "tokens": 3,
           "top_level": 1
@@ -715,6 +942,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "shout",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 66
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 66
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 66
+                },
+                "start": {
+                  "col": 9,
+                  "line": 66
+                }
+              }
+            }
+          ],
           "symbol": "impls::Dog::bark#method",
           "tokens": 7,
           "top_level": 1
@@ -741,6 +998,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 74
+                },
+                "start": {
+                  "col": 9,
+                  "line": 74
+                }
+              }
+            }
+          ],
           "symbol": "impls::Meters::From<f64>::from#method",
           "tokens": 6,
           "top_level": 1
@@ -767,6 +1039,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "f64::from",
+                  "site": {
+                    "end": {
+                      "col": 25,
+                      "line": 80
+                    },
+                    "start": {
+                      "col": 21,
+                      "line": 80
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 29,
+                  "line": 80
+                },
+                "start": {
+                  "col": 9,
+                  "line": 80
+                }
+              }
+            }
+          ],
           "symbol": "impls::Meters::From<u32>::from#method",
           "tokens": 11,
           "top_level": 1
@@ -774,6 +1076,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "impls::Summary::summary#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -786,6 +1089,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "name",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 90
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 90
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 20,
+                  "line": 90
+                },
+                "start": {
+                  "col": 9,
+                  "line": 90
+                }
+              }
+            }
+          ],
           "symbol": "impls::T::Summary::summary#method",
           "tokens": 7,
           "top_level": 1
@@ -793,6 +1126,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "impls::Named::name#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -805,6 +1139,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "clone",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 96
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 96
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 96
+                },
+                "start": {
+                  "col": 9,
+                  "line": 96
+                }
+              }
+            }
+          ],
           "symbol": "impls::String::Named::name#method",
           "tokens": 7,
           "top_level": 1
@@ -812,6 +1176,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "impls::Summary::summary#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -824,6 +1189,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "String::new",
+                  "site": {
+                    "end": {
+                      "col": 20,
+                      "line": 110
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 110
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 22,
+                  "line": 110
+                },
+                "start": {
+                  "col": 9,
+                  "line": 110
+                }
+              }
+            }
+          ],
           "symbol": "impls::Marker::Summary::summary#method",
           "tokens": 7,
           "top_level": 1
@@ -845,6 +1240,79 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Stack::new",
+                  "site": {
+                    "end": {
+                      "col": 31,
+                      "line": 115
+                    },
+                    "start": {
+                      "col": 28,
+                      "line": 115
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 35,
+                  "line": 115
+                },
+                "start": {
+                  "col": 5,
+                  "line": 115
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "push",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 116
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 116
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 116
+                },
+                "start": {
+                  "col": 5,
+                  "line": 116
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 117
+                },
+                "start": {
+                  "col": 5,
+                  "line": 117
+                }
+              }
+            }
+          ],
           "symbol": "impls::build#function",
           "tokens": 21,
           "top_level": 3

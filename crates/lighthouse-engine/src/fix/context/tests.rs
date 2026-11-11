@@ -108,6 +108,7 @@ fn symbol(file: &str, (name, _, _, _): (&str, u32, u32, Option<&str>)) -> Symbol
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     }
 }

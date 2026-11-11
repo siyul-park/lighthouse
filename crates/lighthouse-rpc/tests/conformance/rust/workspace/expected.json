@@ -97,6 +97,77 @@
           "params": 0,
           "returns": 0,
           "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "renamed::make",
+                  "site": {
+                    "end": {
+                      "col": 30,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 26,
+                      "line": 4
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 4
+                },
+                "start": {
+                  "col": 5,
+                  "line": 4
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "size",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 5
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 5
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 5
+                },
+                "start": {
+                  "col": 5,
+                  "line": 5
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 6
+                },
+                "start": {
+                  "col": 5,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": "app[bin:app]::main#function",
           "tokens": 27,
           "top_level": 3
@@ -235,6 +306,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 6
+                },
+                "start": {
+                  "col": 9,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": "core_lib::Thing::size#method",
           "tokens": 3,
           "top_level": 1
@@ -256,6 +343,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 12
+                },
+                "start": {
+                  "col": 5,
+                  "line": 12
+                }
+              }
+            }
+          ],
           "symbol": "core_lib::make#function",
           "tokens": 3,
           "top_level": 1

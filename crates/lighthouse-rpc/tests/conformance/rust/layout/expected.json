@@ -159,6 +159,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 3
+                },
+                "start": {
+                  "col": 5,
+                  "line": 3
+                }
+              }
+            }
+          ],
           "symbol": "layout::add#function",
           "tokens": 5,
           "top_level": 1
@@ -181,6 +197,49 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "iter",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 7
+                    },
+                    "start": {
+                      "col": 12,
+                      "line": 7
+                    }
+                  }
+                },
+                {
+                  "name": "sum",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 7
+                    },
+                    "start": {
+                      "col": 19,
+                      "line": 7
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 24,
+                  "line": 7
+                },
+                "start": {
+                  "col": 5,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": "layout::private_sum#function",
           "tokens": 11,
           "top_level": 1
@@ -191,6 +250,50 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 16
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 16
+                    }
+                  }
+                },
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 16
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 16
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 3,
+              "span": {
+                "end": {
+                  "col": 34,
+                  "line": 16
+                },
+                "start": {
+                  "col": 9,
+                  "line": 16
+                }
+              }
+            }
+          ],
           "symbol": "layout/tests::adds#test",
           "tokens": 15,
           "top_level": 1
@@ -206,6 +309,51 @@
           "params": 0,
           "returns": 0,
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 22
+                    }
+                  }
+                },
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 27,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 24,
+                      "line": 22
+                    }
+                  }
+                }
+              ],
+              "kind": "loop",
+              "literals": 7,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 23
+                },
+                "start": {
+                  "col": 9,
+                  "line": 21
+                }
+              }
+            }
+          ],
           "symbol": "layout/tests::adds_many#test",
           "tokens": 43,
           "top_level": 1
@@ -216,6 +364,50 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 28
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 28
+                    }
+                  }
+                },
+                {
+                  "name": "private_sum",
+                  "site": {
+                    "end": {
+                      "col": 31,
+                      "line": 28
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 28
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 4,
+              "span": {
+                "end": {
+                  "col": 45,
+                  "line": 28
+                },
+                "start": {
+                  "col": 9,
+                  "line": 28
+                }
+              }
+            }
+          ],
           "symbol": "layout/tests::sums_privately#test",
           "tokens": 18,
           "top_level": 1
@@ -458,6 +650,37 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 5
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 5
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 5
+                },
+                "start": {
+                  "col": 5,
+                  "line": 5
+                }
+              }
+            }
+          ],
           "symbol": "layout/more::from_a_file_module#test",
           "tokens": 9,
           "top_level": 1
@@ -543,6 +766,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]/common::two#function",
           "tokens": 3,
           "top_level": 1
@@ -953,6 +1192,63 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 12
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 12
+                    }
+                  }
+                },
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 12
+                    },
+                    "start": {
+                      "col": 16,
+                      "line": 12
+                    }
+                  }
+                },
+                {
+                  "name": "common::two",
+                  "site": {
+                    "end": {
+                      "col": 38,
+                      "line": 12
+                    },
+                    "start": {
+                      "col": 35,
+                      "line": 12
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 42,
+                  "line": 12
+                },
+                "start": {
+                  "col": 5,
+                  "line": 12
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]::through_the_public_api#test",
           "tokens": 19,
           "top_level": 1
@@ -968,6 +1264,65 @@
           "params": 0,
           "returns": 0,
           "statements": 3,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 7,
+              "span": {
+                "end": {
+                  "col": 64,
+                  "line": 17
+                },
+                "start": {
+                  "col": 5,
+                  "line": 17
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 19
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 19
+                    }
+                  }
+                },
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 19
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 19
+                    }
+                  }
+                }
+              ],
+              "kind": "loop",
+              "literals": 1,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 20
+                },
+                "start": {
+                  "col": 5,
+                  "line": 18
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]::table_of_structs#test",
           "tokens": 55,
           "top_level": 2
@@ -978,6 +1333,37 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 25
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 25
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 25
+                },
+                "start": {
+                  "col": 5,
+                  "line": 25
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]::async_case#test",
           "tokens": 9,
           "top_level": 1
@@ -996,6 +1382,37 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 32
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 32
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 32
+                },
+                "start": {
+                  "col": 5,
+                  "line": 32
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]::cases_by_attribute#test",
           "tokens": 9,
           "top_level": 1
@@ -1018,6 +1435,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 38
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 38
+                },
+                "start": {
+                  "col": 5,
+                  "line": 38
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]::test_case_by_path#test",
           "tokens": 9,
           "top_level": 1
@@ -1036,6 +1483,37 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 44
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 44
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 44
+                },
+                "start": {
+                  "col": 5,
+                  "line": 44
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]::one_case_is_a_scenario#test",
           "tokens": 9,
           "top_level": 1
@@ -1046,6 +1524,37 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "add",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 49
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 49
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 49
+                },
+                "start": {
+                  "col": 5,
+                  "line": 49
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:integration]::not_a_test_by_path#function",
           "tokens": 9,
           "top_level": 1
@@ -1437,6 +1946,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "common::two",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 5
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 5
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 5
+                },
+                "start": {
+                  "col": 5,
+                  "line": 5
+                }
+              }
+            }
+          ],
           "symbol": "layout[test:other]::shares_the_helper#test",
           "tokens": 8,
           "top_level": 1

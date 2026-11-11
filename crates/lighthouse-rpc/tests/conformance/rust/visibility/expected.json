@@ -393,6 +393,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 45
+                },
+                "start": {
+                  "col": 9,
+                  "line": 45
+                }
+              }
+            }
+          ],
           "symbol": "visibility::Open::get#method",
           "tokens": 5,
           "top_level": 1
@@ -411,6 +426,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 48
+                },
+                "start": {
+                  "col": 9,
+                  "line": 48
+                }
+              }
+            }
+          ],
           "symbol": "visibility::Open::soft#method",
           "tokens": 5,
           "top_level": 1
@@ -429,6 +459,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 51
+                },
+                "start": {
+                  "col": 9,
+                  "line": 51
+                }
+              }
+            }
+          ],
           "symbol": "visibility::Open::hide#method",
           "tokens": 5,
           "top_level": 1
@@ -436,6 +481,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "visibility::Tr::m#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 0,
@@ -531,6 +577,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 65
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 65
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 65
+                },
+                "start": {
+                  "col": 9,
+                  "line": 65
+                }
+              }
+            }
+          ],
           "symbol": "visibility/tests::t#test",
           "tokens": 6,
           "top_level": 1

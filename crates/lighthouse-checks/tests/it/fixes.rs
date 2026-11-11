@@ -67,6 +67,7 @@ fn declared(names: &[&str], extents: bool) -> Project {
                 role: None,
                 optional: false,
                 type_ref: None,
+                embedded: false,
                 implementation: false,
             };
             (symbol, place)

@@ -23,6 +23,7 @@ fn symbol(module: &str, name: &str, kind: SymbolKind, file: &str, _lines: (u32, 
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     }
 }
@@ -43,6 +44,8 @@ fn summary(symbol: &Symbol, nesting: u32, statements: u32, flow: &[Flow]) -> Fun
         manual_assertions: 0,
         constructs: false,
         configures: None,
+        implements: None,
+        steps: Vec::new(),
     }
 }
 

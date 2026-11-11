@@ -258,6 +258,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 42,
+                  "line": 8
+                },
+                "start": {
+                  "col": 32,
+                  "line": 8
+                }
+              }
+            }
+          ],
           "symbol": "impl::File::Close#method",
           "tokens": 4,
           "top_level": 1
@@ -300,6 +315,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Println",
+                  "site": {
+                    "end": {
+                      "col": 63,
+                      "line": 14
+                    },
+                    "start": {
+                      "col": 56,
+                      "line": 14
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 71,
+                  "line": 14
+                },
+                "start": {
+                  "col": 45,
+                  "line": 14
+                }
+              }
+            }
+          ],
           "symbol": "impl::source::Read#method",
           "tokens": 12,
           "top_level": 1

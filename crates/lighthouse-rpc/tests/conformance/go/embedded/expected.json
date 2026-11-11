@@ -477,6 +477,22 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "assign",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 52,
+                  "line": 25
+                },
+                "start": {
+                  "col": 34,
+                  "line": 25
+                }
+              }
+            }
+          ],
           "symbol": ".::Base::Log#method",
           "tokens": 9,
           "top_level": 1
@@ -496,6 +512,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 42,
+                  "line": 28
+                },
+                "start": {
+                  "col": 32,
+                  "line": 28
+                }
+              }
+            }
+          ],
           "symbol": ".::Base::Close#method",
           "tokens": 4,
           "top_level": 1
@@ -520,6 +551,65 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Log",
+                  "site": {
+                    "end": {
+                      "col": 7,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 4,
+                      "line": 38
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 38
+                },
+                "start": {
+                  "col": 2,
+                  "line": 38
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "Close",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 39
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 39
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 39
+                },
+                "start": {
+                  "col": 2,
+                  "line": 39
+                }
+              }
+            }
+          ],
           "symbol": ".::run#function",
           "tokens": 14,
           "top_level": 2
@@ -544,6 +634,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 56,
+                  "line": 42
+                },
+                "start": {
+                  "col": 32,
+                  "line": 42
+                }
+              }
+            }
+          ],
           "symbol": ".::peek#function",
           "tokens": 10,
           "top_level": 1
@@ -565,6 +671,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 4,
+              "span": {
+                "end": {
+                  "col": 80,
+                  "line": 44
+                },
+                "start": {
+                  "col": 25,
+                  "line": 44
+                }
+              }
+            }
+          ],
           "symbol": ".::build#function",
           "tokens": 20,
           "top_level": 1
@@ -588,6 +710,37 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Close",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 48
+                    },
+                    "start": {
+                      "col": 12,
+                      "line": 48
+                    }
+                  }
+                }
+              ],
+              "kind": "loop",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 49
+                },
+                "start": {
+                  "col": 2,
+                  "line": 47
+                }
+              }
+            }
+          ],
           "symbol": ".::closeAll#function",
           "tokens": 18,
           "top_level": 1
@@ -906,6 +1059,7 @@
           "visibility": "public"
         },
         {
+          "embedded": true,
           "extent": {
             "end": {
               "col": 7,
@@ -940,6 +1094,7 @@
           "visibility": "public"
         },
         {
+          "embedded": true,
           "extent": {
             "end": {
               "col": 11,

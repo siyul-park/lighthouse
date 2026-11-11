@@ -151,6 +151,50 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Sprint",
+                  "site": {
+                    "end": {
+                      "col": 43,
+                      "line": 13
+                    },
+                    "start": {
+                      "col": 37,
+                      "line": 13
+                    }
+                  }
+                },
+                {
+                  "name": "helpers.Count",
+                  "site": {
+                    "end": {
+                      "col": 57,
+                      "line": 13
+                    },
+                    "start": {
+                      "col": 52,
+                      "line": 13
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 67,
+                  "line": 13
+                },
+                "start": {
+                  "col": 26,
+                  "line": 13
+                }
+              }
+            }
+          ],
           "symbol": "cmd/app::Greeting#function",
           "tokens": 14,
           "top_level": 1
@@ -161,6 +205,49 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Println",
+                  "site": {
+                    "end": {
+                      "col": 26,
+                      "line": 15
+                    },
+                    "start": {
+                      "col": 19,
+                      "line": 15
+                    }
+                  }
+                },
+                {
+                  "name": "Greeting",
+                  "site": {
+                    "end": {
+                      "col": 35,
+                      "line": 15
+                    },
+                    "start": {
+                      "col": 27,
+                      "line": 15
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 38,
+                  "line": 15
+                },
+                "start": {
+                  "col": 15,
+                  "line": 15
+                }
+              }
+            }
+          ],
           "symbol": "cmd/app::main#function",
           "tokens": 10,
           "top_level": 1
@@ -332,6 +419,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 41,
+                  "line": 5
+                },
+                "start": {
+                  "col": 28,
+                  "line": 5
+                }
+              }
+            }
+          ],
           "symbol": "internal/text::Count#function",
           "tokens": 7,
           "top_level": 1

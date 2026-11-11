@@ -460,6 +460,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "run",
+                  "site": {
+                    "end": {
+                      "col": 10,
+                      "line": 28
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 28
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 13,
+                  "line": 28
+                },
+                "start": {
+                  "col": 5,
+                  "line": 28
+                }
+              }
+            }
+          ],
           "symbol": "guesses::common#function",
           "tokens": 8,
           "top_level": 1
@@ -478,6 +508,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "tick",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 33
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 33
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 33
+                },
+                "start": {
+                  "col": 5,
+                  "line": 33
+                }
+              }
+            }
+          ],
           "symbol": "guesses::few#function",
           "tokens": 8,
           "top_level": 1
@@ -496,6 +556,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "once",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 38
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 38
+                },
+                "start": {
+                  "col": 5,
+                  "line": 38
+                }
+              }
+            }
+          ],
           "symbol": "guesses::single#function",
           "tokens": 8,
           "top_level": 1
@@ -516,6 +606,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "tick",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 43
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 43
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 43
+                },
+                "start": {
+                  "col": 5,
+                  "line": 43
+                }
+              }
+            }
+          ],
           "symbol": "guesses::exact#function",
           "tokens": 8,
           "top_level": 1
@@ -554,6 +674,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "register",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 59
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 59
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 59
+                },
+                "start": {
+                  "col": 5,
+                  "line": 59
+                }
+              }
+            }
+          ],
           "symbol": "guesses::exercise#function",
           "tokens": 8,
           "top_level": 1

@@ -293,6 +293,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Generated",
+                  "site": {
+                    "end": {
+                      "col": 25,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 16,
+                      "line": 4
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 4
+                },
+                "start": {
+                  "col": 16,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": ".::Plain#function",
           "tokens": 5,
           "top_level": 1

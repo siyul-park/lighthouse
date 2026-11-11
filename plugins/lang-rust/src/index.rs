@@ -177,6 +177,7 @@ impl Extractor<'_> {
         // A free function that returns a type of its own module builds it.
         let role = Role {
             implementation: false,
+            implements: None,
             constructs: built_type(&f.sig)
                 .and_then(|ty| self.idx.type_sym(ty, &cx))
                 .is_some_and(|sym| sym.id.rsplit_once("::").is_some_and(|(m, _)| m == module)),
@@ -223,6 +224,7 @@ impl Extractor<'_> {
             role: None,
             optional: false,
             type_ref: None,
+            embedded: false,
             provides: Vec::new(),
             requires: Vec::new(),
             edges: false,
@@ -272,8 +274,10 @@ impl Extractor<'_> {
             manual_assertions: 0,
             implementation: role.implementation,
             constructs: role.constructs,
+            implements: role.implements,
             configures: None,
             pending: None,
+            steps: facts.steps,
         });
         if let Some(attrs) = test {
             self.frag.tests.push(TestCase {
@@ -569,12 +573,25 @@ impl Extractor<'_> {
         };
         let role = Role {
             implementation: ctx.via.is_some(),
+            implements: self.implemented(ctx, &f.sig.ident.to_string()),
             constructs: ctx
                 .owner
                 .as_ref()
                 .is_some_and(|o| constructs(&f.sig, &o.name)),
         };
         self.summarize(&id, &home, &f.sig, &f.block, (None, role));
+    }
+
+    /// The method of the project trait that an impl method implements.
+    fn implemented(&self, ctx: &ImplCtx, name: &str) -> Option<String> {
+        let Some(ViaTrait::Project(t)) = &ctx.via else {
+            return None;
+        };
+        self.idx
+            .trait_methods
+            .get(&t.id)?
+            .get(name)
+            .map(|m| m.id.clone())
     }
 
     /// A trait impl method without docs of its own shows the documentation of
@@ -631,9 +648,11 @@ pub struct MacroStats {
 
 /// What a function is for, as far as the language says: a method of a trait
 /// impl, or an associated function that builds its owner.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct Role {
     implementation: bool,
+    /// The method of a project trait the function implements.
+    implements: Option<String>,
     constructs: bool,
 }
 

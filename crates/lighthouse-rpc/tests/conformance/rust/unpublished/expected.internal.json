@@ -67,6 +67,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 7
+                },
+                "start": {
+                  "col": 9,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": "closed::Handle::id#method",
           "tokens": 5,
           "top_level": 1
@@ -243,6 +258,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "id",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 12,
+                      "line": 4
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 4
+                },
+                "start": {
+                  "col": 5,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": "consumer::identify#function",
           "tokens": 7,
           "top_level": 1
@@ -352,6 +397,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 7
+                },
+                "start": {
+                  "col": 9,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": "open::Handle::id#method",
           "tokens": 5,
           "top_level": 1
@@ -520,6 +580,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 7
+                },
+                "start": {
+                  "col": 9,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": "shared::Handle::id#method",
           "tokens": 5,
           "top_level": 1

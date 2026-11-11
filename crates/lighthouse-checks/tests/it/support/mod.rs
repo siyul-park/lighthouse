@@ -148,6 +148,7 @@ impl World {
             role: None,
             optional: false,
             type_ref: None,
+            embedded: false,
             implementation: false,
         };
         self.places.push(Place::new(symbol.id.clone(), at(line)));
@@ -214,6 +215,8 @@ impl World {
             manual_assertions: 0,
             constructs: false,
             configures: None,
+            implements: None,
+            steps: Vec::new(),
         });
     }
 

@@ -58,6 +58,23 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 5,
+              "nested": 3,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 8
+                },
+                "start": {
+                  "col": 5,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": "generated/gen::table#function",
           "tokens": 18,
           "top_level": 1
@@ -204,6 +221,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "crate::gen::table",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 3
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 3
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 3
+                },
+                "start": {
+                  "col": 5,
+                  "line": 3
+                }
+              }
+            }
+          ],
           "symbol": "generated/plain::plain#function",
           "tokens": 10,
           "top_level": 1

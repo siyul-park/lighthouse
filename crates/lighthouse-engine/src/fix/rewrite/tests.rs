@@ -294,6 +294,7 @@ fn declared(name: &str, file: &str) -> (Symbol, Place) {
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     };
     (symbol, place)

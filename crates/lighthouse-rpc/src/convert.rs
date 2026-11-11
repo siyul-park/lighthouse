@@ -386,6 +386,7 @@ fn symbol(s: wire::Symbol) -> Result<(core::Symbol, core::Place), String> {
         role: s.role.map(role),
         optional: s.optional,
         type_ref: s.type_ref.map(type_ref),
+        embedded: s.embedded,
         implementation: false,
     };
     Ok((symbol, place))
@@ -452,8 +453,41 @@ fn function(f: wire::FunctionSummary) -> Result<(core::FunctionSummary, bool), S
         manual_assertions: f.manual_assertions,
         constructs: f.constructs,
         configures: f.configures,
+        implements: f.implements,
+        steps: f.steps.into_iter().map(step).collect(),
     };
     Ok((summary, implementation))
+}
+
+fn step(s: wire::Step) -> core::Step {
+    core::Step {
+        span: span(s.span),
+        kind: match s.kind {
+            wire::StepKind::Assign => core::StepKind::Assign,
+            wire::StepKind::Declare => core::StepKind::Declare,
+            wire::StepKind::Call => core::StepKind::Call,
+            wire::StepKind::Return => core::StepKind::Return,
+            wire::StepKind::Jump => core::StepKind::Jump,
+            wire::StepKind::Defer => core::StepKind::Defer,
+            wire::StepKind::If => core::StepKind::If,
+            wire::StepKind::Switch => core::StepKind::Switch,
+            wire::StepKind::Loop => core::StepKind::Loop,
+            wire::StepKind::Block => core::StepKind::Block,
+        },
+        operators: s.operators,
+        indexing: s.indexing,
+        literals: s.literals,
+        calls: s
+            .calls
+            .into_iter()
+            .map(|c| core::StepCall {
+                name: c.name,
+                site: span(c.site),
+            })
+            .collect(),
+        nested: s.nested,
+        guard: s.guard,
+    }
 }
 
 fn type_ref(t: wire::TypeRef) -> core::TypeRef {

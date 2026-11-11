@@ -74,9 +74,15 @@ impl language::Provider for Provider {
                     ancestors: true,
                 },
             },
-            capabilities: ["extent", "reference-sites", "overlays", "source-ast"]
-                .map(str::to_owned)
-                .to_vec(),
+            capabilities: [
+                "extent",
+                "reference-sites",
+                "overlays",
+                "source-ast",
+                "steps",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
             ordered_declarations: false,
             units: Units {
                 by: UnitsBy::Manifest,

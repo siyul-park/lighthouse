@@ -96,6 +96,35 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 8,
+                  "line": 8
+                },
+                "start": {
+                  "col": 2,
+                  "line": 8
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 9
+                },
+                "start": {
+                  "col": 2,
+                  "line": 9
+                }
+              }
+            }
+          ],
           "symbol": ".::Run#function",
           "tokens": 7,
           "top_level": 2

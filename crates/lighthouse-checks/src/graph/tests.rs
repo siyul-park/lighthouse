@@ -191,6 +191,8 @@ fn summary(symbol: SymbolId) -> FunctionSummary {
         manual_assertions: 0,
         constructs: false,
         configures: None,
+        implements: None,
+        steps: Vec::new(),
     }
 }
 

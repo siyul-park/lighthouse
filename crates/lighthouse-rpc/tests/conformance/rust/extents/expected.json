@@ -338,6 +338,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 21
+                },
+                "start": {
+                  "col": 5,
+                  "line": 21
+                }
+              }
+            }
+          ],
           "symbol": "extents::extra#function",
           "tokens": 3,
           "top_level": 1
@@ -359,6 +375,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 26,
+                  "line": 28
+                },
+                "start": {
+                  "col": 9,
+                  "line": 28
+                }
+              }
+            }
+          ],
           "symbol": "extents::Limit::new#method",
           "tokens": 8,
           "top_level": 1
@@ -377,6 +409,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 32
+                },
+                "start": {
+                  "col": 9,
+                  "line": 32
+                }
+              }
+            }
+          ],
           "symbol": "extents::Limit::count#method",
           "tokens": 5,
           "top_level": 1
@@ -387,6 +434,63 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "assert_eq!",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 45
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 45
+                    }
+                  }
+                },
+                {
+                  "name": "Limit::new",
+                  "site": {
+                    "end": {
+                      "col": 30,
+                      "line": 45
+                    },
+                    "start": {
+                      "col": 27,
+                      "line": 45
+                    }
+                  }
+                },
+                {
+                  "name": "count",
+                  "site": {
+                    "end": {
+                      "col": 38,
+                      "line": 45
+                    },
+                    "start": {
+                      "col": 33,
+                      "line": 45
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 45,
+                  "line": 45
+                },
+                "start": {
+                  "col": 9,
+                  "line": 45
+                }
+              }
+            }
+          ],
           "symbol": "extents/tests::new_starts_at_zero#test",
           "tokens": 18,
           "top_level": 1

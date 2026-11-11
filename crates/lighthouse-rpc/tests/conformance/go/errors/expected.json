@@ -48,6 +48,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 4
+                },
+                "start": {
+                  "col": 19,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": ".::Fine#function",
           "tokens": 4,
           "top_level": 1
@@ -177,6 +193,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 35,
+                  "line": 3
+                },
+                "start": {
+                  "col": 21,
+                  "line": 3
+                }
+              }
+            }
+          ],
           "symbol": ".::broken#function",
           "tokens": 4,
           "top_level": 1

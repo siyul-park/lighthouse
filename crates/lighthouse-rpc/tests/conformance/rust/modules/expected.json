@@ -247,6 +247,102 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 26,
+                  "line": 21
+                },
+                "start": {
+                  "col": 5,
+                  "line": 21
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "aid",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 22
+                    }
+                  }
+                },
+                {
+                  "name": "shapes::square::side",
+                  "site": {
+                    "end": {
+                      "col": 33,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 29,
+                      "line": 22
+                    }
+                  }
+                },
+                {
+                  "name": "deep::f",
+                  "site": {
+                    "end": {
+                      "col": 45,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 44,
+                      "line": 22
+                    }
+                  }
+                },
+                {
+                  "name": "f",
+                  "site": {
+                    "end": {
+                      "col": 51,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 50,
+                      "line": 22
+                    }
+                  }
+                },
+                {
+                  "name": "special::special",
+                  "site": {
+                    "end": {
+                      "col": 72,
+                      "line": 22
+                    },
+                    "start": {
+                      "col": 65,
+                      "line": 22
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "operators": 4,
+              "span": {
+                "end": {
+                  "col": 74,
+                  "line": 22
+                },
+                "start": {
+                  "col": 5,
+                  "line": 22
+                }
+              }
+            }
+          ],
           "symbol": "modules::run#function",
           "tokens": 38,
           "top_level": 2
@@ -266,6 +362,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "platform::name",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 29
+                    },
+                    "start": {
+                      "col": 15,
+                      "line": 29
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 29
+                },
+                "start": {
+                  "col": 5,
+                  "line": 29
+                }
+              }
+            }
+          ],
           "symbol": "modules::platform_name#function",
           "tokens": 7,
           "top_level": 1
@@ -284,6 +410,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 7
+                },
+                "start": {
+                  "col": 13,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": "modules/nested/deep::f#function",
           "tokens": 3,
           "top_level": 1
@@ -421,6 +563,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 11,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "modules/platform::name#function",
           "tokens": 3,
           "top_level": 1
@@ -496,6 +654,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "modules/special::special#function",
           "tokens": 3,
           "top_level": 1
@@ -624,6 +798,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 10
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 10
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 13,
+                  "line": 10
+                },
+                "start": {
+                  "col": 5,
+                  "line": 10
+                }
+              }
+            }
+          ],
           "symbol": "modules/shapes::area#function",
           "tokens": 5,
           "top_level": 1
@@ -825,6 +1029,49 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 20,
+                  "line": 5
+                },
+                "start": {
+                  "col": 5,
+                  "line": 5
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 6
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 6
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 13,
+                  "line": 6
+                },
+                "start": {
+                  "col": 5,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": "modules/shapes/square::side#function",
           "tokens": 10,
           "top_level": 2
@@ -919,6 +1166,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "hidden::secret",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 4
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 4
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 4
+                },
+                "start": {
+                  "col": 5,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": "modules/util::helper#function",
           "tokens": 7,
           "top_level": 1
@@ -994,6 +1271,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 2
+                },
+                "start": {
+                  "col": 5,
+                  "line": 2
+                }
+              }
+            }
+          ],
           "symbol": "modules/util/hidden::secret#function",
           "tokens": 3,
           "top_level": 1

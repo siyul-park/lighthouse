@@ -182,6 +182,22 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "kind": "return",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 43,
+                  "line": 11
+                },
+                "start": {
+                  "col": 2,
+                  "line": 11
+                }
+              }
+            }
+          ],
           "symbol": ".::WithName#function",
           "tokens": 16,
           "top_level": 1
@@ -208,6 +224,22 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "kind": "return",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 43,
+                  "line": 16
+                },
+                "start": {
+                  "col": 2,
+                  "line": 16
+                }
+              }
+            }
+          ],
           "symbol": ".::WithAlias#function",
           "tokens": 16,
           "top_level": 1
@@ -237,6 +269,49 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "o",
+                  "site": {
+                    "end": {
+                      "col": 3,
+                      "line": 21
+                    },
+                    "start": {
+                      "col": 2,
+                      "line": 21
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 21
+                },
+                "start": {
+                  "col": 2,
+                  "line": 21
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 12,
+                  "line": 22
+                },
+                "start": {
+                  "col": 2,
+                  "line": 22
+                }
+              }
+            }
+          ],
           "symbol": ".::Apply#function",
           "tokens": 8,
           "top_level": 2

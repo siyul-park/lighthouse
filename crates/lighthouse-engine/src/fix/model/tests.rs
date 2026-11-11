@@ -54,6 +54,7 @@ pub(super) fn symbol(name: &str, lines: (u32, u32), end_col: u32) -> (Symbol, Pl
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     };
     (symbol, place)

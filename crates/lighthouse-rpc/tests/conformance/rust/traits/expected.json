@@ -370,6 +370,50 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "format!",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 7
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 7
+                    }
+                  }
+                },
+                {
+                  "name": "area",
+                  "site": {
+                    "end": {
+                      "col": 32,
+                      "line": 7
+                    },
+                    "start": {
+                      "col": 28,
+                      "line": 7
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 35,
+                  "line": 7
+                },
+                "start": {
+                  "col": 9,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": "traits::Shape::describe#method",
           "tokens": 13,
           "top_level": 1
@@ -377,6 +421,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "traits::Shape::area#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -389,6 +434,23 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 30,
+                  "line": 21
+                },
+                "start": {
+                  "col": 9,
+                  "line": 21
+                }
+              }
+            }
+          ],
           "symbol": "traits::Circle::Shape::area#method",
           "tokens": 11,
           "top_level": 1
@@ -413,6 +475,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "describe",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 26
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 26
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 26
+                },
+                "start": {
+                  "col": 5,
+                  "line": 26
+                }
+              }
+            }
+          ],
           "symbol": "traits::show#function",
           "tokens": 7,
           "top_level": 1
@@ -437,6 +529,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "area",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 30
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 30
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 17,
+                  "line": 30
+                },
+                "start": {
+                  "col": 5,
+                  "line": 30
+                }
+              }
+            }
+          ],
           "symbol": "traits::show_impl#function",
           "tokens": 7,
           "top_level": 1
@@ -461,6 +583,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "area",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 34
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 34
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 17,
+                  "line": 34
+                },
+                "start": {
+                  "col": 5,
+                  "line": 34
+                }
+              }
+            }
+          ],
           "symbol": "traits::show_generic#function",
           "tokens": 7,
           "top_level": 1
@@ -485,6 +637,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "area",
+                  "site": {
+                    "end": {
+                      "col": 15,
+                      "line": 41
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 41
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 17,
+                  "line": 41
+                },
+                "start": {
+                  "col": 5,
+                  "line": 41
+                }
+              }
+            }
+          ],
           "symbol": "traits::show_where#function",
           "tokens": 7,
           "top_level": 1
@@ -510,6 +692,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Shape::area",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 45
+                    },
+                    "start": {
+                      "col": 12,
+                      "line": 45
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 24,
+                  "line": 45
+                },
+                "start": {
+                  "col": 5,
+                  "line": 45
+                }
+              }
+            }
+          ],
           "symbol": "traits::show_path#function",
           "tokens": 8,
           "top_level": 1
@@ -528,6 +740,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "area",
+                  "site": {
+                    "end": {
+                      "col": 24,
+                      "line": 54
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 54
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 26,
+                  "line": 54
+                },
+                "start": {
+                  "col": 9,
+                  "line": 54
+                }
+              }
+            }
+          ],
           "symbol": "traits::Holder::area#method",
           "tokens": 9,
           "top_level": 1

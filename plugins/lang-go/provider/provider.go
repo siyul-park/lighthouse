@@ -51,7 +51,7 @@ func (p *Provider) Manifest() []sdk.LanguageManifest {
 			ConstructorPrefixes: []string{"New", "new", "MustNew", "mustNew"},
 			TestNaming:          sdk.TestNaming{Prefix: "Test", Variants: true},
 		},
-		Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast"},
+		Capabilities: []string{sdk.SemanticEdges, sdk.Extent, sdk.ReferenceSites, sdk.Overlays, "source-ast", "steps"},
 		Units: sdk.Units{
 			By: "directory",
 			// What decides how the go command reads every package.

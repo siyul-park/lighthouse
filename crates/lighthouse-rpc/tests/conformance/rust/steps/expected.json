@@ -1,0 +1,1422 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": "steps::kinds#function",
+          "span": {
+            "end": {
+              "col": 28,
+              "line": 7
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "text": "/// One step of every kind."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::Pair#type"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::helper#function"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::kinds#function"
+        },
+        {
+          "from": {
+            "symbol": "steps::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 27,
+              "line": 10
+            },
+            "start": {
+              "col": 21,
+              "line": 10
+            }
+          },
+          "to": "steps::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "steps::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 23,
+              "line": 17
+            },
+            "start": {
+              "col": 17,
+              "line": 17
+            }
+          },
+          "to": "steps::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "steps::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 20
+            },
+            "start": {
+              "col": 22,
+              "line": 20
+            }
+          },
+          "to": "steps::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "steps::kinds#function"
+          },
+          "kind": "references",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 20,
+              "line": 29
+            },
+            "start": {
+              "col": 16,
+              "line": 29
+            }
+          },
+          "to": "steps::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": "steps::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 34,
+              "line": 29
+            },
+            "start": {
+              "col": 28,
+              "line": 29
+            }
+          },
+          "to": "steps::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "steps::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 28,
+              "line": 31
+            },
+            "start": {
+              "col": 22,
+              "line": 31
+            }
+          },
+          "to": "steps::helper#function"
+        },
+        {
+          "from": {
+            "symbol": "steps::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "syntactic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 38
+            },
+            "start": {
+              "col": 5,
+              "line": 38
+            }
+          },
+          "to": "steps::helper#function"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::jump#function"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::repeated#function"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::labelled#function"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::First#interface"
+        },
+        {
+          "from": {
+            "symbol": "steps::First#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::First::run#method"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::Second#interface"
+        },
+        {
+          "from": {
+            "symbol": "steps::Second#interface"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::Second::run#method"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::A#type"
+        },
+        {
+          "from": {
+            "module": "steps"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::B#type"
+        },
+        {
+          "from": {
+            "symbol": "steps::A#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::A::First::run#method"
+        },
+        {
+          "from": {
+            "symbol": "steps::A#type"
+          },
+          "kind": "implements",
+          "resolution": "syntactic",
+          "to": "steps::First#interface"
+        },
+        {
+          "from": {
+            "symbol": "steps::B#type"
+          },
+          "kind": "contains",
+          "resolution": "syntactic",
+          "to": "steps::B::Second::run#method"
+        },
+        {
+          "from": {
+            "symbol": "steps::B#type"
+          },
+          "kind": "implements",
+          "resolution": "syntactic",
+          "to": "steps::Second#interface"
+        }
+      ],
+      "file": {
+        "facts": {
+          "edition": "2024"
+        },
+        "path": "src/lib.rs"
+      },
+      "functions": [
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              }
+            ],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
+          "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 4
+                },
+                "start": {
+                  "col": 5,
+                  "line": 4
+                }
+              }
+            }
+          ],
+          "symbol": "steps::helper#function",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "guard": true,
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "&[i32]"
+              }
+            ],
+            "results": [
+              {
+                "text": "Result<i32,String>"
+              }
+            ]
+          },
+          "statements": 23,
+          "steps": [
+            {
+              "kind": "declare",
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 9
+                },
+                "start": {
+                  "col": 5,
+                  "line": 9
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 27,
+                      "line": 10
+                    },
+                    "start": {
+                      "col": 21,
+                      "line": 10
+                    }
+                  }
+                }
+              ],
+              "indexing": 1,
+              "kind": "assign",
+              "literals": 3,
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 44,
+                  "line": 10
+                },
+                "start": {
+                  "col": 5,
+                  "line": 10
+                }
+              }
+            },
+            {
+              "indexing": 1,
+              "kind": "assign",
+              "literals": 2,
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 11
+                },
+                "start": {
+                  "col": 5,
+                  "line": 11
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 20,
+                  "line": 12
+                },
+                "start": {
+                  "col": 5,
+                  "line": 12
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "is_empty",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 13
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 13
+                    }
+                  }
+                },
+                {
+                  "name": "format!",
+                  "site": {
+                    "end": {
+                      "col": 26,
+                      "line": 14
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 14
+                    }
+                  }
+                }
+              ],
+              "guard": true,
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 15
+                },
+                "start": {
+                  "col": 5,
+                  "line": 13
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 17
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 17
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 18
+                },
+                "start": {
+                  "col": 5,
+                  "line": 16
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 28,
+                      "line": 20
+                    },
+                    "start": {
+                      "col": 22,
+                      "line": 20
+                    }
+                  }
+                }
+              ],
+              "kind": "switch",
+              "literals": 2,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 22
+                },
+                "start": {
+                  "col": 5,
+                  "line": 19
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "nested": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 25
+                },
+                "start": {
+                  "col": 5,
+                  "line": 23
+                }
+              }
+            },
+            {
+              "kind": "block",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 28
+                },
+                "start": {
+                  "col": 5,
+                  "line": 26
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 34,
+                      "line": 29
+                    },
+                    "start": {
+                      "col": 28,
+                      "line": 29
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 43,
+                  "line": 29
+                },
+                "start": {
+                  "col": 5,
+                  "line": 29
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "len",
+                  "site": {
+                    "end": {
+                      "col": 47,
+                      "line": 30
+                    },
+                    "start": {
+                      "col": 44,
+                      "line": 30
+                    }
+                  }
+                }
+              ],
+              "indexing": 1,
+              "kind": "assign",
+              "literals": 7,
+              "span": {
+                "end": {
+                  "col": 57,
+                  "line": 30
+                },
+                "start": {
+                  "col": 5,
+                  "line": 30
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 28,
+                      "line": 31
+                    },
+                    "start": {
+                      "col": 22,
+                      "line": 31
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 32,
+                  "line": 31
+                },
+                "start": {
+                  "col": 5,
+                  "line": 31
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "f",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 33
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 33
+                    }
+                  }
+                }
+              ],
+              "kind": "block",
+              "literals": 1,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 34
+                },
+                "start": {
+                  "col": 5,
+                  "line": 32
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 37
+                },
+                "start": {
+                  "col": 5,
+                  "line": 35
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 38
+                    }
+                  }
+                },
+                {
+                  "name": "checked_add",
+                  "site": {
+                    "end": {
+                      "col": 30,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 19,
+                      "line": 38
+                    }
+                  }
+                },
+                {
+                  "name": "ok_or",
+                  "site": {
+                    "end": {
+                      "col": 39,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 34,
+                      "line": 38
+                    }
+                  }
+                },
+                {
+                  "name": "String::new",
+                  "site": {
+                    "end": {
+                      "col": 51,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 48,
+                      "line": 38
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 54,
+                  "line": 38
+                },
+                "start": {
+                  "col": 5,
+                  "line": 38
+                }
+              }
+            }
+          ],
+          "symbol": "steps::kinds#function",
+          "tokens": 193,
+          "top_level": 15
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "guard": true,
+              "kind": "if",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 2,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "&[i32]"
+              }
+            ],
+            "results": []
+          },
+          "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "len",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 43
+                    },
+                    "start": {
+                      "col": 15,
+                      "line": 43
+                    }
+                  }
+                }
+              ],
+              "kind": "loop",
+              "literals": 1,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 46
+                },
+                "start": {
+                  "col": 5,
+                  "line": 42
+                }
+              }
+            }
+          ],
+          "symbol": "steps::jump#function",
+          "tokens": 20,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "usize"
+              }
+            ],
+            "results": [
+              {
+                "text": "Vec<i32>"
+              }
+            ]
+          },
+          "statements": 2,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 3,
+              "span": {
+                "end": {
+                  "col": 24,
+                  "line": 50
+                },
+                "start": {
+                  "col": 5,
+                  "line": 50
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "to_vec",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 51
+                    },
+                    "start": {
+                      "col": 16,
+                      "line": 51
+                    }
+                  }
+                }
+              ],
+              "indexing": 1,
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 24,
+                  "line": 51
+                },
+                "start": {
+                  "col": 5,
+                  "line": 51
+                }
+              }
+            }
+          ],
+          "symbol": "steps::repeated#function",
+          "tokens": 20,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "i32"
+              }
+            ],
+            "results": [
+              {
+                "text": "String"
+              }
+            ]
+          },
+          "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "format!",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 55
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 55
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 55
+                },
+                "start": {
+                  "col": 5,
+                  "line": 55
+                }
+              }
+            }
+          ],
+          "symbol": "steps::labelled#function",
+          "tokens": 7,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "implements": "steps::First::run#method",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
+          "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 71
+                },
+                "start": {
+                  "col": 9,
+                  "line": 71
+                }
+              }
+            }
+          ],
+          "symbol": "steps::A::First::run#method",
+          "tokens": 3,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "implementation": true,
+          "implements": "steps::Second::run#method",
+          "max_nesting": 0,
+          "params": 0,
+          "returns": 1,
+          "signature": {
+            "params": [],
+            "results": [
+              {
+                "text": "i32"
+              }
+            ]
+          },
+          "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 77
+                },
+                "start": {
+                  "col": 9,
+                  "line": 77
+                }
+              }
+            }
+          ],
+          "symbol": "steps::B::Second::run#method",
+          "tokens": 3,
+          "top_level": 1
+        }
+      ],
+      "modules": [
+        {
+          "name": "steps",
+          "path": "steps"
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 27,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::Pair#type",
+          "kind": "type",
+          "name": "Pair",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 1
+            },
+            "start": {
+              "col": 1,
+              "line": 1
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 5
+            },
+            "start": {
+              "col": 1,
+              "line": 3
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "One step of every kind.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 7
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::kinds#function",
+          "kind": "function",
+          "name": "kinds",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 39
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::jump#function",
+          "kind": "function",
+          "name": "jump",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 47
+            },
+            "start": {
+              "col": 1,
+              "line": 41
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 52
+            },
+            "start": {
+              "col": 1,
+              "line": 49
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::repeated#function",
+          "kind": "function",
+          "name": "repeated",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 52
+            },
+            "start": {
+              "col": 1,
+              "line": 49
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 56
+            },
+            "start": {
+              "col": 1,
+              "line": 54
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::labelled#function",
+          "kind": "function",
+          "name": "labelled",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 56
+            },
+            "start": {
+              "col": 1,
+              "line": 54
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 60
+            },
+            "start": {
+              "col": 1,
+              "line": 58
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::First#interface",
+          "kind": "interface",
+          "name": "First",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 60
+            },
+            "start": {
+              "col": 1,
+              "line": 58
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 59
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::First::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "steps::First#interface",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 59
+            },
+            "start": {
+              "col": 5,
+              "line": 59
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 62
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::Second#interface",
+          "kind": "interface",
+          "name": "Second",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 62
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 26,
+              "line": 63
+            },
+            "start": {
+              "col": 5,
+              "line": 63
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::Second::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "steps::Second#interface",
+          "span": {
+            "end": {
+              "col": 26,
+              "line": 63
+            },
+            "start": {
+              "col": 5,
+              "line": 63
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 66
+            },
+            "start": {
+              "col": 1,
+              "line": 66
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::A#type",
+          "kind": "type",
+          "name": "A",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 66
+            },
+            "start": {
+              "col": 1,
+              "line": 66
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 14,
+              "line": 67
+            },
+            "start": {
+              "col": 1,
+              "line": 67
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::B#type",
+          "kind": "type",
+          "name": "B",
+          "span": {
+            "end": {
+              "col": 14,
+              "line": 67
+            },
+            "start": {
+              "col": 1,
+              "line": 67
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 72
+            },
+            "start": {
+              "col": 5,
+              "line": 70
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::A::First::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "steps::A#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 72
+            },
+            "start": {
+              "col": 5,
+              "line": 70
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 6,
+              "line": 78
+            },
+            "start": {
+              "col": 5,
+              "line": 76
+            }
+          },
+          "file": "src/lib.rs",
+          "id": "steps::B::Second::run#method",
+          "kind": "method",
+          "name": "run",
+          "owner": "steps::B#type",
+          "span": {
+            "end": {
+              "col": 6,
+              "line": 78
+            },
+            "start": {
+              "col": 5,
+              "line": 76
+            }
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

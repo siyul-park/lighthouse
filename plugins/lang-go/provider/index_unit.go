@@ -213,6 +213,7 @@ func (u *unit) summarize(d *ast.FuncDecl, id string, isTestCase bool) {
 		Constructs:       u.constructs(d),
 		Configures:       u.configures(d),
 		ManualAssertions: manual,
+		Steps:            u.steps(d),
 	})
 	if isTestCase {
 		u.frag.Tests = append(u.frag.Tests, testCaseOf(d, id, usages, u.info()))
@@ -395,7 +396,7 @@ func (u *unit) fields(t *ast.StructType, owner, ownerID string) {
 			name := baseName(field.Type)
 			if name != "" && name != "_" {
 				id := symbolID(kindField, u.module, owner, name)
-				u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name, Owner: ownerID, Doc: doc, Optional: optional, TypeRef: ref}, field.Pos(), field.End(), u.extent(field))
+				u.symbol(sdk.Symbol{ID: id, Kind: kindField, Name: name, Owner: ownerID, Doc: doc, Optional: optional, TypeRef: ref, Embedded: true}, field.Pos(), field.End(), u.extent(field))
 			}
 			continue
 		}

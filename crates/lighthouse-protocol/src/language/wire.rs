@@ -174,7 +174,7 @@ pub struct LanguageManifest {
     #[serde(default)]
     pub conventions: Conventions,
     /// Known values: `semantic-edges`, `extent`, `reference-sites`,
-    /// `complete-references`, `overlays`, and `source-ast`.
+    /// `complete-references`, `overlays`, `source-ast` and `steps`.
     /// Hosts ignore unknown values.
     #[serde(default)]
     pub capabilities: Vec<String>,
@@ -560,6 +560,10 @@ pub struct Symbol {
     /// The type of a field. Added in 0.1 before 1.0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub type_ref: Option<TypeRef>,
+    /// A field that embeds its type (a Go field written without a name), whose
+    /// methods the struct gets as its own. Added in 0.9.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub embedded: bool,
     /// A type of a language that satisfies interfaces by structure: the
     /// sorted, unique keys of the methods a value of it can be called with,
     /// those it gets from embedded fields included. A key is opaque to the
@@ -740,6 +744,11 @@ pub struct FunctionSummary {
     /// elsewhere (a method of a trait impl in Rust). Added in 0.1 before 1.0.
     #[serde(default, skip_serializing_if = "is_false")]
     pub implementation: bool,
+    /// The method of a project trait that this function implements, as a
+    /// symbol id (a method of `impl Trait for T` in Rust); it tells two traits
+    /// that share a method name apart. Added in 0.9.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implements: Option<String>,
     /// The function builds a value of its owner type without taking one: an
     /// associated function without a receiver that returns `Self` or the
     /// owner. Added in 0.1 before 1.0.
@@ -760,6 +769,82 @@ pub struct FunctionSummary {
     /// host settles it from the interfaces of the language.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending: Option<Pending>,
+    /// The top-level statements of the body, in source order (capability
+    /// `steps`); a function without a body has none. Added in 0.9.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<Step>,
+}
+
+/// One top-level statement of a function body, with the counts of the syntax
+/// inside it, closure bodies included. Counts use syntax alone, so every
+/// language counts the same shapes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Step {
+    /// The whole statement, a compound statement with its block.
+    pub span: Span,
+    pub kind: StepKind,
+    /// Binary arithmetic, bitwise and shift operators, compound assignments,
+    /// increments and decrements, and unary minus and bitwise complement;
+    /// not comparisons, logical operators, plain assignment or dereference.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub operators: u32,
+    /// Index and slice expressions; not the instantiation of a generic.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub indexing: u32,
+    /// Number, string, character and byte literals, and one per composite
+    /// literal (a struct, array or slice value written out).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub literals: u32,
+    /// The calls in the step in source order, conversions and builtins left
+    /// out.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub calls: Vec<StepCall>,
+    /// Statements strictly inside the step, counted as `statements` counts.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub nested: u32,
+    /// `if`: no `else`, and a body that only jumps, as `guard` of a `flow` entry.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub guard: bool,
+}
+
+/// A call in a step.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct StepCall {
+    /// The callee as written, without arguments: `fmt.Errorf`, `build`,
+    /// `foo::bar`, `unwrap`, `format!`; empty when the callee has no name.
+    pub name: String,
+    /// The identifier that names the callee, as the `site` of the `calls` edge
+    /// to a project callee is.
+    pub site: Span,
+}
+
+/// What kind of statement a step is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum StepKind {
+    /// An assignment or definition with a value, a `let` with an initializer,
+    /// an increment.
+    Assign,
+    /// A declaration without a value: Go `var x T`, `const`, `type`; Rust
+    /// `let x;`.
+    Declare,
+    /// A statement run for its effect: an expression, a macro, a channel send.
+    Call,
+    /// `return`, and the tail expression of a Rust body that is not itself an
+    /// `if`, `match`, loop or block.
+    Return,
+    /// `break`, `continue`, `goto`.
+    Jump,
+    /// Go `defer` and `go`.
+    Defer,
+    /// A conditional, with its `else` chain.
+    If,
+    /// `switch`, type switch, `select`, `match`.
+    Switch,
+    /// Every loop form.
+    Loop,
+    /// A bare or labeled block, `unsafe`.
+    Block,
 }
 
 /// A method that implements an interface when some interface of the project

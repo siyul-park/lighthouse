@@ -76,6 +76,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 28,
+                  "line": 6
+                },
+                "start": {
+                  "col": 20,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": ".::Enter#function",
           "tokens": 4,
           "top_level": 1
@@ -191,6 +207,51 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Enter",
+                  "site": {
+                    "end": {
+                      "col": 10,
+                      "line": 6
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 6
+                    }
+                  }
+                },
+                {
+                  "name": "Fatal",
+                  "site": {
+                    "end": {
+                      "col": 10,
+                      "line": 7
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 7
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 8
+                },
+                "start": {
+                  "col": 2,
+                  "line": 6
+                }
+              }
+            }
+          ],
           "symbol": ".::TestEnter#test",
           "tokens": 16,
           "top_level": 1
@@ -290,6 +351,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 28,
+                  "line": 4
+                },
+                "start": {
+                  "col": 20,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": ".::Extra#function",
           "tokens": 4,
           "top_level": 1

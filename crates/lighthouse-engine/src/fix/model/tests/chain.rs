@@ -55,6 +55,8 @@ fn function(name: &str, file: &str, result: &str) -> (Symbol, Place, FunctionSum
         manual_assertions: 0,
         constructs: false,
         configures: None,
+        implements: None,
+        steps: Vec::new(),
     };
     (symbol, place, summary)
 }

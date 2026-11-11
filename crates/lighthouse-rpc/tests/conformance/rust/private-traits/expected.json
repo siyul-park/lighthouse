@@ -70,6 +70,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "private_traits::Greet::hello#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -82,6 +83,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "to_owned",
+                  "site": {
+                    "end": {
+                      "col": 25,
+                      "line": 10
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 10
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 10
+                },
+                "start": {
+                  "col": 9,
+                  "line": 10
+                }
+              }
+            }
+          ],
           "symbol": "private_traits::English::Greet::hello#method",
           "tokens": 7,
           "top_level": 1
@@ -89,6 +121,7 @@
         {
           "flow": [],
           "implementation": true,
+          "implements": "private_traits::Greet::bye#method",
           "max_nesting": 0,
           "params": 0,
           "returns": 1,
@@ -101,6 +134,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "to_owned",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 14
+                    },
+                    "start": {
+                      "col": 15,
+                      "line": 14
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 14
+                },
+                "start": {
+                  "col": 9,
+                  "line": 14
+                }
+              }
+            }
+          ],
           "symbol": "private_traits::English::Greet::bye#method",
           "tokens": 7,
           "top_level": 1

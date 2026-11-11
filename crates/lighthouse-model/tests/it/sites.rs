@@ -25,6 +25,7 @@ fn symbol(name: &str, file: &str) -> Symbol {
         role: None,
         optional: false,
         type_ref: None,
+        embedded: false,
         implementation: false,
     }
 }

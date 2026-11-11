@@ -594,6 +594,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "String::new",
+                  "site": {
+                    "end": {
+                      "col": 31,
+                      "line": 25
+                    },
+                    "start": {
+                      "col": 28,
+                      "line": 25
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 26
+                },
+                "start": {
+                  "col": 9,
+                  "line": 23
+                }
+              }
+            }
+          ],
           "symbol": "calls::Counter::new#method",
           "tokens": 17,
           "top_level": 1
@@ -612,6 +643,51 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "kind": "assign",
+              "literals": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 30
+                },
+                "start": {
+                  "col": 9,
+                  "line": 30
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "double",
+                  "site": {
+                    "end": {
+                      "col": 20,
+                      "line": 31
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 31
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 22,
+                  "line": 31
+                },
+                "start": {
+                  "col": 9,
+                  "line": 31
+                }
+              }
+            }
+          ],
           "symbol": "calls::Counter::bump#method",
           "tokens": 13,
           "top_level": 2
@@ -630,6 +706,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "sq",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 35
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 35
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 37,
+                  "line": 35
+                },
+                "start": {
+                  "col": 9,
+                  "line": 35
+                }
+              }
+            }
+          ],
           "symbol": "calls::Counter::double#method",
           "tokens": 12,
           "top_level": 1
@@ -653,6 +760,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "read",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 39
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 39
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 39
+                },
+                "start": {
+                  "col": 9,
+                  "line": 39
+                }
+              }
+            }
+          ],
           "symbol": "calls::Counter::load#method",
           "tokens": 8,
           "top_level": 1
@@ -675,6 +812,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 43
+                },
+                "start": {
+                  "col": 9,
+                  "line": 43
+                }
+              }
+            }
+          ],
           "symbol": "calls::Counter::read#method",
           "tokens": 3,
           "top_level": 1
@@ -698,6 +850,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "load",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 47
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 47
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 47
+                },
+                "start": {
+                  "col": 9,
+                  "line": 47
+                }
+              }
+            }
+          ],
           "symbol": "calls::Counter::get#method",
           "tokens": 8,
           "top_level": 1
@@ -720,6 +902,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 52
+                },
+                "start": {
+                  "col": 5,
+                  "line": 52
+                }
+              }
+            }
+          ],
           "symbol": "calls::helper#function",
           "tokens": 3,
           "top_level": 1
@@ -743,6 +940,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 56
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 56
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 56
+                },
+                "start": {
+                  "col": 5,
+                  "line": 56
+                }
+              }
+            }
+          ],
           "symbol": "calls::wrapper#function",
           "tokens": 6,
           "top_level": 1
@@ -765,6 +992,62 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "into_iter",
+                  "site": {
+                    "end": {
+                      "col": 20,
+                      "line": 60
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 60
+                    }
+                  }
+                },
+                {
+                  "name": "map",
+                  "site": {
+                    "end": {
+                      "col": 26,
+                      "line": 60
+                    },
+                    "start": {
+                      "col": 23,
+                      "line": 60
+                    }
+                  }
+                },
+                {
+                  "name": "collect",
+                  "site": {
+                    "end": {
+                      "col": 42,
+                      "line": 60
+                    },
+                    "start": {
+                      "col": 35,
+                      "line": 60
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 44,
+                  "line": 60
+                },
+                "start": {
+                  "col": 5,
+                  "line": 60
+                }
+              }
+            }
+          ],
           "symbol": "calls::apply#function",
           "tokens": 16,
           "top_level": 1
@@ -783,6 +1066,36 @@
             "results": []
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "double",
+                  "site": {
+                    "end": {
+                      "col": 13,
+                      "line": 64
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 64
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 16,
+                  "line": 64
+                },
+                "start": {
+                  "col": 5,
+                  "line": 64
+                }
+              }
+            }
+          ],
           "symbol": "calls::unknown#function",
           "tokens": 8,
           "top_level": 1
@@ -804,6 +1117,50 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "String::new",
+                  "site": {
+                    "end": {
+                      "col": 27,
+                      "line": 70
+                    },
+                    "start": {
+                      "col": 24,
+                      "line": 70
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 7,
+                  "line": 71
+                },
+                "start": {
+                  "col": 5,
+                  "line": 68
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 72
+                },
+                "start": {
+                  "col": 5,
+                  "line": 72
+                }
+              }
+            }
+          ],
           "symbol": "calls::literal#function",
           "tokens": 22,
           "top_level": 2
@@ -822,6 +1179,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "HashMap::new",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 76
+                    },
+                    "start": {
+                      "col": 14,
+                      "line": 76
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 76
+                },
+                "start": {
+                  "col": 5,
+                  "line": 76
+                }
+              }
+            }
+          ],
           "symbol": "calls::map#function",
           "tokens": 7,
           "top_level": 1
@@ -846,6 +1233,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "bump",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 80
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 80
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 13,
+                  "line": 80
+                },
+                "start": {
+                  "col": 5,
+                  "line": 80
+                }
+              }
+            }
+          ],
           "symbol": "calls::typed#function",
           "tokens": 7,
           "top_level": 1
@@ -864,6 +1281,77 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Counter::new",
+                  "site": {
+                    "end": {
+                      "col": 29,
+                      "line": 84
+                    },
+                    "start": {
+                      "col": 26,
+                      "line": 84
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "span": {
+                "end": {
+                  "col": 32,
+                  "line": 84
+                },
+                "start": {
+                  "col": 5,
+                  "line": 84
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "bump",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 85
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 85
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 85
+                },
+                "start": {
+                  "col": 5,
+                  "line": 85
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 12,
+                  "line": 86
+                },
+                "start": {
+                  "col": 5,
+                  "line": 86
+                }
+              }
+            }
+          ],
           "symbol": "calls::chain#function",
           "tokens": 21,
           "top_level": 3
@@ -886,6 +1374,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 14,
+                  "line": 9
+                },
+                "start": {
+                  "col": 9,
+                  "line": 9
+                }
+              }
+            }
+          ],
           "symbol": "calls/math::square#function",
           "tokens": 5,
           "top_level": 1

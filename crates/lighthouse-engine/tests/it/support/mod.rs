@@ -71,6 +71,7 @@ impl LanguageProvider for Toy {
                             role: None,
                             optional: false,
                             type_ref: None,
+                            embedded: false,
                             implementation: false,
                         };
                         Some((symbol, place))

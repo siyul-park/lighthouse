@@ -79,6 +79,7 @@ impl Walker<'_> {
 
 impl Walker<'_> {
     pub(super) fn call(&mut self, c: &ExprCall) {
+        self.tally_call(c);
         if let Expr::Path(p) = &*c.func {
             let hit = self.hit(&p.path, Ns::Value);
             if let Some((kind, id)) = self.call_target(&hit) {
@@ -128,6 +129,7 @@ impl Walker<'_> {
     }
 
     pub(super) fn method_call(&mut self, m: &ExprMethodCall) {
+        self.tally_method(m);
         let name = m.method.to_string();
         match self.expr_hint(&m.receiver) {
             Some(recv) => {
@@ -211,6 +213,7 @@ impl Walker<'_> {
     }
 
     pub(super) fn struct_literal(&mut self, s: &ExprStruct) {
+        self.tally.literals += 1;
         match self.hit(&s.path, Ns::Type) {
             Hit::Item(sym) if sym.kind == SymbolKind::Type => {
                 if let Some(at) = last_ident(&s.path) {

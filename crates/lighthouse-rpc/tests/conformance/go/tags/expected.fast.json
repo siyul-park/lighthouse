@@ -136,6 +136,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 35,
+                  "line": 4
+                },
+                "start": {
+                  "col": 22,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": ".::Mode#function",
           "tokens": 4,
           "top_level": 1

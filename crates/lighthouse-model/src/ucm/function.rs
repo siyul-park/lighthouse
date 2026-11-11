@@ -40,6 +40,64 @@ pub struct FunctionSummary {
     /// The type a functional-option builder configures (`module::name`).
     #[serde(default)]
     pub configures: Option<String>,
+    /// The method of a project trait this function implements, as a symbol id.
+    #[serde(default)]
+    pub implements: Option<String>,
+    /// The top-level statements of the body, in source order; empty when the
+    /// provider does not report them.
+    #[serde(default)]
+    pub steps: Vec<Step>,
+}
+
+/// One top-level statement of a body and the syntax counted inside it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Step {
+    pub span: Span,
+    pub kind: StepKind,
+    pub operators: u32,
+    pub indexing: u32,
+    pub literals: u32,
+    pub calls: Vec<StepCall>,
+    /// Statements strictly inside the step.
+    pub nested: u32,
+    /// An `if` with no `else` whose body only jumps.
+    pub guard: bool,
+}
+
+/// A call in a step: the callee as written and where its name is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StepCall {
+    pub name: String,
+    pub site: Span,
+}
+
+vocabulary!(StepKind, "step kind" {
+    Assign => "assign",
+    Declare => "declare",
+    Call => "call",
+    Return => "return",
+    Jump => "jump",
+    Defer => "defer",
+    If => "if",
+    Switch => "switch",
+    Loop => "loop",
+    Block => "block",
+});
+
+/// What kind of statement a step is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum StepKind {
+    Assign,
+    Declare,
+    Call,
+    Return,
+    Jump,
+    Defer,
+    If,
+    Switch,
+    Loop,
+    Block,
 }
 
 /// The parameter and result types of a function, receiver excluded, one entry

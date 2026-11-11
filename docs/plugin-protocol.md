@@ -1,10 +1,10 @@
-# Plugin protocol 0.8
+# Plugin protocol 0.9
 
 Normative contract between Lighthouse (the host) and a language plugin: a
 separate process that analyzes source in its own language with native tools.
 Rules and analyzers stay in the host; a plugin only turns files into
 the code model. The wire types are defined by
-[`protocol/schema/lighthouse-protocol-0.8.json`](../protocol/schema/lighthouse-protocol-0.8.json),
+[`protocol/schema/lighthouse-protocol-0.9.json`](../protocol/schema/lighthouse-protocol-0.9.json),
 generated from the `lighthouse-protocol` crate and checked in; where this text
 and the schema disagree, the schema wins. The wire model is separate from the
 host's internal model: internal changes are not protocol changes.
@@ -27,7 +27,7 @@ Key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 ## Versioning
 
-`protocolVersion` is `"0.8"`. Host and plugin MUST agree exactly; a plugin that
+`protocolVersion` is `"0.9"`. Host and plugin MUST agree exactly; a plugin that
 receives another version answers `initialize` with an error, a host that
 receives another version refuses the plugin. Receivers MUST ignore unknown
 fields. Fields of protocol messages are camelCase (`protocolVersion`,
@@ -36,7 +36,7 @@ fields. Fields of protocol messages are camelCase (`protocolVersion`,
 
 `extent` on symbols, `site` on edges and the capabilities `extent` and
 `reference-sites` were added to 0.1 before 1.0, as optional fields: a plugin that
-sends none of them remains valid in 0.8, and hosts ignore what they do not
+sends none of them remains valid in 0.9, and hosts ignore what they do not
 know. They make fixes possible (see "Fixing" in [architecture.md](architecture.md)).
 
 `context.overlays` is real: a list of `{ path, text }` that stand in for requested
@@ -46,7 +46,7 @@ run verifies candidate edits this way, and writes only after they pass. `lang-go
 passes them to `go/packages` as its `Overlay`, `lang-rust` reads them in place of the
 files.
 
-Protocol 0.8 indexes by unit. A request carries `units`: each is the files of one unit of the language (`files`, with `source_ast` asking for the selectable AST of a file) or the host files whose selected regions the core sends (`regions`). The provider answers one result per unit it was sent, the regions' facts merged into the fragment of their host file, in the unit with the id `#regions`. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
+Protocol 0.9 indexes by unit. A request carries `units`: each is the files of one unit of the language (`files`, with `source_ast` asking for the selectable AST of a file) or the host files whose selected regions the core sends (`regions`). The provider answers one result per unit it was sent, the regions' facts merged into the fragment of their host file, in the unit with the id `#regions`. A provider MUST reject unsupported region inputs as incomplete rather than silently dropping them.
 
 The host keeps each answer: a run sends a provider only the units whose key changed (their files, the provider's settings files, its identity), or whose `imports` moved: a unit lists the units whose `api` it read, and is asked again when one of those `api` is no longer what it was when the unit was answered. A run with every unit current starts no provider process. A provider keeps nothing between requests; it answers from what the request holds and from the disk.
 
@@ -131,6 +131,7 @@ in Rust, `net/url` in Go) and refuses anything else. Result:
   `source-ast`: the provider can expose its serialized AST and per-pointer `mapping`
   when `source_ast` is requested. The provider parses and maps; core evaluates selectors,
   filters and context projections.
+  `steps`: every function with a body carries `steps`, one per top-level statement.
   `complete-references`: every reference to a symbol, in signatures, fields and
   receivers too, is an edge with a `site`, so a rename cannot miss one; no bundled
   provider declares it yet.
@@ -467,6 +468,8 @@ receiver and every parameter on, in order, naming the callee).
 results: every result in Go, and in Rust the arity of the returned tuple (1 for a
 single value, 0 for `()`), looking inside a `Result<T, E>` at `T`.
 
+`implements` (optional) names, as a symbol id, the method of a project trait that a function implements: a method of `impl Trait for T` in Rust, so that two traits that share a method name stay apart. A field symbol has `embedded` (optional) when it embeds its type, a Go field written without a name: the struct gets the methods of the type as its own.
+
 `implementation` (optional) marks a function that implements a method a trait or
 interface declares elsewhere: a method of a trait impl in Rust, a method of a type
 that satisfies an interface its package names or imports in Go; the host adds the
@@ -504,6 +507,30 @@ language and each is reported only where the language has it; only a function wi
 a body has events, and a plugin that reports none leaves the field out. Closures
 count for the function that contains them; functions declared inside a body have
 summaries of their own.
+
+`steps` (optional, capability `steps`) lists the top-level statements of a body in
+source order, each `{ span, kind, operators?, indexing?, literals?, calls?, nested?,
+guard? }`; items declared in the body and empty statements are not steps, so there are
+`top_level` steps and `statements = steps + sum(nested)`. The counts are of the syntax
+inside the statement, closure bodies included, and use no type information:
+`operators` are arithmetic, bitwise and shift operators (compound assignments, `++`,
+`--` too), unary minus and Go's `^`, not comparisons, `&&`, `||`, `!`, plain
+assignment or dereference; `indexing` index and slice expressions, not the
+instantiation of a generic; `literals` number, string, character and byte literals
+(not `true`, `false`, `nil`) and one per composite literal (a Go `T{..}`, a Rust array
+or struct expression or `vec!`); `nested` the statements strictly inside the step;
+`guard` an `if` with no `else` whose body only jumps. `calls` lists the calls of the
+step as `{ name, site }` in source order, a call being what a call expression names
+other than a conversion, a builtin or (Rust) a tuple struct or variant constructor,
+and every method call and macro but `vec!`: `name` is the callee as written without
+arguments (`fmt.Errorf`, `build`, `foo::bar`, `format!`, empty when it is not named)
+and `site` the span of the identifier that names it, the `site` of the `calls` edge to
+a project callee. A step's `kind` is `assign` (an assignment, a definition, `++`, a
+`let` with a value), `declare` (Go `var`, `const`, `type`; a `let` without a value),
+`call` (a statement run for its effect, a send, a macro), `return` (and a Rust tail
+expression that is not an `if`, `match`, loop or block), `jump`, `defer` (`defer` and
+`go`), `if`, `switch` (`switch`, type switch, `select`, `match`), `loop` or `block`; a
+labeled statement has the kind of the statement it labels.
 
 | kind | maps |
 | --- | --- |
@@ -623,7 +650,7 @@ built plugin and validates every result against the schema.
 
 The cases `comments`, `errors`, `extents`, `flow`, `generated`, `signatures`, `tests`
 and `visibility` exist under the same name in every language, and `events` in every provider that
-reports body events; each language adds its own beside them. A shared case a language cannot
+reports body events, `steps` in every provider that declares `steps`; each language adds its own beside them. A shared case a language cannot
 run is listed with its reason in `NOT_APPLICABLE` of `crates/lighthouse-rpc/tests/it/conformance.rs`.
 
 The exchanges of the protocol itself are recorded in `protocol/conformance/*.json`: each file

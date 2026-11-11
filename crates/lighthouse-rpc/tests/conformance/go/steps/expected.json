@@ -1,0 +1,1359 @@
+{
+  "fragments": [
+    {
+      "comments": [
+        {
+          "attached_to": ".::kinds#function",
+          "span": {
+            "end": {
+              "col": 37,
+              "line": 19
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "text": "// kinds has one step of every kind."
+        },
+        {
+          "attached_to": ".::Holder#type",
+          "span": {
+            "end": {
+              "col": 47,
+              "line": 66
+            },
+            "start": {
+              "col": 1,
+              "line": 66
+            }
+          },
+          "text": "// Holder embeds one Foo and only has another."
+        },
+        {
+          "attached_to": ".::Plain#type",
+          "span": {
+            "end": {
+              "col": 60,
+              "line": 73
+            },
+            "start": {
+              "col": 1,
+              "line": 73
+            }
+          },
+          "text": "// Plain has a field named as its type that embeds nothing."
+        }
+      ],
+      "edges": [
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 10,
+              "line": 4
+            },
+            "start": {
+              "col": 2,
+              "line": 4
+            }
+          },
+          "to": "errors"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "imports",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 7,
+              "line": 5
+            },
+            "start": {
+              "col": 2,
+              "line": 5
+            }
+          },
+          "to": "fmt"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair::a#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Pair#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Pair::b#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Max#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::helper#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::kinds#function"
+        },
+        {
+          "from": {
+            "symbol": ".::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 16,
+              "line": 23
+            },
+            "start": {
+              "col": 10,
+              "line": 23
+            }
+          },
+          "to": ".::helper"
+        },
+        {
+          "from": {
+            "symbol": ".::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 34
+            },
+            "start": {
+              "col": 11,
+              "line": 34
+            }
+          },
+          "to": ".::helper"
+        },
+        {
+          "from": {
+            "symbol": ".::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 42
+            },
+            "start": {
+              "col": 5,
+              "line": 42
+            }
+          },
+          "to": ".::helper"
+        },
+        {
+          "from": {
+            "symbol": ".::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 11,
+              "line": 44
+            },
+            "start": {
+              "col": 8,
+              "line": 44
+            }
+          },
+          "to": ".::Max"
+        },
+        {
+          "from": {
+            "symbol": ".::kinds#function"
+          },
+          "kind": "references",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 17,
+              "line": 45
+            },
+            "start": {
+              "col": 13,
+              "line": 45
+            }
+          },
+          "to": ".::Pair"
+        },
+        {
+          "from": {
+            "symbol": ".::kinds#function"
+          },
+          "kind": "calls",
+          "resolution": "semantic",
+          "site": {
+            "end": {
+              "col": 21,
+              "line": 46
+            },
+            "start": {
+              "col": 15,
+              "line": 46
+            }
+          },
+          "to": ".::helper"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::jump#function"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Foo#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Foo#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Foo::Run#method"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Holder#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Holder#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Holder::Foo#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Holder#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Holder::Named#field"
+        },
+        {
+          "from": {
+            "symbol": ".::Holder#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Holder::Foo2#field"
+        },
+        {
+          "from": {
+            "module": "."
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Plain#type"
+        },
+        {
+          "from": {
+            "symbol": ".::Plain#type"
+          },
+          "kind": "contains",
+          "resolution": "semantic",
+          "to": ".::Plain::Foo#field"
+        }
+      ],
+      "file": {
+        "facts": {
+          "inline_bodies": "[{\"line\":17,\"open\":{\"col\":25,\"line\":17},\"close\":{\"col\":35,\"line\":17},\"statements\":[\"return n\"],\"plain\":true}]"
+        },
+        "path": "steps.go"
+      },
+      "functions": [
+        {
+          "flow": [
+            {
+              "guard": true,
+              "kind": "if",
+              "nesting": 0
+            }
+          ],
+          "max_nesting": 1,
+          "params": 2,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "T"
+              },
+              {
+                "text": "T"
+              }
+            ],
+            "results": [
+              {
+                "text": "T"
+              }
+            ]
+          },
+          "statements": 3,
+          "steps": [
+            {
+              "guard": true,
+              "kind": "if",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 13
+                },
+                "start": {
+                  "col": 2,
+                  "line": 11
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 14
+                },
+                "start": {
+                  "col": 2,
+                  "line": 14
+                }
+              }
+            }
+          ],
+          "symbol": ".::Max#function",
+          "tokens": 12,
+          "top_level": 2
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 1,
+          "returns": 1,
+          "signature": {
+            "params": [
+              {
+                "text": "int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              }
+            ]
+          },
+          "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 34,
+                  "line": 17
+                },
+                "start": {
+                  "col": 26,
+                  "line": 17
+                }
+              }
+            }
+          ],
+          "symbol": ".::helper#function",
+          "tokens": 4,
+          "top_level": 1
+        },
+        {
+          "flow": [
+            {
+              "guard": true,
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "kind": "if",
+              "nesting": 0
+            },
+            {
+              "arms": 1,
+              "kind": "switch",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "kind": "jump",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 1,
+          "params": 2,
+          "returns": 2,
+          "signature": {
+            "params": [
+              {
+                "text": "[]int"
+              },
+              {
+                "text": "chan int"
+              }
+            ],
+            "results": [
+              {
+                "text": "int"
+              },
+              {
+                "text": "error"
+              }
+            ]
+          },
+          "statements": 25,
+          "steps": [
+            {
+              "kind": "declare",
+              "span": {
+                "end": {
+                  "col": 15,
+                  "line": 21
+                },
+                "start": {
+                  "col": 2,
+                  "line": 21
+                }
+              }
+            },
+            {
+              "kind": "declare",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 22
+                },
+                "start": {
+                  "col": 2,
+                  "line": 22
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 23
+                    },
+                    "start": {
+                      "col": 10,
+                      "line": 23
+                    }
+                  }
+                }
+              ],
+              "indexing": 1,
+              "kind": "assign",
+              "literals": 2,
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 23
+                },
+                "start": {
+                  "col": 2,
+                  "line": 23
+                }
+              }
+            },
+            {
+              "indexing": 1,
+              "kind": "assign",
+              "literals": 2,
+              "operators": 2,
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 24
+                },
+                "start": {
+                  "col": 2,
+                  "line": 24
+                }
+              }
+            },
+            {
+              "kind": "assign",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 9,
+                  "line": 25
+                },
+                "start": {
+                  "col": 2,
+                  "line": 25
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "errors.New",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 27
+                    },
+                    "start": {
+                      "col": 20,
+                      "line": 27
+                    }
+                  }
+                }
+              ],
+              "guard": true,
+              "kind": "if",
+              "literals": 3,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 28
+                },
+                "start": {
+                  "col": 2,
+                  "line": 26
+                }
+              }
+            },
+            {
+              "kind": "if",
+              "nested": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 31
+                },
+                "start": {
+                  "col": 2,
+                  "line": 29
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 34
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 34
+                    }
+                  }
+                }
+              ],
+              "kind": "switch",
+              "literals": 2,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 35
+                },
+                "start": {
+                  "col": 2,
+                  "line": 32
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "nested": 1,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 38
+                },
+                "start": {
+                  "col": 2,
+                  "line": 36
+                }
+              }
+            },
+            {
+              "kind": "block",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 41
+                },
+                "start": {
+                  "col": 2,
+                  "line": 39
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 42
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 42
+                    }
+                  }
+                }
+              ],
+              "kind": "defer",
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 42
+                },
+                "start": {
+                  "col": 2,
+                  "line": 42
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "fmt.Println",
+                  "site": {
+                    "end": {
+                      "col": 19,
+                      "line": 43
+                    },
+                    "start": {
+                      "col": 12,
+                      "line": 43
+                    }
+                  }
+                }
+              ],
+              "kind": "defer",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 43
+                },
+                "start": {
+                  "col": 2,
+                  "line": 43
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "Max",
+                  "site": {
+                    "end": {
+                      "col": 11,
+                      "line": 44
+                    },
+                    "start": {
+                      "col": 8,
+                      "line": 44
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 22,
+                  "line": 44
+                },
+                "start": {
+                  "col": 2,
+                  "line": 44
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "fmt.Sprint",
+                  "site": {
+                    "end": {
+                      "col": 12,
+                      "line": 45
+                    },
+                    "start": {
+                      "col": 6,
+                      "line": 45
+                    }
+                  }
+                }
+              ],
+              "indexing": 1,
+              "kind": "call",
+              "literals": 7,
+              "span": {
+                "end": {
+                  "col": 39,
+                  "line": 45
+                },
+                "start": {
+                  "col": 2,
+                  "line": 45
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 21,
+                      "line": 46
+                    },
+                    "start": {
+                      "col": 15,
+                      "line": 46
+                    }
+                  }
+                },
+                {
+                  "name": "",
+                  "site": {
+                    "end": {
+                      "col": 31,
+                      "line": 46
+                    },
+                    "start": {
+                      "col": 30,
+                      "line": 46
+                    }
+                  }
+                }
+              ],
+              "kind": "call",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 32,
+                  "line": 46
+                },
+                "start": {
+                  "col": 2,
+                  "line": 46
+                }
+              }
+            },
+            {
+              "kind": "loop",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 50
+                },
+                "start": {
+                  "col": 1,
+                  "line": 47
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 51
+                },
+                "start": {
+                  "col": 2,
+                  "line": 51
+                }
+              }
+            }
+          ],
+          "symbol": ".::kinds#function",
+          "tokens": 163,
+          "top_level": 17
+        },
+        {
+          "flow": [
+            {
+              "kind": "loop",
+              "nesting": 0
+            },
+            {
+              "guard": true,
+              "kind": "if",
+              "nesting": 1
+            }
+          ],
+          "max_nesting": 2,
+          "params": 1,
+          "returns": 0,
+          "signature": {
+            "params": [
+              {
+                "text": "[]int"
+              }
+            ],
+            "results": []
+          },
+          "statements": 3,
+          "steps": [
+            {
+              "kind": "loop",
+              "literals": 1,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 59
+                },
+                "start": {
+                  "col": 2,
+                  "line": 55
+                }
+              }
+            }
+          ],
+          "symbol": ".::jump#function",
+          "tokens": 17,
+          "top_level": 1
+        },
+        {
+          "flow": [],
+          "max_nesting": 0,
+          "params": 0,
+          "pending": {
+            "carriers": [
+              ".::Foo#type",
+              ".::Holder#type"
+            ],
+            "key": "Run:func()()"
+          },
+          "returns": 0,
+          "statements": 0,
+          "symbol": ".::Foo::Run#method",
+          "tokens": 2,
+          "top_level": 0
+        }
+      ],
+      "modules": [
+        {
+          "name": "steps",
+          "path": "."
+        }
+      ],
+      "symbols": [
+        {
+          "extent": {
+            "end": {
+              "col": 29,
+              "line": 8
+            },
+            "start": {
+              "col": 1,
+              "line": 8
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Pair#type",
+          "kind": "type",
+          "name": "Pair",
+          "span": {
+            "end": {
+              "col": 29,
+              "line": 8
+            },
+            "start": {
+              "col": 6,
+              "line": 8
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "file": "steps.go",
+          "id": ".::Pair::a#field",
+          "kind": "field",
+          "name": "a",
+          "owner": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 8
+            },
+            "start": {
+              "col": 19,
+              "line": 8
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "private"
+        },
+        {
+          "file": "steps.go",
+          "id": ".::Pair::b#field",
+          "kind": "field",
+          "name": "b",
+          "owner": ".::Pair#type",
+          "span": {
+            "end": {
+              "col": 27,
+              "line": 8
+            },
+            "start": {
+              "col": 22,
+              "line": 8
+            }
+          },
+          "type_ref": {
+            "text": "int"
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Max#function",
+          "kind": "function",
+          "name": "Max",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 15
+            },
+            "start": {
+              "col": 1,
+              "line": 10
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 36,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "file": "steps.go",
+          "id": ".::helper#function",
+          "kind": "function",
+          "name": "helper",
+          "span": {
+            "end": {
+              "col": 36,
+              "line": 17
+            },
+            "start": {
+              "col": 1,
+              "line": 17
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "doc": "kinds has one step of every kind.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 52
+            },
+            "start": {
+              "col": 1,
+              "line": 19
+            }
+          },
+          "file": "steps.go",
+          "id": ".::kinds#function",
+          "kind": "function",
+          "name": "kinds",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 52
+            },
+            "start": {
+              "col": 1,
+              "line": 20
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 60
+            },
+            "start": {
+              "col": 1,
+              "line": 54
+            }
+          },
+          "file": "steps.go",
+          "id": ".::jump#function",
+          "kind": "function",
+          "name": "jump",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 60
+            },
+            "start": {
+              "col": 1,
+              "line": 54
+            }
+          },
+          "visibility": "private"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 18,
+              "line": 62
+            },
+            "start": {
+              "col": 1,
+              "line": 62
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Foo#type",
+          "kind": "type",
+          "name": "Foo",
+          "provides": [
+            "Run:func()()"
+          ],
+          "span": {
+            "end": {
+              "col": 18,
+              "line": 62
+            },
+            "start": {
+              "col": 6,
+              "line": 62
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 20,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 64
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Foo::Run#method",
+          "kind": "method",
+          "name": "Run",
+          "owner": ".::Foo#type",
+          "span": {
+            "end": {
+              "col": 20,
+              "line": 64
+            },
+            "start": {
+              "col": 1,
+              "line": 64
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Holder embeds one Foo and only has another.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 71
+            },
+            "start": {
+              "col": 1,
+              "line": 66
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Holder#type",
+          "kind": "type",
+          "name": "Holder",
+          "provides": [
+            "Run:func()()"
+          ],
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 71
+            },
+            "start": {
+              "col": 6,
+              "line": 67
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "embedded": true,
+          "extent": {
+            "end": {
+              "col": 5,
+              "line": 68
+            },
+            "start": {
+              "col": 2,
+              "line": 68
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Holder::Foo#field",
+          "kind": "field",
+          "name": "Foo",
+          "owner": ".::Holder#type",
+          "span": {
+            "end": {
+              "col": 5,
+              "line": 68
+            },
+            "start": {
+              "col": 2,
+              "line": 68
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Foo",
+            "text": "example.com/steps.Foo"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 69
+            },
+            "start": {
+              "col": 2,
+              "line": 69
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Holder::Named#field",
+          "kind": "field",
+          "name": "Named",
+          "owner": ".::Holder#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 69
+            },
+            "start": {
+              "col": 2,
+              "line": 69
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Foo",
+            "text": "example.com/steps.Foo"
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 11,
+              "line": 70
+            },
+            "start": {
+              "col": 2,
+              "line": 70
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Holder::Foo2#field",
+          "kind": "field",
+          "name": "Foo2",
+          "owner": ".::Holder#type",
+          "span": {
+            "end": {
+              "col": 11,
+              "line": 70
+            },
+            "start": {
+              "col": 2,
+              "line": 70
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Foo",
+            "text": "example.com/steps.Foo"
+          },
+          "visibility": "public"
+        },
+        {
+          "doc": "Plain has a field named as its type that embeds nothing.",
+          "extent": {
+            "end": {
+              "col": 2,
+              "line": 76
+            },
+            "start": {
+              "col": 1,
+              "line": 73
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Plain#type",
+          "kind": "type",
+          "name": "Plain",
+          "span": {
+            "end": {
+              "col": 2,
+              "line": 76
+            },
+            "start": {
+              "col": 6,
+              "line": 74
+            }
+          },
+          "visibility": "public"
+        },
+        {
+          "extent": {
+            "end": {
+              "col": 9,
+              "line": 75
+            },
+            "start": {
+              "col": 2,
+              "line": 75
+            }
+          },
+          "file": "steps.go",
+          "id": ".::Plain::Foo#field",
+          "kind": "field",
+          "name": "Foo",
+          "owner": ".::Plain#type",
+          "span": {
+            "end": {
+              "col": 9,
+              "line": 75
+            },
+            "start": {
+              "col": 2,
+              "line": 75
+            }
+          },
+          "type_ref": {
+            "exported": true,
+            "symbol": ".::Foo",
+            "text": "example.com/steps.Foo"
+          },
+          "visibility": "public"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "incomplete": [],
+  "notices": [],
+  "sources": []
+}

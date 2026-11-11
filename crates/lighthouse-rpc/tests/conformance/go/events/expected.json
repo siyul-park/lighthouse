@@ -490,6 +490,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 16
+                },
+                "start": {
+                  "col": 33,
+                  "line": 16
+                }
+              }
+            }
+          ],
           "symbol": ".::Custom::Error#method",
           "tokens": 4,
           "top_level": 1
@@ -518,6 +534,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 68,
+                  "line": 19
+                },
+                "start": {
+                  "col": 40,
+                  "line": 19
+                }
+              }
+            }
+          ],
           "symbol": ".::Custom::Is#method",
           "tokens": 6,
           "top_level": 1
@@ -543,6 +574,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Err",
+                  "site": {
+                    "end": {
+                      "col": 68,
+                      "line": 27
+                    },
+                    "start": {
+                      "col": 65,
+                      "line": 27
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 70,
+                  "line": 27
+                },
+                "start": {
+                  "col": 54,
+                  "line": 27
+                }
+              }
+            }
+          ],
           "symbol": ".::Fetch#function",
           "tokens": 8,
           "top_level": 1
@@ -574,6 +635,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 79,
+                  "line": 29
+                },
+                "start": {
+                  "col": 64,
+                  "line": 29
+                }
+              }
+            }
+          ],
           "symbol": ".::Open#function",
           "tokens": 6,
           "top_level": 1
@@ -617,6 +693,37 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "guard": true,
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 34
+                },
+                "start": {
+                  "col": 2,
+                  "line": 32
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 35
+                },
+                "start": {
+                  "col": 2,
+                  "line": 35
+                }
+              }
+            }
+          ],
           "symbol": ".::Must#function",
           "tokens": 14,
           "top_level": 2
@@ -655,6 +762,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 57,
+                  "line": 38
+                },
+                "start": {
+                  "col": 32,
+                  "line": 38
+                }
+              }
+            }
+          ],
           "symbol": ".::Compare#function",
           "tokens": 6,
           "top_level": 1
@@ -677,6 +799,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 40
+                },
+                "start": {
+                  "col": 31,
+                  "line": 40
+                }
+              }
+            }
+          ],
           "symbol": ".::NotNil#function",
           "tokens": 6,
           "top_level": 1
@@ -699,6 +836,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 50,
+                  "line": 42
+                },
+                "start": {
+                  "col": 30,
+                  "line": 42
+                }
+              }
+            }
+          ],
           "symbol": ".::AtEnd#function",
           "tokens": 8,
           "top_level": 1
@@ -737,6 +889,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 50,
+                      "line": 44
+                    },
+                    "start": {
+                      "col": 44,
+                      "line": 44
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 68,
+                  "line": 44
+                },
+                "start": {
+                  "col": 33,
+                  "line": 44
+                }
+              }
+            }
+          ],
           "symbol": ".::Wrapped#function",
           "tokens": 11,
           "top_level": 1
@@ -759,6 +942,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 51,
+                      "line": 46
+                    },
+                    "start": {
+                      "col": 45,
+                      "line": 46
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 69,
+                  "line": 46
+                },
+                "start": {
+                  "col": 34,
+                  "line": 46
+                }
+              }
+            }
+          ],
           "symbol": ".::Wrapping#function",
           "tokens": 11,
           "top_level": 1
@@ -781,6 +995,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 50,
+                      "line": 48
+                    },
+                    "start": {
+                      "col": 44,
+                      "line": 48
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 68,
+                  "line": 48
+                },
+                "start": {
+                  "col": 33,
+                  "line": 48
+                }
+              }
+            }
+          ],
           "symbol": ".::Plain#function",
           "tokens": 11,
           "top_level": 1
@@ -825,6 +1070,52 @@
             ]
           },
           "statements": 3,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Error",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 52
+                    },
+                    "start": {
+                      "col": 12,
+                      "line": 52
+                    }
+                  }
+                }
+              ],
+              "guard": true,
+              "kind": "if",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 53
+                },
+                "start": {
+                  "col": 2,
+                  "line": 51
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 11,
+                  "line": 54
+                },
+                "start": {
+                  "col": 2,
+                  "line": 54
+                }
+              }
+            }
+          ],
           "symbol": ".::Assert#function",
           "tokens": 25,
           "top_level": 2
@@ -870,6 +1161,37 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 1,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 61
+                },
+                "start": {
+                  "col": 2,
+                  "line": 58
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 62
+                },
+                "start": {
+                  "col": 2,
+                  "line": 62
+                }
+              }
+            }
+          ],
           "symbol": ".::Kind#function",
           "tokens": 18,
           "top_level": 2
@@ -915,6 +1237,37 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "kind": "switch",
+              "literals": 1,
+              "nested": 2,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 69
+                },
+                "start": {
+                  "col": 2,
+                  "line": 66
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 10,
+                  "line": 70
+                },
+                "start": {
+                  "col": 2,
+                  "line": 70
+                }
+              }
+            }
+          ],
           "symbol": ".::Choose#function",
           "tokens": 13,
           "top_level": 2
@@ -953,6 +1306,22 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "kind": "return",
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 50,
+                  "line": 74
+                },
+                "start": {
+                  "col": 2,
+                  "line": 74
+                }
+              }
+            }
+          ],
           "symbol": ".::Closure#function",
           "tokens": 13,
           "top_level": 1
@@ -991,6 +1360,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 54,
+                      "line": 79
+                    },
+                    "start": {
+                      "col": 48,
+                      "line": 79
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 67,
+                  "line": 79
+                },
+                "start": {
+                  "col": 37,
+                  "line": 79
+                }
+              }
+            }
+          ],
           "symbol": ".::ConstFormat#function",
           "tokens": 11,
           "top_level": 1
@@ -1029,6 +1428,38 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 49,
+                      "line": 81
+                    },
+                    "start": {
+                      "col": 43,
+                      "line": 81
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 2,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 70,
+                  "line": 81
+                },
+                "start": {
+                  "col": 32,
+                  "line": 81
+                }
+              }
+            }
+          ],
           "symbol": ".::Concat#function",
           "tokens": 13,
           "top_level": 1
@@ -1054,6 +1485,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 60,
+                      "line": 83
+                    },
+                    "start": {
+                      "col": 54,
+                      "line": 83
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 68,
+                  "line": 83
+                },
+                "start": {
+                  "col": 43,
+                  "line": 83
+                }
+              }
+            }
+          ],
           "symbol": ".::Dynamic#function",
           "tokens": 11,
           "top_level": 1
@@ -1076,6 +1537,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 50,
+                      "line": 85
+                    },
+                    "start": {
+                      "col": 44,
+                      "line": 85
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 64,
+                  "line": 85
+                },
+                "start": {
+                  "col": 33,
+                  "line": 85
+                }
+              }
+            }
+          ],
           "symbol": ".::Indexed#function",
           "tokens": 11,
           "top_level": 1
@@ -1117,6 +1609,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 54,
+                      "line": 87
+                    },
+                    "start": {
+                      "col": 48,
+                      "line": 87
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 2,
+              "span": {
+                "end": {
+                  "col": 75,
+                  "line": 87
+                },
+                "start": {
+                  "col": 37,
+                  "line": 87
+                }
+              }
+            }
+          ],
           "symbol": ".::Star#function",
           "tokens": 15,
           "top_level": 1
@@ -1135,6 +1658,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "fmt.Errorf",
+                  "site": {
+                    "end": {
+                      "col": 40,
+                      "line": 89
+                    },
+                    "start": {
+                      "col": 34,
+                      "line": 89
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 49,
+                  "line": 89
+                },
+                "start": {
+                  "col": 23,
+                  "line": 89
+                }
+              }
+            }
+          ],
           "symbol": ".::NoArgs#function",
           "tokens": 9,
           "top_level": 1
@@ -2371,6 +2925,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 39,
+                  "line": 11
+                },
+                "start": {
+                  "col": 29,
+                  "line": 11
+                }
+              }
+            }
+          ],
           "symbol": ".::Base::Close#method",
           "tokens": 4,
           "top_level": 1
@@ -2390,6 +2959,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Close",
+                  "site": {
+                    "end": {
+                      "col": 54,
+                      "line": 16
+                    },
+                    "start": {
+                      "col": 49,
+                      "line": 16
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 56,
+                  "line": 16
+                },
+                "start": {
+                  "col": 35,
+                  "line": 16
+                }
+              }
+            }
+          ],
           "symbol": ".::Shielded::Close#method",
           "tokens": 10,
           "top_level": 1
@@ -2409,6 +3008,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 38,
+                  "line": 20
+                },
+                "start": {
+                  "col": 29,
+                  "line": 20
+                }
+              }
+            }
+          ],
           "symbol": ".::Leaf::Name#method",
           "tokens": 4,
           "top_level": 1
@@ -2433,6 +3048,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Name",
+                  "site": {
+                    "end": {
+                      "col": 41,
+                      "line": 27
+                    },
+                    "start": {
+                      "col": 37,
+                      "line": 27
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 43,
+                  "line": 27
+                },
+                "start": {
+                  "col": 28,
+                  "line": 27
+                }
+              }
+            }
+          ],
           "symbol": ".::Use#function",
           "tokens": 8,
           "top_level": 1
@@ -2451,6 +3096,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Use",
+                  "site": {
+                    "end": {
+                      "col": 32,
+                      "line": 29
+                    },
+                    "start": {
+                      "col": 29,
+                      "line": 29
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 42,
+                  "line": 29
+                },
+                "start": {
+                  "col": 22,
+                  "line": 29
+                }
+              }
+            }
+          ],
           "symbol": ".::Pass#function",
           "tokens": 9,
           "top_level": 1
@@ -2475,6 +3151,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 37,
+                  "line": 33
+                },
+                "start": {
+                  "col": 29,
+                  "line": 33
+                }
+              }
+            }
+          ],
           "symbol": ".::Simple::Other#method",
           "tokens": 4,
           "top_level": 1
@@ -2494,6 +3186,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 45,
+                  "line": 38
+                },
+                "start": {
+                  "col": 36,
+                  "line": 38
+                }
+              }
+            }
+          ],
           "symbol": ".::entry::Name#method",
           "tokens": 4,
           "top_level": 1
@@ -2513,6 +3221,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 44,
+                  "line": 39
+                },
+                "start": {
+                  "col": 36,
+                  "line": 39
+                }
+              }
+            }
+          ],
           "symbol": ".::entry::Size#method",
           "tokens": 4,
           "top_level": 1
@@ -2532,6 +3256,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 44,
+                  "line": 40
+                },
+                "start": {
+                  "col": 36,
+                  "line": 40
+                }
+              }
+            }
+          ],
           "symbol": ".::entry::Mode#method",
           "tokens": 4,
           "top_level": 1
@@ -2551,6 +3291,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 54,
+                  "line": 41
+                },
+                "start": {
+                  "col": 36,
+                  "line": 41
+                }
+              }
+            }
+          ],
           "symbol": ".::entry::ModTime#method",
           "tokens": 8,
           "top_level": 1
@@ -2570,6 +3326,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 48,
+                  "line": 42
+                },
+                "start": {
+                  "col": 36,
+                  "line": 42
+                }
+              }
+            }
+          ],
           "symbol": ".::entry::IsDir#method",
           "tokens": 4,
           "top_level": 1
@@ -2589,6 +3360,21 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 46,
+                  "line": 43
+                },
+                "start": {
+                  "col": 36,
+                  "line": 43
+                }
+              }
+            }
+          ],
           "symbol": ".::entry::Sys#method",
           "tokens": 4,
           "top_level": 1
@@ -2613,6 +3399,66 @@
             ]
           },
           "statements": 4,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "os.Stat",
+                  "site": {
+                    "end": {
+                      "col": 22,
+                      "line": 46
+                    },
+                    "start": {
+                      "col": 18,
+                      "line": 46
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 46
+                },
+                "start": {
+                  "col": 2,
+                  "line": 46
+                }
+              }
+            },
+            {
+              "guard": true,
+              "kind": "if",
+              "literals": 1,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 49
+                },
+                "start": {
+                  "col": 2,
+                  "line": 47
+                }
+              }
+            },
+            {
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 13,
+                  "line": 50
+                },
+                "start": {
+                  "col": 2,
+                  "line": 50
+                }
+              }
+            }
+          ],
           "symbol": ".::Stat#function",
           "tokens": 24,
           "top_level": 3
@@ -2715,6 +3561,7 @@
           "visibility": "public"
         },
         {
+          "embedded": true,
           "extent": {
             "end": {
               "col": 27,
@@ -2865,6 +3712,7 @@
           "visibility": "public"
         },
         {
+          "embedded": true,
           "extent": {
             "end": {
               "col": 25,

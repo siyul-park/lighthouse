@@ -27,7 +27,7 @@ pub(super) const SCRIPT: &str = r#"#!/bin/bash
       body=$(dd bs=1 count="$n" 2>/dev/null)
     }
     languages='[{"id":"fake","globs":["**/*.fake"],"capabilities":["semantic-edges","future-thing"]}]'
-    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.8}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
+    initialize() { send '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"'"${2:-0.9}"'","serverInfo":{"name":"'"${1:-fake}"'","version":"1.2"},"capabilities":{"languages":'"$languages"'}}}'; }
     fragment='{"file":{"path":"a.fake"},"modules":[{"path":"m"}],"symbols":[],"edges":[],"functions":[],"tests":[]}'
     unit() { send '{"jsonrpc":"2.0","id":'"$id"',"result":{"units":[{"id":"u","body":"b","api":"a",'"$1"'}]}}'; }
     recv

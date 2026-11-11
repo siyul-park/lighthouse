@@ -24,7 +24,9 @@ mod view;
 
 pub use applicability::Applicability;
 pub use edit::{Anchor, EditOp, FixOutcome, Owner};
-pub use function::{Event, EventKind, FunctionSummary, Signature, TestStyle, TypeRef};
+pub use function::{
+    Event, EventKind, FunctionSummary, Signature, Step, StepCall, StepKind, TestStyle, TypeRef,
+};
 pub use kinds::{
     CASES, COLLISIONS, DECLARATIONS, DUPLICATED, EDGES, EDGES_IN, FUNCTIONS, HOST, Host,
     IMPLEMENTS, INCOMING, MARKERS, MEMBERS, METHODS, MODULE_CASES, NOTICES, ORDERED_BY, PATHS,
@@ -303,6 +305,9 @@ pub struct Symbol {
     /// The type of a field.
     #[serde(default)]
     pub type_ref: Option<TypeRef>,
+    /// A field that embeds its type.
+    #[serde(default)]
+    pub embedded: bool,
     /// A method of a trait impl: its signature is not its own to choose.
     #[serde(default)]
     pub implementation: bool,
@@ -362,6 +367,7 @@ impl Symbol {
             role: None,
             optional: false,
             type_ref: None,
+            embedded: false,
             implementation: false,
         }
     }

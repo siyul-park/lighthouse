@@ -201,6 +201,62 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "first",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 9
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 9
+                    }
+                  }
+                },
+                {
+                  "name": "copied",
+                  "site": {
+                    "end": {
+                      "col": 25,
+                      "line": 9
+                    },
+                    "start": {
+                      "col": 19,
+                      "line": 9
+                    }
+                  }
+                },
+                {
+                  "name": "unwrap",
+                  "site": {
+                    "end": {
+                      "col": 34,
+                      "line": 9
+                    },
+                    "start": {
+                      "col": 28,
+                      "line": 9
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 36,
+                  "line": 9
+                },
+                "start": {
+                  "col": 5,
+                  "line": 9
+                }
+              }
+            }
+          ],
           "symbol": "events::first#function",
           "tokens": 15,
           "top_level": 1
@@ -241,6 +297,50 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "parse",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 13
+                    },
+                    "start": {
+                      "col": 12,
+                      "line": 13
+                    }
+                  }
+                },
+                {
+                  "name": "expect",
+                  "site": {
+                    "end": {
+                      "col": 36,
+                      "line": 13
+                    },
+                    "start": {
+                      "col": 30,
+                      "line": 13
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 44,
+                  "line": 13
+                },
+                "start": {
+                  "col": 5,
+                  "line": 13
+                }
+              }
+            }
+          ],
           "symbol": "events::named#function",
           "tokens": 18,
           "top_level": 1
@@ -275,6 +375,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "unreachable!",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 17
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 17
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 17
+                },
+                "start": {
+                  "col": 5,
+                  "line": 17
+                }
+              }
+            }
+          ],
           "symbol": "events::never#function",
           "tokens": 6,
           "top_level": 1
@@ -301,6 +431,37 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "todo!",
+                  "site": {
+                    "end": {
+                      "col": 9,
+                      "line": 21
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 21
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 21
+                },
+                "start": {
+                  "col": 5,
+                  "line": 21
+                }
+              }
+            }
+          ],
           "symbol": "events::later#function",
           "tokens": 7,
           "top_level": 1
@@ -327,6 +488,36 @@
           "params": 0,
           "returns": 0,
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "unimplemented!",
+                  "site": {
+                    "end": {
+                      "col": 18,
+                      "line": 25
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 25
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 21,
+                  "line": 25
+                },
+                "start": {
+                  "col": 5,
+                  "line": 25
+                }
+              }
+            }
+          ],
           "symbol": "events::missing#function",
           "tokens": 6,
           "top_level": 1
@@ -367,6 +558,39 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "panic!",
+                  "site": {
+                    "end": {
+                      "col": 14,
+                      "line": 30
+                    },
+                    "start": {
+                      "col": 9,
+                      "line": 30
+                    }
+                  }
+                }
+              ],
+              "guard": true,
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 6,
+                  "line": 31
+                },
+                "start": {
+                  "col": 5,
+                  "line": 29
+                }
+              }
+            }
+          ],
           "symbol": "events::fails#function",
           "tokens": 14,
           "top_level": 1
@@ -401,6 +625,79 @@
             ]
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "unwrap",
+                  "site": {
+                    "end": {
+                      "col": 30,
+                      "line": 38
+                    },
+                    "start": {
+                      "col": 24,
+                      "line": 38
+                    }
+                  }
+                }
+              ],
+              "kind": "assign",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 33,
+                  "line": 38
+                },
+                "start": {
+                  "col": 5,
+                  "line": 38
+                }
+              }
+            },
+            {
+              "calls": [
+                {
+                  "name": "f",
+                  "site": {
+                    "end": {
+                      "col": 6,
+                      "line": 39
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 39
+                    }
+                  }
+                },
+                {
+                  "name": "helper",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 39
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 39
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 39
+                },
+                "start": {
+                  "col": 5,
+                  "line": 39
+                }
+              }
+            }
+          ],
           "symbol": "events::inner#function",
           "tokens": 39,
           "top_level": 2
@@ -435,6 +732,37 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "unwrap",
+                  "site": {
+                    "end": {
+                      "col": 23,
+                      "line": 36
+                    },
+                    "start": {
+                      "col": 17,
+                      "line": 36
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 25,
+                  "line": 36
+                },
+                "start": {
+                  "col": 9,
+                  "line": 36
+                }
+              }
+            }
+          ],
           "symbol": "events::inner::helper#function",
           "tokens": 10,
           "top_level": 1
@@ -473,6 +801,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "unwrap_err",
+                  "site": {
+                    "end": {
+                      "col": 17,
+                      "line": 43
+                    },
+                    "start": {
+                      "col": 7,
+                      "line": 43
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 19,
+                  "line": 43
+                },
+                "start": {
+                  "col": 5,
+                  "line": 43
+                }
+              }
+            }
+          ],
           "symbol": "events::flipped#function",
           "tokens": 7,
           "top_level": 1
@@ -491,6 +849,36 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "value",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 53
+                    },
+                    "start": {
+                      "col": 11,
+                      "line": 53
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "span": {
+                "end": {
+                  "col": 18,
+                  "line": 53
+                },
+                "start": {
+                  "col": 5,
+                  "line": 53
+                }
+              }
+            }
+          ],
           "symbol": "events::declared#function",
           "tokens": 32,
           "top_level": 1
@@ -509,6 +897,38 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "map",
+                  "site": {
+                    "end": {
+                      "col": 16,
+                      "line": 57
+                    },
+                    "start": {
+                      "col": 13,
+                      "line": 57
+                    }
+                  }
+                }
+              ],
+              "kind": "return",
+              "literals": 2,
+              "operators": 1,
+              "span": {
+                "end": {
+                  "col": 27,
+                  "line": 57
+                },
+                "start": {
+                  "col": 5,
+                  "line": 57
+                }
+              }
+            }
+          ],
           "symbol": "events::quiet#function",
           "tokens": 16,
           "top_level": 1

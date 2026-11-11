@@ -70,6 +70,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 26,
+                  "line": 4
+                },
+                "start": {
+                  "col": 18,
+                  "line": 4
+                }
+              }
+            }
+          ],
           "symbol": ".::Foo#function",
           "tokens": 4,
           "top_level": 1
@@ -88,6 +104,22 @@
             ]
           },
           "statements": 1,
+          "steps": [
+            {
+              "kind": "return",
+              "literals": 1,
+              "span": {
+                "end": {
+                  "col": 26,
+                  "line": 7
+                },
+                "start": {
+                  "col": 18,
+                  "line": 7
+                }
+              }
+            }
+          ],
           "symbol": ".::Bar#function",
           "tokens": 4,
           "top_level": 1
@@ -292,6 +324,51 @@
             "results": []
           },
           "statements": 2,
+          "steps": [
+            {
+              "calls": [
+                {
+                  "name": "Foo",
+                  "site": {
+                    "end": {
+                      "col": 8,
+                      "line": 8
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 8
+                    }
+                  }
+                },
+                {
+                  "name": "Fatal",
+                  "site": {
+                    "end": {
+                      "col": 10,
+                      "line": 9
+                    },
+                    "start": {
+                      "col": 5,
+                      "line": 9
+                    }
+                  }
+                }
+              ],
+              "kind": "if",
+              "literals": 2,
+              "nested": 1,
+              "span": {
+                "end": {
+                  "col": 3,
+                  "line": 10
+                },
+                "start": {
+                  "col": 2,
+                  "line": 8
+                }
+              }
+            }
+          ],
           "symbol": ".::TestFoo#test",
           "tokens": 16,
           "top_level": 1

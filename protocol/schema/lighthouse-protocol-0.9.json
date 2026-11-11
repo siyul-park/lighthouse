@@ -936,6 +936,13 @@
           "description": "The function implements a method that a trait or interface declares\nelsewhere (a method of a trait impl in Rust). Added in 0.1 before 1.0.",
           "type": "boolean"
         },
+        "implements": {
+          "description": "The method of a project trait that this function implements, as a\nsymbol id (a method of `impl Trait for T` in Rust); it tells two traits\nthat share a method name apart. Added in 0.9.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "manual_assertions": {
           "description": "Checks of a test file's function written out by hand: an `if` that\ncompares and whose only effect is to fail the test. Added in 0.1\nbefore 1.0; zero when the plugin does not count them.",
           "format": "uint32",
@@ -977,6 +984,13 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "steps": {
+          "description": "The top-level statements of the body, in source order (capability\n`steps`); a function without a body has none. Added in 0.9.",
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "type": "array"
         },
         "symbol": {
           "type": "string"
@@ -1194,7 +1208,7 @@
         },
         "capabilities": {
           "default": [],
-          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, and `source-ast`.\nHosts ignore unknown values.",
+          "description": "Known values: `semantic-edges`, `extent`, `reference-sites`,\n`complete-references`, `overlays`, `source-ast` and `steps`.\nHosts ignore unknown values.",
           "items": {
             "type": "string"
           },
@@ -1685,6 +1699,131 @@
       ],
       "type": "object"
     },
+    "Step": {
+      "description": "One top-level statement of a function body, with the counts of the syntax\ninside it, closure bodies included. Counts use syntax alone, so every\nlanguage counts the same shapes.",
+      "properties": {
+        "calls": {
+          "description": "The calls in the step in source order, conversions and builtins left\nout.",
+          "items": {
+            "$ref": "#/$defs/StepCall"
+          },
+          "type": "array"
+        },
+        "guard": {
+          "description": "`if`: no `else`, and a body that only jumps, as `guard` of a `flow` entry.",
+          "type": "boolean"
+        },
+        "indexing": {
+          "description": "Index and slice expressions; not the instantiation of a generic.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/StepKind"
+        },
+        "literals": {
+          "description": "Number, string, character and byte literals, and one per composite\nliteral (a struct, array or slice value written out).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "nested": {
+          "description": "Statements strictly inside the step, counted as `statements` counts.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "operators": {
+          "description": "Binary arithmetic, bitwise and shift operators, compound assignments,\nincrements and decrements, and unary minus and bitwise complement;\nnot comparisons, logical operators, plain assignment or dereference.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "span": {
+          "$ref": "#/$defs/Span",
+          "description": "The whole statement, a compound statement with its block."
+        }
+      },
+      "required": [
+        "span",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "StepCall": {
+      "description": "A call in a step.",
+      "properties": {
+        "name": {
+          "description": "The callee as written, without arguments: `fmt.Errorf`, `build`,\n`foo::bar`, `unwrap`, `format!`; empty when the callee has no name.",
+          "type": "string"
+        },
+        "site": {
+          "$ref": "#/$defs/Span",
+          "description": "The identifier that names the callee, as the `site` of the `calls` edge\nto a project callee is."
+        }
+      },
+      "required": [
+        "name",
+        "site"
+      ],
+      "type": "object"
+    },
+    "StepKind": {
+      "description": "What kind of statement a step is.",
+      "oneOf": [
+        {
+          "const": "assign",
+          "description": "An assignment or definition with a value, a `let` with an initializer,\nan increment.",
+          "type": "string"
+        },
+        {
+          "const": "declare",
+          "description": "A declaration without a value: Go `var x T`, `const`, `type`; Rust\n`let x;`.",
+          "type": "string"
+        },
+        {
+          "const": "call",
+          "description": "A statement run for its effect: an expression, a macro, a channel send.",
+          "type": "string"
+        },
+        {
+          "const": "return",
+          "description": "`return`, and the tail expression of a Rust body that is not itself an\n`if`, `match`, loop or block.",
+          "type": "string"
+        },
+        {
+          "const": "jump",
+          "description": "`break`, `continue`, `goto`.",
+          "type": "string"
+        },
+        {
+          "const": "defer",
+          "description": "Go `defer` and `go`.",
+          "type": "string"
+        },
+        {
+          "const": "if",
+          "description": "A conditional, with its `else` chain.",
+          "type": "string"
+        },
+        {
+          "const": "switch",
+          "description": "`switch`, type switch, `select`, `match`.",
+          "type": "string"
+        },
+        {
+          "const": "loop",
+          "description": "Every loop form.",
+          "type": "string"
+        },
+        {
+          "const": "block",
+          "description": "A bare or labeled block, `unsafe`.",
+          "type": "string"
+        }
+      ]
+    },
     "Supports": {
       "description": "What a model can do, as OpenAI's model object lists it.",
       "properties": {
@@ -1708,6 +1847,10 @@
         },
         "edges": {
           "description": "The host adds an `implements` edge from every type that provides what\nthe interface requires.",
+          "type": "boolean"
+        },
+        "embedded": {
+          "description": "A field that embeds its type (a Go field written without a name), whose\nmethods the struct gets as its own. Added in 0.9.",
           "type": "boolean"
         },
         "extent": {
