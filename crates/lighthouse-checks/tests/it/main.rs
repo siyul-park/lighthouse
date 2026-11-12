@@ -28,6 +28,7 @@ mod model_selects;
 mod module_types;
 mod pool;
 mod probe;
+mod real_subjects;
 mod region_options;
 mod rules;
 mod rust;

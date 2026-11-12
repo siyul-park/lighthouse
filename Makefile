@@ -97,9 +97,11 @@ lint: plugins cli
 	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) check . --allow-incomplete
 	$(call test-examples,'markdown/*')
 
-# Every example of every checked decision, and the generated docs.
+# Every example of every checked decision, and the queries of the translated
+# decisions held to the decisions on the subjects of the whole repository.
 decisions: plugins cli
 	$(call test-examples,)
+	cargo test --release -p lighthouse-checks --test it -- --ignored the_query_holds_of_the_subjects_the_decision_reports_on_this_repository
 
 docs: cli
 	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) docs check
