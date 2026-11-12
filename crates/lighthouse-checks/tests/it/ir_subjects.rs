@@ -104,7 +104,8 @@ fn the_query_holds_of_the_subjects_the_decision_reports() {
     let comp = lighthouse_test_support::composition();
     let bundled = lighthouse_test_support::bundled();
     let worlds = varied();
-    let (mut compared, mut skipped, mut violating) = (Vec::new(), Vec::new(), 0usize);
+    let (mut compared, mut skipped, mut violating) =
+        (Vec::new(), Vec::<(String, String)>::new(), 0usize);
     for decision in bundled.decisions() {
         let Some(CheckKind::Cel(check)) = decision.check.as_ref().map(|c| &c.kind) else {
             continue;
@@ -116,8 +117,12 @@ fn the_query_holds_of_the_subjects_the_decision_reports() {
         let Ok(ucq) = lighthouse_logic::translate(comp.cel(), check, select.variable()) else {
             continue;
         };
-        if check.at.is_some() || !decision.applies_to("go") {
-            skipped.push(id);
+        if check.at.is_some() {
+            skipped.push((id, "reported elsewhere than at the subject".to_owned()));
+            continue;
+        }
+        if !decision.applies_to("go") {
+            skipped.push((id, "does not apply to Go".to_owned()));
             continue;
         }
         let options = decision.resolve_options(&Map::new(), Some("go")).unwrap();
@@ -137,29 +142,30 @@ fn the_query_holds_of_the_subjects_the_decision_reports() {
         let pack = decision.pack().to_owned();
         let shipped_plugin = Checks::new(&comp, &pack, bundled).unwrap();
         let mut saw = 0;
-        for world in &worlds {
-            let Ok(subjects) = world.try_diagnose_with(
-                &probe_catalog,
-                &Subject {
-                    plugin: &probe_plugin,
-                    id: "local",
-                },
-                "local/probe",
-                json!({}),
-            ) else {
-                continue;
-            };
-            let Ok(reported) = world.try_diagnose_with(
-                bundled,
-                &Subject {
-                    plugin: &shipped_plugin,
-                    id: &pack,
-                },
-                &id,
-                json!({}),
-            ) else {
-                continue;
-            };
+        let mut flagged = 0;
+        for (at, world) in worlds.iter().enumerate() {
+            let subjects = world
+                .try_diagnose_with(
+                    &probe_catalog,
+                    &Subject {
+                        plugin: &probe_plugin,
+                        id: "local",
+                    },
+                    "local/probe",
+                    json!({}),
+                )
+                .unwrap_or_else(|e| panic!("{id}: the probe on project {at}: {e}"));
+            let reported = world
+                .try_diagnose_with(
+                    bundled,
+                    &Subject {
+                        plugin: &shipped_plugin,
+                        id: &pack,
+                    },
+                    &id,
+                    json!({}),
+                )
+                .unwrap_or_else(|e| panic!("{id}: the decision on project {at}: {e}"));
             let place = |d: &lighthouse_model::Diagnostic| {
                 (d.file.to_string_lossy().into_owned(), d.span.start.line)
             };
@@ -170,16 +176,23 @@ fn the_query_holds_of_the_subjects_the_decision_reports() {
                 ucq.holds(&both["s"], file, &options).then(|| place(d))
             }));
             saw += subjects.len();
-            violating += found.values().sum::<usize>();
+            flagged += found.values().sum::<usize>();
             assert_eq!(
                 found, expected,
                 "{id}: the query and the decision differ on the subjects of a project\n{ucq}"
             );
         }
-        if saw > 0 {
-            compared.push(id);
+        violating += flagged;
+        if saw == 0 {
+            skipped.push((id, "the projects have no subject of its kind".to_owned()));
         } else {
-            skipped.push(id);
+            if flagged == 0 && !ucq.cqs.is_empty() {
+                skipped.push((
+                    id.clone(),
+                    "no subject violates it in the projects".to_owned(),
+                ));
+            }
+            compared.push(id);
         }
     }
     eprintln!("compared {}: {compared:?}", compared.len());

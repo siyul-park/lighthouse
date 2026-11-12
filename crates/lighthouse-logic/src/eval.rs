@@ -1,7 +1,7 @@
 //! The evaluator of a [`Ucq`] over the JSON fact value of a subject: a
 //! nested-loop join over the containers the atoms name.
 
-use std::cmp::Ordering;
+use std::{borrow::Cow, cmp::Ordering};
 
 use serde_json::Value;
 
@@ -14,13 +14,17 @@ struct Facts<'v> {
     options: &'v Value,
 }
 
-/// The members the atoms have bound, by binder.
-type Members = Vec<Option<Value>>;
+/// The members the atoms have bound, by binder: borrowed from the facts, or a
+/// key of a map.
+type Members<'a> = Vec<Option<Cow<'a, Value>>>;
 
 impl Ucq {
     /// Whether the subject violates the decision. The query is false where the
     /// CEL gives no verdict (a path the facts lack, a comparison of values
     /// that do not compare); a run of the check reports those as incomplete.
+    /// The one exception is a bound value that is read but fails in the CEL:
+    /// the query is then true where the CEL errors. That is on the error side
+    /// only, which a run reports as incomplete.
     pub fn holds(&self, subject: &Value, file: &Value, options: &Value) -> bool {
         let facts = Facts {
             subject,
@@ -32,7 +36,7 @@ impl Ucq {
     }
 }
 
-fn join(cq: &Cq, at: usize, facts: &Facts, members: &mut Members) -> bool {
+fn join<'a>(cq: &Cq, at: usize, facts: &Facts<'a>, members: &mut Members<'a>) -> bool {
     let Some(atom) = cq.atoms.get(at) else {
         return cq
             .empties
@@ -44,7 +48,7 @@ fn join(cq: &Cq, at: usize, facts: &Facts, members: &mut Members) -> bool {
                 .all(|p| size(p, facts, members).is_some_and(|n| n > 0))
             && cq.cmps.iter().all(|c| compares(c, facts, members));
     };
-    let Some(items) = reach(&atom.list, facts, members).and_then(elements) else {
+    let Some(items) = reach(&atom.list, facts, members).and_then(|c| elements(&c)) else {
         return false;
     };
     items.into_iter().any(|item| {
@@ -55,28 +59,35 @@ fn join(cq: &Cq, at: usize, facts: &Facts, members: &mut Members) -> bool {
 
 /// What `exists` and `filter` range over: the items of a list, the keys of a
 /// map.
-fn elements(container: &Value) -> Option<Vec<Value>> {
+fn elements<'a>(container: &Cow<'a, Value>) -> Option<Vec<Cow<'a, Value>>> {
     match container {
-        Value::Array(items) => Some(items.clone()),
-        Value::Object(map) => Some(map.keys().cloned().map(Value::String).collect()),
+        Cow::Borrowed(Value::Array(items)) => Some(items.iter().map(Cow::Borrowed).collect()),
+        Cow::Borrowed(Value::Object(map)) => Some(
+            map.keys()
+                .map(|key| Cow::Owned(Value::String(key.clone())))
+                .collect(),
+        ),
         _ => None,
     }
 }
 
-fn reach<'a>(path: &Path, facts: &'a Facts, members: &'a Members) -> Option<&'a Value> {
+fn reach<'a>(path: &Path, facts: &Facts<'a>, members: &Members<'a>) -> Option<Cow<'a, Value>> {
     let root = match path.root {
-        Root::Subject => facts.subject,
-        Root::File => facts.file,
-        Root::Binder(id) => members.get(id)?.as_ref()?,
+        Root::Subject => Cow::Borrowed(facts.subject),
+        Root::File => Cow::Borrowed(facts.file),
+        Root::Binder(id) => members.get(id)?.as_ref()?.clone(),
     };
     path.fields
         .iter()
-        .try_fold(root, |value, field| value.get(field))
+        .try_fold(root, |value, field| match value {
+            Cow::Borrowed(value) => value.get(field).map(Cow::Borrowed),
+            Cow::Owned(value) => value.get(field).cloned().map(Cow::Owned),
+        })
 }
 
 /// The size of a list, a map or a text; `None` when there is none to measure.
 fn size(path: &Path, facts: &Facts, members: &Members) -> Option<usize> {
-    match reach(path, facts, members)? {
+    match reach(path, facts, members)?.as_ref() {
         Value::Array(items) => Some(items.len()),
         Value::Object(map) => Some(map.len()),
         Value::String(text) => Some(text.chars().count()),
@@ -92,9 +103,9 @@ fn operand(side: &Operand, facts: &Facts, members: &Members) -> Option<Value> {
             .try_fold(facts.options, |value, field| value.get(field))
             .cloned(),
         Operand::Path(path) => {
-            let value = reach(path, facts, members)?;
+            let value = reach(path, facts, members)?.into_owned();
             if path.offset == 0 {
-                return Some(value.clone());
+                return Some(value);
             }
             value
                 .as_i64()

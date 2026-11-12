@@ -279,7 +279,9 @@ impl<'a> Translator<'_> {
                 None if name == self.subject => Ok(Operand::Path(Self::path(Root::Subject))),
                 None if name == "file" => Ok(Operand::Path(Self::path(Root::File))),
                 None if name == "options" => Ok(Operand::Option(Vec::new())),
-                None => Err(Reject::new(format!("pack variable `{name}`"))),
+                None => Err(Reject::new(format!(
+                    "undefined name or pack variable `{name}`"
+                ))),
             },
             Expr::Select(select) if !select.test => match self.term(&select.operand, scope)? {
                 Operand::Path(path) if path.offset != 0 => {

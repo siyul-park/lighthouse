@@ -292,6 +292,6 @@ fn what_is_refused_is_named_by_its_construct() {
     assert!(rejected("symbol.a == (symbol.b ? 1 : 2)").contains("ternary"));
     assert!(rejected("symbol.name == 'a' + symbol.b").contains("concatenation"));
     assert!(rejected("symbol.m['k'] == 1").contains("index"));
-    assert!(rejected("declaration_group > 1").contains("pack variable"));
+    assert!(rejected("declaration_group > 1").contains("undefined name or pack variable"));
     assert!(rejected("symbol.k in symbol.kinds").contains("membership in a field"));
 }
