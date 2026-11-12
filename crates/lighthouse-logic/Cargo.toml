@@ -1,0 +1,13 @@
+[package]
+name = "lighthouse-logic"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+cel.workspace = true
+lighthouse-spec.workspace = true
+serde_json.workspace = true

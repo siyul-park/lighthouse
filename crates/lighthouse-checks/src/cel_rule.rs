@@ -430,6 +430,8 @@ impl VariableResolver for Shared<'_> {
 }
 
 mod evaluation;
+#[cfg(test)]
+mod fidelity;
 
 /// Per variable, whether it is file-level: it names no selected value and no
 /// variable that does.

@@ -1920,8 +1920,10 @@ dependencies = [
  "blake3",
  "cel",
  "globset",
+ "lang-cel",
  "lighthouse-engine",
  "lighthouse-graph",
+ "lighthouse-logic",
  "lighthouse-model",
  "lighthouse-plugin",
  "lighthouse-process",
@@ -2012,6 +2014,15 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "lighthouse-logic"
+version = "0.1.0"
+dependencies = [
+ "cel",
+ "lighthouse-spec",
+ "serde_json",
 ]
 
 [[package]]
