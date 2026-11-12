@@ -1,0 +1,5 @@
+#!/bin/sh
+# Checks the staged files with Lighthouse; a finding over the threshold stops the commit.
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$files" ] && exit 0
+git diff --cached --name-only --diff-filter=ACMR -z | xargs -0 lighthouse check --allow-incomplete
