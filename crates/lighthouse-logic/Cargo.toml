@@ -10,4 +10,6 @@ doctest = false
 [dependencies]
 cel.workspace = true
 lighthouse-spec.workspace = true
+schemars.workspace = true
+serde.workspace = true
 serde_json.workspace = true

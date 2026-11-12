@@ -1920,6 +1920,7 @@ dependencies = [
  "blake3",
  "cel",
  "globset",
+ "insta",
  "lighthouse-engine",
  "lighthouse-graph",
  "lighthouse-logic",
@@ -2021,6 +2022,8 @@ version = "0.1.0"
 dependencies = [
  "cel",
  "lighthouse-spec",
+ "schemars",
+ "serde",
  "serde_json",
 ]
 

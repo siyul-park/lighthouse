@@ -5,7 +5,9 @@
 
 mod eval;
 mod ir;
+mod tier;
 mod translate;
 
 pub use ir::{Atom, Cmp, Const, Cq, Op, Operand, Path, Root, Ucq};
+pub use tier::{Classified, Tier, tier};
 pub use translate::{Reject, translate};
