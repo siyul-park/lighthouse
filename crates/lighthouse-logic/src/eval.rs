@@ -79,7 +79,7 @@ fn compares(cmp: &Cmp, facts: &Facts, members: &Members) -> Option<bool> {
         }),
         Op::In => match &right {
             Value::Array(items) => Some(items.iter().any(|i| same(&left, i))),
-            Value::Object(map) => left.as_str().map(|key| map.contains_key(key)),
+            Value::Object(map) => Some(left.as_str().is_some_and(|key| map.contains_key(key))),
             _ => None,
         },
         _ => left

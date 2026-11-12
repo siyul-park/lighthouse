@@ -309,3 +309,26 @@ fn what_is_refused_is_named_by_its_construct() {
     assert!(rejected("declaration_group > 1").contains("undefined name or pack variable"));
     assert!(rejected("symbol.k in symbol.kinds").contains("membership in a field"));
 }
+
+#[test]
+fn the_body_of_a_variable_with_parameters_reads_the_subject() {
+    let variables = json!([
+        {"name": "big", "params": ["x"], "expression": "symbol.max > x"},
+    ]);
+    let ucq = query("symbol", variables, "big(3)").unwrap();
+
+    assert!(holds(&ucq, json!({"max": 4}), json!({})));
+    assert!(!holds(&ucq, json!({"max": 3}), json!({})));
+}
+
+#[test]
+fn a_key_that_is_not_text_is_not_in_a_map() {
+    let negated = query("symbol", json!([]), "!(symbol.k in options.keys)").unwrap();
+
+    assert!(holds(&negated, json!({"k": 1}), json!({"keys": {"a": 1}})));
+    assert!(!holds(
+        &negated,
+        json!({"k": "a"}),
+        json!({"keys": {"a": 1}})
+    ));
+}

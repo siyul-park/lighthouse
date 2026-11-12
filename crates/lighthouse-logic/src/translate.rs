@@ -61,8 +61,9 @@ struct Node<'a> {
 enum Binding<'a> {
     /// An expression, read in the scope it was written in.
     Value(&'a IdedExpr, Scope<'a>, Used),
-    /// A variable with parameters, applied by name.
-    Macro(&'a [String], &'a IdedExpr),
+    /// A variable with parameters, applied by name; its body starts from the
+    /// roots (the file and the subject) and its parameters.
+    Macro(&'a [String], &'a IdedExpr, Scope<'a>),
     /// What a path starts from: the subject, the file or a child member.
     Root(Root),
 }
@@ -222,13 +223,13 @@ impl<'a> Translator {
 
     /// The body of the variable `name` applied to `args`, with its scope.
     fn apply(&self, name: &str, args: &'a [IdedExpr], scope: &Scope<'a>) -> Option<R<Applied<'a>>> {
-        let Some(Binding::Macro(params, body)) = lookup(scope, name) else {
+        let Some(Binding::Macro(params, body, roots)) = lookup(scope, name) else {
             return None;
         };
         if params.len() != args.len() {
             return Some(Err(Construct::Arity(name.to_owned()).into()));
         }
-        let mut inner: Scope = None;
+        let mut inner = roots;
         let mut flags = Vec::new();
         for (param, arg) in params.iter().zip(args) {
             let flag = Rc::new(Cell::new(false));
@@ -558,10 +559,18 @@ pub fn translate(env: &Env, check: &CelCheck, subject: &str) -> R<Ucq> {
         .collect::<Result<_, _>>()
         .map_err(Construct::Compile)?;
     let condition = env.compile(&check.condition).map_err(Construct::Compile)?;
-    let mut scope: Scope = bind(&None, "file", Binding::Root(Root::File));
-    scope = bind(&scope, subject, Binding::Root(Root::Subject));
+    let roots = bind(
+        &bind(&None, "file", Binding::Root(Root::File)),
+        subject,
+        Binding::Root(Root::Subject),
+    );
+    let mut scope = roots.clone();
     for (variable, program) in check.variables.iter().zip(&programs) {
-        scope = bind(&scope, &variable.name, binding(variable, program, &scope));
+        scope = bind(
+            &scope,
+            &variable.name,
+            binding(variable, program, &scope, &roots),
+        );
     }
     let translator = Translator {
         next: Cell::new(0),
@@ -622,11 +631,16 @@ fn lookup<'a>(scope: &Scope<'a>, name: &str) -> Option<Binding<'a>> {
     None
 }
 
-fn binding<'a>(variable: &'a Variable, program: &'a Program, scope: &Scope<'a>) -> Binding<'a> {
+fn binding<'a>(
+    variable: &'a Variable,
+    program: &'a Program,
+    scope: &Scope<'a>,
+    roots: &Scope<'a>,
+) -> Binding<'a> {
     if variable.params.is_empty() {
         Binding::Value(program.expression(), scope.clone(), None)
     } else {
-        Binding::Macro(&variable.params, program.expression())
+        Binding::Macro(&variable.params, program.expression(), roots.clone())
     }
 }
 
