@@ -505,6 +505,19 @@ impl World {
         rule: &str,
         options: Value,
     ) -> Vec<lighthouse_model::Diagnostic> {
+        self.try_diagnose_with(catalog, subject, rule, options)
+            .unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Like [`World::diagnose_with`], and the reason when the run left notices
+    /// or did not finish.
+    pub fn try_diagnose_with(
+        &self,
+        catalog: &Catalog,
+        subject: &Subject,
+        rule: &str,
+        options: Value,
+    ) -> Result<Vec<lighthouse_model::Diagnostic>, String> {
         let dir = tempfile::tempdir().unwrap();
         for (path, fragment) in self.fragments() {
             let target = dir.path().join(path);
@@ -547,13 +560,16 @@ impl World {
             .unwrap()
             .check(&[], &[rule.to_owned()])
             .unwrap();
-        assert!(outcome.notices.is_empty(), "{:?}", outcome.notices);
-        assert!(
-            outcome.incomplete.is_empty(),
-            "the check did not finish: {:?}",
-            outcome.incomplete
-        );
-        outcome.diagnostics
+        if !outcome.notices.is_empty() {
+            return Err(format!("{:?}", outcome.notices));
+        }
+        if !outcome.incomplete.is_empty() {
+            return Err(format!(
+                "the check did not finish: {:?}",
+                outcome.incomplete
+            ));
+        }
+        Ok(outcome.diagnostics)
     }
 
     pub fn names(&self, found: &[(String, u32)]) -> Vec<String> {

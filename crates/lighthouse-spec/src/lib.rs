@@ -42,8 +42,8 @@ pub use env::{Env, base};
 pub use error::Error;
 pub use example::{Example, ExampleFile, ExampleKind, Expect};
 pub use expression::{
-    Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, parse_template,
-    program_calls, program_identifiers,
+    Call, SUBJECT_VARIABLES, TemplatePart, children, free_variables, identifiers, is_empty_list,
+    parse_template, program_calls, program_identifiers,
 };
 pub use files::{Listing, ProjectFiles};
 pub use fix::{CommandSpec, Fix, FixKind, FixScope};

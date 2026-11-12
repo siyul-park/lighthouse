@@ -65,6 +65,11 @@ pub fn children(expr: &IdedExpr) -> Vec<&IdedExpr> {
     }
 }
 
+/// Whether the expression is the list `[]`.
+pub fn is_empty_list(expr: &IdedExpr) -> bool {
+    matches!(&expr.expr, Expr::List(list) if list.elements.is_empty())
+}
+
 /// The identifiers a program names: its variables, the variables its
 /// comprehensions bind, and the functions it calls.
 pub fn program_identifiers(program: &cel::Program) -> BTreeSet<String> {

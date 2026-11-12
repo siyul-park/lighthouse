@@ -14,6 +14,10 @@ mod tests;
 
 use std::{cell::Cell, fmt, rc::Rc};
 
+/// The most steps of reading one decision: variables are inlined, so a
+/// chain of variables that each use the one before twice grows by powers.
+const MAX_STEPS: usize = 20_000;
+
 use cel::{
     Program,
     common::ast::{
@@ -53,7 +57,7 @@ impl std::error::Error for Reject {}
 #[derive(Clone)]
 enum Binding<'a> {
     /// An expression, read in the scope it was written in.
-    Value(&'a IdedExpr, Scope<'a>),
+    Value(&'a IdedExpr, Scope<'a>, Used),
     /// A variable with parameters, applied by name.
     Macro(&'a [String], &'a IdedExpr),
     /// A member of a child list.
@@ -61,6 +65,50 @@ enum Binding<'a> {
 }
 
 type Scope<'a> = Option<Rc<Node<'a>>>;
+
+/// Whether a bound value was read: a value the body never reads may fail in
+/// the CEL, which the query would not.
+type Used = Option<Rc<Cell<bool>>>;
+
+/// A body read with its names bound, and the values to check once it is read.
+type Applied<'a> = (&'a IdedExpr, Scope<'a>, Vec<Rc<Cell<bool>>>);
+
+fn mark(used: &Used) {
+    if let Some(flag) = used {
+        flag.set(true);
+    }
+}
+
+/// `read`, unless a value it bound was never read.
+fn settled<T>(flags: &[Rc<Cell<bool>>], read: R<T>) -> R<T> {
+    let read = read?;
+    if flags.iter().any(|f| !f.get()) {
+        return Err(Reject::new("a bound value that is never read"));
+    }
+    Ok(read)
+}
+
+/// How a call is named in a rejection: by the construct, not the operator.
+fn named(name: &str, target: Option<&IdedExpr>) -> String {
+    let operator = match name {
+        "_?_:_" => "ternary",
+        "_+_" => "concatenation or arithmetic",
+        "_-_" | "-_" => "subtraction",
+        "_*_" => "multiplication",
+        "_/_" => "division",
+        "_%_" => "modulo",
+        "_[_]" | "_[?_]" => "index",
+        "@in" => "in",
+        _ => "",
+    };
+    if !operator.is_empty() {
+        return operator.to_owned();
+    }
+    match target.map(|t| &t.expr) {
+        Some(Expr::Ident(space)) => format!("the call `{space}.{name}`"),
+        _ => format!("the call `{name}`"),
+    }
+}
 
 struct Node<'a> {
     name: &'a str,
@@ -106,6 +154,7 @@ pub fn translate(env: &Env, check: &CelCheck, subject: &str) -> R<Ucq> {
     let translator = Translator {
         subject,
         next: Cell::new(0),
+        steps: Cell::new(0),
     };
     let cqs = translator.formula(condition.expression(), &scope)?.dnf()?;
     Ok(Ucq {
@@ -116,7 +165,7 @@ pub fn translate(env: &Env, check: &CelCheck, subject: &str) -> R<Ucq> {
 
 fn binding<'a>(variable: &'a Variable, program: &'a Program, scope: &Scope<'a>) -> Binding<'a> {
     if variable.params.is_empty() {
-        Binding::Value(program.expression(), scope.clone())
+        Binding::Value(program.expression(), scope.clone(), None)
     } else {
         Binding::Macro(&variable.params, program.expression())
     }
@@ -125,24 +174,33 @@ fn binding<'a>(variable: &'a Variable, program: &'a Program, scope: &Scope<'a>) 
 struct Translator<'s> {
     subject: &'s str,
     next: Cell<usize>,
+    steps: Cell<usize>,
 }
 
 /// A value that is a list.
 enum Members {
     Path(Path),
-    Literal(usize),
+    Literal(i64),
     Choice(Box<F>, Box<Members>, Box<Members>),
     Filter { binder: usize, list: Path, cond: F },
 }
 
 /// How a comprehension is written.
 enum Shape<'a> {
-    Bind(Scope<'a>),
+    Bind(Scope<'a>, Rc<Cell<bool>>),
     Exists(usize, Path, F),
     Filter(usize, Path, F),
 }
 
 impl<'a> Translator<'_> {
+    fn step(&self) -> R<()> {
+        self.steps.set(self.steps.get() + 1);
+        if self.steps.get() > MAX_STEPS {
+            return Err(Reject::new("a condition that expands too far"));
+        }
+        Ok(())
+    }
+
     fn fresh(&self) -> usize {
         let id = self.next.get();
         self.next.set(id + 1);
@@ -158,12 +216,7 @@ impl<'a> Translator<'_> {
     }
 
     /// The body of the variable `name` applied to `args`, with its scope.
-    fn apply(
-        &self,
-        name: &str,
-        args: &'a [IdedExpr],
-        scope: &Scope<'a>,
-    ) -> Option<R<(&'a IdedExpr, Scope<'a>)>> {
+    fn apply(&self, name: &str, args: &'a [IdedExpr], scope: &Scope<'a>) -> Option<R<Applied<'a>>> {
         let Some(Binding::Macro(params, body)) = lookup(scope, name) else {
             return None;
         };
@@ -173,10 +226,17 @@ impl<'a> Translator<'_> {
             ))));
         }
         let mut inner: Scope = None;
+        let mut flags = Vec::new();
         for (param, arg) in params.iter().zip(args) {
-            inner = bind(&inner, param, Binding::Value(arg, scope.clone()));
+            let flag = Rc::new(Cell::new(false));
+            flags.push(flag.clone());
+            inner = bind(
+                &inner,
+                param,
+                Binding::Value(arg, scope.clone(), Some(flag)),
+            );
         }
-        Some(Ok((body, inner)))
+        Some(Ok((body, inner, flags)))
     }
 
     /// `cel.bind(name, value, body)` written as a call: the body, with the
@@ -186,7 +246,7 @@ impl<'a> Translator<'_> {
         name: &str,
         args: &'a [IdedExpr],
         scope: &Scope<'a>,
-    ) -> Option<(&'a IdedExpr, Scope<'a>)> {
+    ) -> Option<Applied<'a>> {
         let named = matches!(target.map(|t| &t.expr), Some(Expr::Ident(n)) if n == "cel");
         let [var, value, body] = args else {
             return None;
@@ -194,23 +254,37 @@ impl<'a> Translator<'_> {
         let Expr::Ident(var) = &var.expr else {
             return None;
         };
-        (named && name == "bind")
-            .then(|| (body, bind(scope, var, Binding::Value(value, scope.clone()))))
+        (named && name == "bind").then(|| {
+            let flag = Rc::new(Cell::new(false));
+            let inner = bind(
+                scope,
+                var,
+                Binding::Value(value, scope.clone(), Some(flag.clone())),
+            );
+            (body, inner, vec![flag])
+        })
     }
 
     fn term(&self, e: &'a IdedExpr, scope: &Scope<'a>) -> R<Operand> {
+        self.step()?;
         match &e.expr {
             Expr::Literal(value) => Ok(Operand::Const(constant(value)?)),
             Expr::Ident(name) => match lookup(scope, name) {
-                Some(Binding::Value(x, inner)) => self.term(x, &inner),
+                Some(Binding::Value(x, inner, used)) => {
+                    mark(&used);
+                    self.term(x, &inner)
+                }
                 Some(Binding::Binder(id)) => Ok(Operand::Path(Self::path(Root::Binder(id)))),
                 Some(Binding::Macro(..)) => Err(Reject::new(format!("`{name}` without arguments"))),
                 None if name == self.subject => Ok(Operand::Path(Self::path(Root::Subject))),
                 None if name == "file" => Ok(Operand::Path(Self::path(Root::File))),
                 None if name == "options" => Ok(Operand::Option(Vec::new())),
-                None => Err(Reject::new(format!("variable `{name}`"))),
+                None => Err(Reject::new(format!("pack variable `{name}`"))),
             },
             Expr::Select(select) if !select.test => match self.term(&select.operand, scope)? {
+                Operand::Path(path) if path.offset != 0 => {
+                    Err(Reject::new("arithmetic outside a comparison"))
+                }
                 Operand::Path(mut path) => {
                     path.fields.push(select.field.clone());
                     Ok(Operand::Path(path))
@@ -239,9 +313,10 @@ impl<'a> Translator<'_> {
                 scope,
             ),
             Expr::Comprehension(c) => match self.shape(c, scope)? {
-                Shape::Bind(inner) => self.term(&c.result, &inner),
+                Shape::Bind(inner, used) => settled(&[used], self.term(&c.result, &inner)),
                 _ => Err(Reject::new("a comprehension as a value")),
             },
+            Expr::Select(_) => Err(Reject::new("has()")),
             _ => Err(Reject::new("an expression that is not a value")),
         }
     }
@@ -253,50 +328,62 @@ impl<'a> Translator<'_> {
         args: &'a [IdedExpr],
         scope: &Scope<'a>,
     ) -> R<Operand> {
-        if let Some((body, inner)) = Self::bound(target, name, args, scope) {
-            return self.term(body, &inner);
+        if let Some((body, inner, flags)) = Self::bound(target, name, args, scope) {
+            return settled(&flags, self.term(body, &inner));
         }
         if target.is_none()
             && let Some(applied) = self.apply(name, args, scope)
         {
-            let (body, inner) = applied?;
-            return self.term(body, &inner);
+            let (body, inner, flags) = applied?;
+            return settled(&flags, self.term(body, &inner));
         }
-        let sign = match name {
+        let sign: i64 = match name {
             ADD => 1,
             SUBSTRACT => -1,
             NEGATE => {
                 return match args.first().map(|a| self.term(a, scope)) {
-                    Some(Ok(Operand::Const(Const::Int(n)))) => Ok(Operand::Const(Const::Int(-n))),
-                    _ => Err(Reject::new("arithmetic")),
+                    Some(Ok(Operand::Const(Const::Int(n)))) => n
+                        .checked_neg()
+                        .map(|n| Operand::Const(Const::Int(n)))
+                        .ok_or_else(overflow),
+                    _ => Err(Reject::new("negation of a field")),
                 };
             }
-            other => return Err(Reject::new(format!("the call `{other}`"))),
+            other => return Err(Reject::new(named(other, target))),
         };
         let [a, b] = args else {
             return Err(Reject::new("arithmetic"));
         };
+        let shift = |k: i64| k.checked_mul(sign).ok_or_else(overflow);
         match (self.term(a, scope)?, self.term(b, scope)?) {
-            (Operand::Const(Const::Int(x)), Operand::Const(Const::Int(y))) => {
-                Ok(Operand::Const(Const::Int(x + sign * y)))
-            }
+            (Operand::Const(Const::Int(x)), Operand::Const(Const::Int(y))) => x
+                .checked_add(shift(y)?)
+                .map(|n| Operand::Const(Const::Int(n)))
+                .ok_or_else(overflow),
             (Operand::Path(mut p), Operand::Const(Const::Int(k))) => {
-                p.offset += sign * k;
+                p.offset = p.offset.checked_add(shift(k)?).ok_or_else(overflow)?;
                 Ok(Operand::Path(p))
             }
             (Operand::Const(Const::Int(k)), Operand::Path(mut p)) if sign == 1 => {
-                p.offset += k;
+                p.offset = p.offset.checked_add(k).ok_or_else(overflow)?;
                 Ok(Operand::Path(p))
+            }
+            (Operand::Const(Const::Str(_)), _) | (_, Operand::Const(Const::Str(_))) => {
+                Err(Reject::new("concatenation"))
             }
             _ => Err(Reject::new("arithmetic of fields")),
         }
     }
 
     fn formula(&self, e: &'a IdedExpr, scope: &Scope<'a>) -> R<F> {
+        self.step()?;
         match &e.expr {
             Expr::Literal(LiteralValue::Boolean(b)) => Ok(F::Lit(*b.inner())),
             Expr::Ident(name) => match lookup(scope, name) {
-                Some(Binding::Value(x, inner)) => self.formula(x, &inner),
+                Some(Binding::Value(x, inner, used)) => {
+                    mark(&used);
+                    self.formula(x, &inner)
+                }
                 _ => self.truth(e, scope),
             },
             Expr::Select(_) => self.truth(e, scope),
@@ -307,7 +394,7 @@ impl<'a> Translator<'_> {
                 scope,
             ),
             Expr::Comprehension(c) => match self.shape(c, scope)? {
-                Shape::Bind(inner) => self.formula(&c.result, &inner),
+                Shape::Bind(inner, used) => settled(&[used], self.formula(&c.result, &inner)),
                 Shape::Exists(binder, list, cond) => Ok(F::Has {
                     binder,
                     list,
@@ -335,14 +422,14 @@ impl<'a> Translator<'_> {
         args: &'a [IdedExpr],
         scope: &Scope<'a>,
     ) -> R<F> {
-        if let Some((body, inner)) = Self::bound(target, name, args, scope) {
-            return self.formula(body, &inner);
+        if let Some((body, inner, flags)) = Self::bound(target, name, args, scope) {
+            return settled(&flags, self.formula(body, &inner));
         }
         if target.is_none()
             && let Some(applied) = self.apply(name, args, scope)
         {
-            let (body, inner) = applied?;
-            return self.formula(body, &inner);
+            let (body, inner, flags) = applied?;
+            return settled(&flags, self.formula(body, &inner));
         }
         let operands: Vec<&'a IdedExpr> = target.into_iter().chain(args).collect();
         match (name, operands.as_slice()) {
@@ -368,14 +455,14 @@ impl<'a> Translator<'_> {
             (IN, [a, b]) => {
                 let (left, right) = (self.term(a, scope)?, self.term(b, scope)?);
                 if matches!(right, Operand::Path(_)) {
-                    return Err(Reject::new("membership in a field list"));
+                    return Err(Reject::new("membership in a field"));
                 }
                 compare(left, Op::In, right)
             }
             ("startsWith", [a, b]) => self.comparison(Op::Starts, a, b, scope),
             ("endsWith", [a, b]) => self.comparison(Op::Ends, a, b, scope),
             ("contains", [a, b]) => self.comparison(Op::Contains, a, b, scope),
-            (other, _) => Err(Reject::new(format!("the call `{other}`"))),
+            (other, _) => Err(Reject::new(named(other, target))),
         }
     }
 
@@ -395,7 +482,7 @@ impl<'a> Translator<'_> {
         };
         if let Some(counted) = counted {
             let Operand::Const(Const::Int(k)) = self.term(other, scope)? else {
-                return Err(Reject::new("size compared with a non-literal"));
+                return Err(Reject::new("a size compared with a non-literal"));
             };
             return self.sized(self.members(counted, scope)?, op, k);
         }
@@ -440,7 +527,7 @@ impl<'a> Translator<'_> {
             _ => n >= k,
         };
         match list {
-            Members::Literal(n) => Ok(F::Lit(holds(i64::try_from(n).unwrap_or(i64::MAX)))),
+            Members::Literal(n) => Ok(F::Lit(holds(n))),
             Members::Choice(c, a, b) => {
                 let (a, b) = (self.sized(*a, op, k)?, self.sized(*b, op, k)?);
                 self.choice(&c, a, b)
@@ -471,10 +558,25 @@ impl<'a> Translator<'_> {
     }
 
     fn members(&self, e: &'a IdedExpr, scope: &Scope<'a>) -> R<Members> {
+        self.step()?;
         match &e.expr {
-            Expr::List(list) => Ok(Members::Literal(list.elements.len())),
+            Expr::List(list) => {
+                if list
+                    .elements
+                    .iter()
+                    .any(|item| !matches!(item.expr, Expr::Literal(_)))
+                {
+                    return Err(Reject::new("a list literal of computed elements"));
+                }
+                Ok(Members::Literal(
+                    i64::try_from(list.elements.len()).map_err(|_| overflow())?,
+                ))
+            }
             Expr::Ident(name) => match lookup(scope, name) {
-                Some(Binding::Value(x, inner)) => self.members(x, &inner),
+                Some(Binding::Value(x, inner, used)) => {
+                    mark(&used);
+                    self.members(x, &inner)
+                }
                 _ => self.members_path(e, scope),
             },
             Expr::Select(_) => self.members_path(e, scope),
@@ -486,22 +588,22 @@ impl<'a> Translator<'_> {
                 ))
             }
             Expr::Call(call)
-                if let Some((body, inner)) =
+                if let Some((body, inner, flags)) =
                     Self::bound(call.target.as_deref(), &call.func_name, &call.args, scope) =>
             {
-                self.members(body, &inner)
+                settled(&flags, self.members(body, &inner))
             }
             Expr::Call(call) if call.target.is_none() => {
                 match self.apply(&call.func_name, &call.args, scope) {
                     Some(applied) => {
-                        let (body, inner) = applied?;
-                        self.members(body, &inner)
+                        let (body, inner, flags) = applied?;
+                        settled(&flags, self.members(body, &inner))
                     }
-                    None => Err(Reject::new(format!("the call `{}`", call.func_name))),
+                    None => Err(Reject::new(named(&call.func_name, None))),
                 }
             }
             Expr::Comprehension(c) => match self.shape(c, scope)? {
-                Shape::Bind(inner) => self.members(&c.result, &inner),
+                Shape::Bind(inner, used) => settled(&[used], self.members(&c.result, &inner)),
                 Shape::Filter(binder, list, cond) => Ok(Members::Filter { binder, list, cond }),
                 Shape::Exists(..) => Err(Reject::new("a condition as a list")),
             },
@@ -511,6 +613,9 @@ impl<'a> Translator<'_> {
 
     fn members_path(&self, e: &'a IdedExpr, scope: &Scope<'a>) -> R<Members> {
         match self.term(e, scope)? {
+            Operand::Path(path) if path.offset != 0 => {
+                Err(Reject::new("arithmetic outside a comparison"))
+            }
             Operand::Path(path) => Ok(Members::Path(path)),
             _ => Err(Reject::new("a list that is not a field")),
         }
@@ -518,14 +623,15 @@ impl<'a> Translator<'_> {
 
     /// Reads a comprehension as `cel.bind`, `exists` or `filter`.
     fn shape(&self, c: &'a ComprehensionExpr, scope: &Scope<'a>) -> R<Shape<'a>> {
-        let empty_list = |e: &IdedExpr| matches!(&e.expr, Expr::List(l) if l.elements.is_empty());
         let literal = |e: &IdedExpr, want: bool| matches!(&e.expr, Expr::Literal(LiteralValue::Boolean(b)) if *b.inner() == want);
-        if empty_list(&c.iter_range) && literal(&c.loop_cond, false) {
-            return Ok(Shape::Bind(bind(
+        if lighthouse_spec::is_empty_list(&c.iter_range) && literal(&c.loop_cond, false) {
+            let flag = Rc::new(Cell::new(false));
+            let inner = bind(
                 scope,
                 &c.accu_var,
-                Binding::Value(&c.accu_init, scope.clone()),
-            )));
+                Binding::Value(&c.accu_init, scope.clone(), Some(flag.clone())),
+            );
+            return Ok(Shape::Bind(inner, flag));
         }
         let step = match &c.loop_step.expr {
             Expr::Call(call) => call,
@@ -533,7 +639,7 @@ impl<'a> Translator<'_> {
         };
         let wanted = if literal(&c.accu_init, false) && step.func_name == LOGICAL_OR {
             step.args.get(1)
-        } else if empty_list(&c.accu_init) && step.func_name == CONDITIONAL {
+        } else if lighthouse_spec::is_empty_list(&c.accu_init) && step.func_name == CONDITIONAL {
             step.args.first()
         } else {
             let all = literal(&c.accu_init, true) && step.func_name == LOGICAL_AND;
@@ -542,8 +648,10 @@ impl<'a> Translator<'_> {
         let Some(cond) = wanted else {
             return Err(Reject::new("a comprehension"));
         };
-        let Operand::Path(list) = self.term(&c.iter_range, scope)? else {
-            return Err(Reject::new("a comprehension over a computed list"));
+        let list = match self.term(&c.iter_range, scope)? {
+            Operand::Path(list) if list.offset == 0 => list,
+            Operand::Path(_) => return Err(Reject::new("arithmetic outside a comparison")),
+            _ => return Err(Reject::new("a comprehension over a computed list")),
         };
         let binder = self.fresh();
         let inner = bind(scope, &c.iter_var, Binding::Binder(binder));
@@ -598,16 +706,28 @@ fn compare(mut left: Operand, mut op: Op, mut right: Operand) -> R<F> {
         }
         _ => {}
     }
-    if let (Operand::Path(path), Operand::Const(Const::Int(k))) = (&mut left, &mut right)
+    if let Operand::Path(path) = &mut left
         && path.offset != 0
     {
-        *k -= path.offset;
-        path.offset = 0;
+        match &mut right {
+            Operand::Const(Const::Int(k)) => {
+                *k = k.checked_sub(path.offset).ok_or_else(overflow)?;
+                path.offset = 0;
+            }
+            Operand::Option(_) if !matches!(op, Op::In | Op::NotIn) => {}
+            _ => return Err(Reject::new("arithmetic outside a comparison with a number")),
+        }
     }
     if matches!(op, Op::Lt | Op::Le | Op::Gt | Op::Ge)
-        && matches!(&right, Operand::Const(c) if !matches!(c, Const::Int(_)))
+        && matches!(&right, Operand::Const(c) if !matches!(c, Const::Int(_) | Const::Str(_)))
     {
-        return Err(Reject::new("an order between values that are not numbers"));
+        return Err(Reject::new(
+            "an order between values that are not numbers or texts",
+        ));
     }
     Ok(F::Cmp(Cmp { left, op, right }))
+}
+
+fn overflow() -> Reject {
+    Reject::new("an integer that overflows")
 }

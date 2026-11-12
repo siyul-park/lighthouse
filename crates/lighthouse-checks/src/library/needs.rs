@@ -153,7 +153,7 @@ impl Needs {
             }
             Expr::Comprehension(comprehension) => {
                 let positional = self.is_range(&comprehension.iter_range);
-                let binds_range = is_empty_list(&comprehension.iter_range)
+                let binds_range = lighthouse_spec::is_empty_list(&comprehension.iter_range)
                     && self.is_range(&comprehension.accu_init);
                 if positional {
                     self.positions.push(comprehension.iter_var.clone());
@@ -245,7 +245,7 @@ impl Needs {
                     || (call.func_name == "range"
                         && matches!(call.target.as_deref().map(|t| &t.expr), Some(Expr::Ident(n)) if n == "lists"))
             }
-            Expr::Comprehension(c) if is_empty_list(&c.iter_range) => {
+            Expr::Comprehension(c) if lighthouse_spec::is_empty_list(&c.iter_range) => {
                 // `list.sortBy(e, key)` is `cel.bind(input, list, input.@sortByAssociatedKeys(..))`.
                 self.is_range(&c.accu_init)
                     && matches!(&c.result.expr, Expr::Call(call)
@@ -257,11 +257,6 @@ impl Needs {
             _ => false,
         }
     }
-}
-
-/// Whether the expression is the list `[]`.
-fn is_empty_list(expr: &IdedExpr) -> bool {
-    matches!(&expr.expr, Expr::List(list) if list.elements.is_empty())
 }
 
 /// Whether the step of a comprehension appends the iteration variable itself

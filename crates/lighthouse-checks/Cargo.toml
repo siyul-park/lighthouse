@@ -29,7 +29,6 @@ toml.workspace = true
 [dev-dependencies]
 lighthouse-engine.workspace = true
 lighthouse-logic.workspace = true
-lang-cel.workspace = true
 lighthouse-rpc.workspace = true
 tempfile.workspace = true
 lighthouse-test-support = { path = "../lighthouse-test-support" }

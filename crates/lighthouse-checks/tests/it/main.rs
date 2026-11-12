@@ -18,6 +18,7 @@ mod edge_anchor;
 mod fixes;
 mod func_facts;
 mod go;
+mod ir_subjects;
 mod layout;
 mod level_solve;
 mod levels;

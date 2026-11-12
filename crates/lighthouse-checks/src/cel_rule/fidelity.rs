@@ -50,24 +50,44 @@ impl Shape {
             .fold(self, |shape, f| shape.fields.entry(f.clone()).or_default())
     }
 
-    fn make(&self, dice: &mut Dice) -> Value {
+    /// A value of this shape. With `lax`, fields are sometimes missing.
+    fn make(&self, dice: &mut Dice, lax: bool) -> Value {
         // A container read both as a list and by its fields is a record that is
         // sometimes empty.
         let record = self.members.is_some() && !self.fields.is_empty();
         if record && self.count.map_or(dice.below(4) == 0, |n| n == 0) {
             return json!({});
         }
-        if let (Some(members), true) = (&self.members, self.fields.is_empty()) {
+        // A path read by its fields and compared with a constant is sometimes
+        // that constant (`module.parent == null`).
+        if !self.fields.is_empty() && !self.values.is_empty() && dice.below(2) == 0 {
+            return self.values[dice.below(self.values.len())].clone();
+        }
+        if let Some(members) = &self.members
+            && self.fields.is_empty()
+        {
             let count = self.count.unwrap_or_else(|| dice.below(3));
-            return Value::Array((0..count).map(|_| members.make(dice)).collect());
+            let plain =
+                members.fields.is_empty() && members.values.is_empty() && members.members.is_none();
+            // Only its size is read: a list, a map or a text.
+            if plain {
+                return match dice.below(3) {
+                    0 => Value::Array(vec![json!(0); count]),
+                    1 => Value::Object((0..count).map(|i| (format!("k{i}"), json!(i))).collect()),
+                    _ => json!("a".repeat(count)),
+                };
+            }
+            return Value::Array((0..count).map(|_| members.make(dice, lax)).collect());
         }
         if !self.fields.is_empty() {
-            return Value::Object(
-                self.fields
-                    .iter()
-                    .map(|(k, s)| (k.clone(), s.make(dice)))
-                    .collect(),
-            );
+            let mut object = Map::new();
+            for (name, shape) in &self.fields {
+                if lax && dice.below(10) == 0 {
+                    continue;
+                }
+                object.insert(name.clone(), shape.make(dice, lax));
+            }
+            return Value::Object(object);
         }
         let pool: Vec<&Value> = self.values.iter().collect();
         pool.get(dice.below(pool.len()))
@@ -84,7 +104,17 @@ fn around(constant: &Value) -> Vec<Value> {
     match constant {
         Value::Number(n) => {
             let k = n.as_i64().unwrap_or(0);
-            vec![json!(k - 1), json!(k), json!(k + 1), json!(0), json!(1000)]
+            let f = k as f64;
+            vec![
+                json!(k - 1),
+                json!(k),
+                json!(k + 1),
+                json!(0),
+                json!(1000),
+                json!(f),
+                json!(f + 0.5),
+                json!(f - 0.5),
+            ]
         }
         Value::String(s) => vec![
             json!(s),
@@ -221,27 +251,38 @@ fn place(cq: &Cq, options: &Value, satisfy: bool, subject: &mut Shape, file: &mu
     }
 }
 
-/// The options with each number moved and each flag flipped.
-fn varied(options: &Map<String, Value>) -> Value {
-    let moved = options
-        .iter()
-        .map(|(k, v)| {
-            let v = match v {
-                Value::Number(n) if n.is_i64() => json!(n.as_i64().unwrap_or(0) + 1),
-                Value::Bool(b) => json!(!b),
-                other => other.clone(),
-            };
-            (k.clone(), v)
-        })
-        .collect();
-    Value::Object(moved)
+/// The options moved one way: numbers by one, flags flipped, a list gaining or
+/// losing an item and a text growing or shrinking.
+fn moved(options: &Map<String, Value>, up: bool) -> Value {
+    let step = |v: &Value| match v {
+        Value::Number(n) if n.is_i64() => json!(n.as_i64().unwrap_or(0) + if up { 1 } else { -1 }),
+        Value::Bool(b) => json!(!b),
+        Value::Array(items) => {
+            let mut items = items.clone();
+            if up {
+                items.push(json!("zz"));
+            } else if !items.is_empty() {
+                items.remove(0);
+            }
+            Value::Array(items)
+        }
+        Value::String(text) => {
+            let mut text = text.clone();
+            if up {
+                text.push('x');
+            } else {
+                text.pop();
+            }
+            json!(text)
+        }
+        other => other.clone(),
+    };
+    Value::Object(options.iter().map(|(k, v)| (k.clone(), step(v))).collect())
 }
 
 #[test]
 fn the_query_of_every_translated_decision_agrees_with_its_cel() {
-    let mut libraries = lighthouse_plugin::Registry::default();
-    libraries.register(&lang_cel::Cel::new()).unwrap();
-    let comp = crate::compose(&libraries).unwrap();
+    let comp = crate::compose(&lighthouse_test_support::libraries()).unwrap();
     let bundled = comp.bundled().unwrap();
     let (mut translated, mut rejected, mut compared) =
         (Vec::new(), BTreeMap::<String, String>::new(), 0usize);
@@ -261,45 +302,63 @@ fn the_query_of_every_translated_decision_agrees_with_its_cel() {
             }
         };
         let rule = CelRule::new(&comp, decision, check).unwrap();
-        let language = decision.languages.keys().next().cloned();
-        let defaults = rule_options(decision, &Options::default(), language.as_deref())
-            .unwrap_or_else(|e| panic!("{id}: {e}"));
+        let languages: Vec<Option<String>> = match decision.languages.keys().next() {
+            None => vec![None],
+            Some(_) => decision.languages.keys().cloned().map(Some).collect(),
+        };
+        let trivial = ucq.cqs.is_empty() || ucq.cqs.iter().any(|cq| *cq == Cq::default());
+        let mut witnessed = vec![false; ucq.cqs.len()];
         let mut checked = 0;
         let mut seen = [false, false];
-        for (round, options) in [Value::Object(defaults.clone()), varied(&defaults)]
-            .iter()
-            .enumerate()
-        {
-            let mut dice = Dice(0x9E37_79B9_7F4A_7C15 ^ (round as u64 + 1));
-            for at in 0..SAMPLES {
-                // Half of the samples are built to satisfy one conjunction.
-                let only = (at % 2 == 1 && !ucq.cqs.is_empty())
-                    .then(|| &ucq.cqs[dice.below(ucq.cqs.len())]);
-                let (subject, file) = shapes(&ucq, options, only);
-                let (s, f) = (subject.make(&mut dice), file.make(&mut dice));
-                let expected = judge(&rule, &id, select.variable(), &s, &f, options);
-                let Some(expected) = expected else { continue };
-                checked += 1;
-                seen[usize::from(expected)] = true;
-                assert_eq!(
-                    ucq.holds(&s, &f, options),
-                    expected,
-                    "{id}: the query and the CEL differ on subject {s} file {f} options {options}\n{ucq}"
-                );
+        for language in &languages {
+            let defaults = rule_options(decision, &Options::default(), language.as_deref())
+                .unwrap_or_else(|e| panic!("{id}: {e}"));
+            let sets = [
+                Value::Object(defaults.clone()),
+                moved(&defaults, true),
+                moved(&defaults, false),
+            ];
+            for (round, options) in sets.iter().enumerate() {
+                let mut dice = Dice(0x9E37_79B9_7F4A_7C15 ^ (round as u64 + 1));
+                for at in 0..SAMPLES {
+                    // Half of the samples are built to satisfy one conjunction.
+                    let only = (at % 2 == 1 && !ucq.cqs.is_empty())
+                        .then(|| &ucq.cqs[dice.below(ucq.cqs.len())]);
+                    let lax = at % 5 == 4;
+                    let (subject, file) = shapes(&ucq, options, only);
+                    let (s, f) = (subject.make(&mut dice, lax), file.make(&mut dice, lax));
+                    let expected = judge(&rule, &id, select.variable(), &s, &f, options);
+                    let Some(expected) = expected else { continue };
+                    checked += 1;
+                    seen[usize::from(expected)] = true;
+                    assert_eq!(
+                        ucq.holds(&s, &f, options),
+                        expected,
+                        "{id}: the query and the CEL differ on subject {s} file {f} options {options}\n{ucq}"
+                    );
+                    if expected {
+                        for (at, cq) in ucq.cqs.iter().enumerate() {
+                            let one = Ucq {
+                                cqs: vec![cq.clone()],
+                                binders: ucq.binders,
+                            };
+                            witnessed[at] |= one.holds(&s, &f, options);
+                        }
+                    }
+                }
             }
         }
         assert!(
             checked >= MIN_COMPARED,
-            "{id}: only {checked} samples ran in the CEL ({SAMPLES} each); the generator does not reach its fields\n{ucq}"
+            "{id}: only {checked} samples ran in the CEL; the generator does not reach its fields\n{ucq}"
         );
-        let trivial = ucq.cqs.is_empty()
-            || ucq
-                .cqs
-                .iter()
-                .any(|cq| cq.atoms.is_empty() && cq.cmps.is_empty() && cq.empties.is_empty());
         assert!(
             trivial || seen == [true, true],
             "{id} {seen:?} {checked}: the samples reached only one verdict, so they cannot tell the query from the CEL\n{ucq}"
+        );
+        assert!(
+            trivial || witnessed.iter().all(|w| *w),
+            "{id} {witnessed:?}: a conjunction was never the witness of a violation\n{ucq}"
         );
         compared += checked;
         translated.push(id);
@@ -307,6 +366,35 @@ fn the_query_of_every_translated_decision_agrees_with_its_cel() {
     eprintln!("translated {}: {translated:?}", translated.len());
     eprintln!("rejected {}: {rejected:#?}", rejected.len());
     assert!(!translated.is_empty() && compared > 0);
+}
+
+#[test]
+fn the_forms_production_parses_are_translated() {
+    let comp = crate::compose(&lighthouse_test_support::libraries()).unwrap();
+    let program = comp.cel().compile("cel.bind(k, symbol.n, k > 2)").unwrap();
+    // `cel.bind` is a macro in the composed environment, not a call.
+    assert!(matches!(
+        program.expression().expr,
+        cel::common::ast::Expr::Comprehension(_)
+    ));
+    let check = |condition: &str| -> lighthouse_spec::CelCheck {
+        serde_json::from_value(json!({"where": condition, "message": "m"})).unwrap()
+    };
+
+    let bound =
+        lighthouse_logic::translate(comp.cel(), &check("cel.bind(k, symbol.n, k > 2)"), "symbol");
+    let regex = lighthouse_logic::translate(
+        comp.cel(),
+        &check("regex.matches(symbol.name, 'a')"),
+        "symbol",
+    );
+
+    assert!(
+        bound
+            .unwrap()
+            .holds(&json!({"n": 3}), &json!(null), &json!({}))
+    );
+    assert_eq!(regex.unwrap_err().0, "the call `regex.matches`");
 }
 
 /// What the CEL says of the subject, `None` when it fails on it (an

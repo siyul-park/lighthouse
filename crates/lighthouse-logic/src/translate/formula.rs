@@ -9,6 +9,9 @@ use super::{R, Reject};
 /// The most conjunctions a decision may expand to.
 const MAX_CQS: usize = 4096;
 
+/// The most literals one conjunction may hold.
+const MAX_LITERALS: usize = 256;
+
 /// A condition on the subject, before it is a query.
 #[derive(Debug, Clone)]
 pub(super) enum F {
@@ -76,7 +79,15 @@ impl F {
                     all = all
                         .iter()
                         .flat_map(|a| next.iter().map(move |b| merged(a, b)))
-                        .collect();
+                        .map(|cq| {
+                            let literals =
+                                cq.atoms.len() + cq.cmps.len() + cq.empties.len() + cq.filled.len();
+                            if literals > MAX_LITERALS {
+                                return Err(Reject::new("a conjunction of too many conditions"));
+                            }
+                            Ok(cq)
+                        })
+                        .collect::<R<_>>()?;
                 }
                 Ok(all)
             }

@@ -1,5 +1,7 @@
 //! The evaluator of a [`Ucq`] over the JSON fact value of a subject: a
-//! nested-loop join over the lists the atoms name.
+//! nested-loop join over the containers the atoms name.
+
+use std::cmp::Ordering;
 
 use serde_json::Value;
 
@@ -12,21 +14,25 @@ struct Facts<'v> {
     options: &'v Value,
 }
 
+/// The members the atoms have bound, by binder.
+type Members = Vec<Option<Value>>;
+
 impl Ucq {
-    /// Whether the subject violates the decision. A path that the facts lack
-    /// makes its comparison false, as an execution error is no violation.
+    /// Whether the subject violates the decision. The query is false where the
+    /// CEL gives no verdict (a path the facts lack, a comparison of values
+    /// that do not compare); a run of the check reports those as incomplete.
     pub fn holds(&self, subject: &Value, file: &Value, options: &Value) -> bool {
         let facts = Facts {
             subject,
             file,
             options,
         };
-        let mut members: Vec<Option<&Value>> = vec![None; self.binders];
+        let mut members: Members = vec![None; self.binders];
         self.cqs.iter().any(|cq| join(cq, 0, &facts, &mut members))
     }
 }
 
-fn join<'v>(cq: &Cq, at: usize, facts: &Facts<'v>, members: &mut Vec<Option<&'v Value>>) -> bool {
+fn join(cq: &Cq, at: usize, facts: &Facts, members: &mut Members) -> bool {
     let Some(atom) = cq.atoms.get(at) else {
         return cq
             .empties
@@ -38,20 +44,30 @@ fn join<'v>(cq: &Cq, at: usize, facts: &Facts<'v>, members: &mut Vec<Option<&'v 
                 .all(|p| size(p, facts, members).is_some_and(|n| n > 0))
             && cq.cmps.iter().all(|c| compares(c, facts, members));
     };
-    let Some(Value::Array(items)) = reach(&atom.list, facts, members) else {
+    let Some(items) = reach(&atom.list, facts, members).and_then(elements) else {
         return false;
     };
-    items.iter().any(|item| {
+    items.into_iter().any(|item| {
         members[atom.binder] = Some(item);
         join(cq, at + 1, facts, members)
     })
 }
 
-fn reach<'v>(path: &Path, facts: &Facts<'v>, members: &[Option<&'v Value>]) -> Option<&'v Value> {
+/// What `exists` and `filter` range over: the items of a list, the keys of a
+/// map.
+fn elements(container: &Value) -> Option<Vec<Value>> {
+    match container {
+        Value::Array(items) => Some(items.clone()),
+        Value::Object(map) => Some(map.keys().cloned().map(Value::String).collect()),
+        _ => None,
+    }
+}
+
+fn reach<'a>(path: &Path, facts: &'a Facts, members: &'a Members) -> Option<&'a Value> {
     let root = match path.root {
         Root::Subject => facts.subject,
         Root::File => facts.file,
-        Root::Binder(id) => (*members.get(id)?)?,
+        Root::Binder(id) => members.get(id)?.as_ref()?,
     };
     path.fields
         .iter()
@@ -59,7 +75,7 @@ fn reach<'v>(path: &Path, facts: &Facts<'v>, members: &[Option<&'v Value>]) -> O
 }
 
 /// The size of a list, a map or a text; `None` when there is none to measure.
-fn size(path: &Path, facts: &Facts, members: &[Option<&Value>]) -> Option<usize> {
+fn size(path: &Path, facts: &Facts, members: &Members) -> Option<usize> {
     match reach(path, facts, members)? {
         Value::Array(items) => Some(items.len()),
         Value::Object(map) => Some(map.len()),
@@ -68,7 +84,7 @@ fn size(path: &Path, facts: &Facts, members: &[Option<&Value>]) -> Option<usize>
     }
 }
 
-fn operand(side: &Operand, facts: &Facts, members: &[Option<&Value>]) -> Option<Value> {
+fn operand(side: &Operand, facts: &Facts, members: &Members) -> Option<Value> {
     match side {
         Operand::Const(value) => Some(json(value)),
         Operand::Option(fields) => fields
@@ -80,7 +96,10 @@ fn operand(side: &Operand, facts: &Facts, members: &[Option<&Value>]) -> Option<
             if path.offset == 0 {
                 return Some(value.clone());
             }
-            value.as_i64().map(|n| Value::from(n + path.offset))
+            value
+                .as_i64()
+                .and_then(|n| n.checked_add(path.offset))
+                .map(Value::from)
         }
     }
 }
@@ -95,17 +114,28 @@ fn json(value: &Const) -> Value {
     }
 }
 
-fn same(a: &Value, b: &Value) -> bool {
-    match (a.as_i64(), b.as_i64()) {
-        (Some(x), Some(y)) => x == y,
-        _ => match (a, b) {
-            (Value::Number(x), Value::Number(y)) => x.as_f64() == y.as_f64(),
-            _ => a == b,
+/// The order of two numbers, as CEL compares them: integers as integers, an
+/// integer and a double as doubles; two texts in order. Nothing else is
+/// ordered.
+fn order(a: &Value, b: &Value) -> Option<Ordering> {
+    match (a, b) {
+        (Value::String(x), Value::String(y)) => Some(x.cmp(y)),
+        (Value::Number(x), Value::Number(y)) => match (x.as_i64(), y.as_i64()) {
+            (Some(x), Some(y)) => Some(x.cmp(&y)),
+            _ => x.as_f64()?.partial_cmp(&y.as_f64()?),
         },
+        _ => None,
     }
 }
 
-fn compares(cmp: &Cmp, facts: &Facts, members: &[Option<&Value>]) -> bool {
+fn same(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(_), Value::Number(_)) => order(a, b) == Some(Ordering::Equal),
+        _ => a == b,
+    }
+}
+
+fn compares(cmp: &Cmp, facts: &Facts, members: &Members) -> bool {
     let (Some(left), Some(right)) = (
         operand(&cmp.left, facts, members),
         operand(&cmp.right, facts, members),
@@ -115,19 +145,20 @@ fn compares(cmp: &Cmp, facts: &Facts, members: &[Option<&Value>]) -> bool {
     match cmp.op {
         Op::Eq => same(&left, &right),
         Op::Ne => !same(&left, &right),
-        Op::Lt | Op::Le | Op::Gt | Op::Ge => match (left.as_i64(), right.as_i64()) {
-            (Some(x), Some(y)) => match cmp.op {
-                Op::Lt => x < y,
-                Op::Le => x <= y,
-                Op::Gt => x > y,
-                _ => x >= y,
-            },
-            _ => false,
-        },
-        Op::In | Op::NotIn => match &right {
-            Value::Array(items) => items.iter().any(|i| same(&left, i)) == (cmp.op == Op::In),
-            _ => false,
-        },
+        Op::Lt | Op::Le | Op::Gt | Op::Ge => order(&left, &right).is_some_and(|o| match cmp.op {
+            Op::Lt => o == Ordering::Less,
+            Op::Le => o != Ordering::Greater,
+            Op::Gt => o == Ordering::Greater,
+            _ => o != Ordering::Less,
+        }),
+        Op::In | Op::NotIn => {
+            let found = match &right {
+                Value::Array(items) => items.iter().any(|i| same(&left, i)),
+                Value::Object(map) => left.as_str().is_some_and(|key| map.contains_key(key)),
+                _ => return false,
+            };
+            found == (cmp.op == Op::In)
+        }
         Op::Starts | Op::NotStarts | Op::Ends | Op::NotEnds | Op::Contains | Op::NotContains => {
             let (Some(text), Some(part)) = (left.as_str(), right.as_str()) else {
                 return false;

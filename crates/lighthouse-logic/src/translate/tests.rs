@@ -163,3 +163,135 @@ fn a_missing_field_is_no_violation() {
 
     assert!(!ucq.holds(&json!({"func": null}), &json!(null), &json!({})));
 }
+
+fn holds(ucq: &Ucq, subject: Value, options: Value) -> bool {
+    ucq.holds(&subject, &json!(null), &options)
+}
+
+#[test]
+fn not_exists_of_true_is_an_empty_container() {
+    let ucq = query("symbol", json!([]), "!symbol.callers.exists(c, true)").unwrap();
+
+    assert_eq!(ucq.cqs[0].empties.len(), 1);
+    assert!(holds(&ucq, json!({"callers": []}), json!({})));
+    assert!(!holds(&ucq, json!({"callers": [1]}), json!({})));
+}
+
+#[test]
+fn membership_in_an_option_list_or_an_option_map() {
+    let list = query("symbol", json!([]), "symbol.k in options.kinds").unwrap();
+    let map = query("symbol", json!([]), "symbol.k in options.keys").unwrap();
+
+    assert!(holds(
+        &list,
+        json!({"k": "a"}),
+        json!({"kinds": ["a", "b"]})
+    ));
+    assert!(!holds(
+        &list,
+        json!({"k": "c"}),
+        json!({"kinds": ["a", "b"]})
+    ));
+    assert!(holds(&map, json!({"k": "a"}), json!({"keys": {"a": 1}})));
+    assert!(!holds(&map, json!({"k": "b"}), json!({"keys": {"a": 1}})));
+}
+
+#[test]
+fn a_size_is_that_of_a_list_a_map_or_a_text() {
+    let none = query("symbol", json!([]), "size(symbol.x) == 0").unwrap();
+    let some = query("symbol", json!([]), "size(symbol.x) > 0").unwrap();
+
+    for (value, empty) in [
+        (json!(""), true),
+        (json!("ab"), false),
+        (json!({}), true),
+        (json!({"k": 1}), false),
+        (json!([]), true),
+        (json!([1]), false),
+    ] {
+        assert_eq!(
+            holds(&none, json!({"x": value}), json!({})),
+            empty,
+            "{value}"
+        );
+        assert_eq!(
+            holds(&some, json!({"x": value}), json!({})),
+            !empty,
+            "{value}"
+        );
+    }
+}
+
+#[test]
+fn members_of_a_map_are_its_keys() {
+    let ucq = query("symbol", json!([]), "symbol.m.exists(k, k == 'a')").unwrap();
+
+    assert!(holds(&ucq, json!({"m": {"a": 1}}), json!({})));
+    assert!(!holds(&ucq, json!({"m": {"b": 1}}), json!({})));
+}
+
+#[test]
+fn numbers_compare_as_the_cel_compares_them() {
+    let over = query("symbol", json!([]), "symbol.n > 2").unwrap();
+    let after = query("symbol", json!([]), "symbol.s > 'a'").unwrap();
+
+    assert!(holds(&over, json!({"n": 2.5}), json!({})));
+    assert!(!holds(&over, json!({"n": 2.0}), json!({})));
+    assert!(holds(&after, json!({"s": "b"}), json!({})));
+    assert!(!holds(&after, json!({"s": 3}), json!({})));
+}
+
+#[test]
+fn a_chain_of_variables_that_doubles_is_refused_past_a_cap() {
+    let chain = |depth: usize| {
+        let mut variables = vec![json!({"name": "v0", "expression": "symbol.a == 1"})];
+        for at in 1..=depth {
+            let name = format!("v{at}");
+            let expression = format!("v{} && v{}", at - 1, at - 1);
+            variables.push(json!({"name": name, "expression": expression}));
+        }
+        query("symbol", Value::Array(variables), &format!("v{depth}"))
+    };
+
+    assert!(chain(4).is_ok());
+    assert!(chain(10).unwrap_err().0.contains("too many conditions"));
+    assert!(chain(16).unwrap_err().0.contains("expands too far"));
+}
+
+#[test]
+fn a_condition_with_too_many_cases_is_refused() {
+    let case = |at: usize| format!("(symbol.a{at} == 1 || symbol.a{at} == 2)");
+    let all: Vec<String> = (0..13).map(case).collect();
+
+    let found = rejected(&all.join(" && "));
+
+    assert!(found.contains("too many cases"), "{found}");
+}
+
+#[test]
+fn a_bound_value_that_is_never_read_is_refused() {
+    let variables = json!([{"name": "f", "params": ["x"], "expression": "true"}]);
+
+    let unused_bind = rejected("cel.bind(k, symbol.x.y, true)");
+    let unused_param = query("symbol", variables, "f(symbol.a)").unwrap_err().0;
+
+    assert!(unused_bind.contains("never read"), "{unused_bind}");
+    assert!(unused_param.contains("never read"), "{unused_param}");
+}
+
+#[test]
+fn arithmetic_is_only_for_a_comparison_with_a_number() {
+    assert!(rejected("(symbol.callers + 1).exists(c, c.t)").contains("outside a comparison"));
+    assert!(rejected("(symbol.n + 1).y == 1").contains("outside a comparison"));
+    assert!(rejected("symbol.n + 1 == 'a'").contains("outside a comparison"));
+    assert!(rejected("symbol.n + 9223372036854775807 + 1 > 0").contains("overflows"));
+}
+
+#[test]
+fn what_is_refused_is_named_by_its_construct() {
+    assert!(rejected("symbol.a == (symbol.b ? 1 : 2)").contains("ternary"));
+    assert!(rejected("symbol.name == 'a' + symbol.b").contains("concatenation"));
+    assert!(rejected("symbol.m['k'] == 1").contains("index"));
+    assert!(rejected("declaration_group > 1").contains("pack variable"));
+    assert!(rejected("symbol.k in symbol.kinds").contains("membership in a field"));
+}

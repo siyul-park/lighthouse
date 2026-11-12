@@ -60,6 +60,7 @@ lang-cel = { path = "plugins/lang-cel" }
 lighthouse-checks = { path = "crates/lighthouse-checks" }
 lighthouse-graph = { path = "crates/lighthouse-graph" }
 lighthouse-engine = { path = "crates/lighthouse-engine" }
+lighthouse-logic = { path = "crates/lighthouse-logic" }
 lighthouse-ml = { path = "crates/lighthouse-ml" }
 lighthouse-model = { path = "crates/lighthouse-model" }
 lighthouse-plugin = { path = "crates/lighthouse-plugin" }
@@ -69,5 +70,4 @@ lighthouse-report = { path = "crates/lighthouse-report" }
 lighthouse-rpc = { path = "crates/lighthouse-rpc" }
 lighthouse-session = { path = "crates/lighthouse-session" }
 lighthouse-spec = { path = "crates/lighthouse-spec" }
-lighthouse-logic = { path = "crates/lighthouse-logic" }
 lighthouse-store = { path = "crates/lighthouse-store" }

@@ -1920,7 +1920,6 @@ dependencies = [
  "blake3",
  "cel",
  "globset",
- "lang-cel",
  "lighthouse-engine",
  "lighthouse-graph",
  "lighthouse-logic",
