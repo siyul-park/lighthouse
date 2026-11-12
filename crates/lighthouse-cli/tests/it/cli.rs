@@ -290,11 +290,41 @@ fn decision_list_all_shows_status_of_every_decision() {
         .unwrap();
     let text = String::from_utf8(out.stdout).unwrap();
     for line in [
-        "core/max-lines\timplemented\tinfo\tFiles stay small and cohesive",
-        "design/no-duplication\tjudged\tinfo\tBehavior has one implementation",
+        "core/max-lines\timplemented\tinfo\tF\tFiles stay small and cohesive",
+        "design/declaration-groups\timplemented\terror\tO\tDeclarations follow ownership groups",
+        "design/no-duplication\tjudged\tinfo\tT\tBehavior has one implementation",
     ] {
-        assert!(text.lines().any(|l| l == line), "{line}");
+        assert!(
+            text.lines().any(|l| l == line || l.starts_with(line)),
+            "{line}\n{text}"
+        );
     }
+    let footer = text.lines().last().unwrap();
+    assert!(footer.starts_with("tiers: F "), "{footer}");
+}
+
+#[test]
+fn decision_list_json_gives_the_tier_and_its_reason() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = lighthouse(dir.path())
+        .args(["decision", "list", "--all", "--format", "json"])
+        .output()
+        .unwrap();
+    let list: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let item = |id: &str| {
+        list["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["id"] == id)
+            .unwrap_or_else(|| panic!("{id}"))
+            .clone()
+    };
+
+    assert_eq!(item("core/max-lines")["tier"], "F");
+    assert_eq!(item("core/max-lines")["tierReason"], "translated");
+    assert_eq!(item("design/declaration-groups")["tier"], "O");
+    assert_eq!(item("design/owner-file")["tierReason"], "placement");
 }
 
 #[test]

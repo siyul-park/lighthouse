@@ -2139,6 +2139,7 @@ dependencies = [
  "lang-cel",
  "lighthouse-checks",
  "lighthouse-engine",
+ "lighthouse-logic",
  "lighthouse-ml",
  "lighthouse-model",
  "lighthouse-plugin",

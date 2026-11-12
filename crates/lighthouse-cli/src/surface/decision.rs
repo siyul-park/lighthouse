@@ -89,7 +89,7 @@ pub fn list(ctx: &Context, args: &DecisionListArgs, format: Format) -> Result<Re
     let registry = session.in_process_registry()?;
     let enabled = active_decisions(&session)?;
     let fixing = Fixing::of(&session)?;
-    let rows = decision_rows(&session.catalog, &registry, args.all);
+    let rows = decision_rows(&session, &registry, args.all);
     let Page { items, omitted } = page(rows, args.limit);
     let decisions: Vec<DecisionItem> = items
         .into_iter()
@@ -113,14 +113,21 @@ pub fn list(ctx: &Context, args: &DecisionListArgs, format: Format) -> Result<Re
             let _ = if args.all {
                 writeln!(
                     out,
-                    "{}\t{}\t{}\t{}",
-                    row.id, row.status, row.severity, row.title
+                    "{}\t{}\t{}\t{}\t{}",
+                    row.id,
+                    row.status,
+                    row.severity,
+                    row.tier.as_ref().map_or("-", |t| t.tier.as_str()),
+                    row.title
                 )
             } else {
                 writeln!(out, "{}\t{}\t{}", row.id, row.severity, row.title)
             };
         }
         out.push_str(&omitted_line(omitted));
+        if args.all {
+            out.push_str(&tier_line(&list.decisions));
+        }
         out
     })
 }
@@ -314,6 +321,27 @@ pub fn eval(ctx: &Context, args: &DecisionEvalArgs, format: Format) -> Result<Re
         audit: args.audit,
     })?;
     Reply::data(format, &report, || eval_text(&report))
+}
+
+/// How many of the listed decisions are in each tier.
+fn tier_line(items: &[DecisionItem]) -> String {
+    let count = |wanted: &str| {
+        items
+            .iter()
+            .filter(|i| {
+                i.row
+                    .tier
+                    .as_ref()
+                    .is_some_and(|t| t.tier.as_str() == wanted)
+            })
+            .count()
+    };
+    format!(
+        "tiers: F {}, O {}, T {}\n",
+        count("F"),
+        count("O"),
+        count("T")
+    )
 }
 
 /// The answer as text: the verdict, then a line for each finding the edit

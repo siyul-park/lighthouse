@@ -14,6 +14,7 @@ globset.workspace = true
 lang-cel.workspace = true
 lighthouse-checks.workspace = true
 lighthouse-engine.workspace = true
+lighthouse-logic.workspace = true
 lighthouse-ml.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true

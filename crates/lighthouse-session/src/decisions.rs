@@ -9,6 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use lighthouse_logic::Classified;
 use lighthouse_plugin::Registry;
 use lighthouse_report::docs::{Density, decision_markdown};
 use lighthouse_rpc::{StartOptions, Started};
@@ -42,6 +43,10 @@ pub struct DecisionRow {
     pub status: Implementation,
     pub severity: String,
     pub title: String,
+    /// How far the decision can be reasoned about, and why; absent for a rule
+    /// with no decision in the catalog.
+    #[serde(flatten)]
+    pub tier: Option<Classified>,
 }
 
 /// How far a decision is carried out.
@@ -138,7 +143,9 @@ impl TestTimings {
 
 /// The decisions the registry has a rule for, with their catalog titles; with
 /// `all`, every catalog decision too, implemented or not.
-pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<DecisionRow> {
+pub fn decision_rows(session: &Session, registry: &Registry, all: bool) -> Vec<DecisionRow> {
+    let catalog = &session.catalog;
+    let tier = |decision: &Decision| Some(lighthouse_logic::tier(session.comp.cel(), decision));
     let mut rows = Vec::new();
     if all {
         for decision in catalog.decisions() {
@@ -149,6 +156,7 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
                     .severity
                     .map_or_else(|| "-".to_owned(), |s| s.to_string()),
                 title: decision.title.clone(),
+                tier: tier(decision),
             });
         }
     }
@@ -162,6 +170,7 @@ pub fn decision_rows(catalog: &Catalog, registry: &Registry, all: bool) -> Vec<D
             status: Implementation::Implemented,
             severity: meta.severity.to_string(),
             title: meta.description.clone(),
+            tier: catalog.decision(&meta.id).and_then(tier),
         });
     }
     rows

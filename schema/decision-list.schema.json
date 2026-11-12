@@ -185,6 +185,29 @@
               }
             ]
           },
+          "tier": {
+            "oneOf": [
+              {
+                "const": "F",
+                "description": "A formal check: a union of conjunctive queries with comparisons.",
+                "type": "string"
+              },
+              {
+                "const": "O",
+                "description": "An order check: its fix moves or reorders declarations.",
+                "type": "string"
+              },
+              {
+                "const": "T",
+                "description": "A check no formal engine reads: a model, a command, a placement\nacross files, or CEL outside the fragment.",
+                "type": "string"
+              }
+            ]
+          },
+          "tierReason": {
+            "description": "`translated` for F; `fix:move` or `fix:reorder` for O; for T one of\n`no-check`, `no-select`, `model`, `command`, `abstain`, `no-condition`,\n`placement` or `outside-fragment:<construct>`.",
+            "type": "string"
+          },
           "title": {
             "type": "string"
           }

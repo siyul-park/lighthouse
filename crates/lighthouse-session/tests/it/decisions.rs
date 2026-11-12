@@ -8,12 +8,13 @@ fn decision_rows() {
     let session = session(dir.path());
     let registry = session.in_process_registry().unwrap();
 
-    let ruled = lighthouse_session::decision_rows(&session.catalog, &registry, false);
+    let ruled = lighthouse_session::decision_rows(&session, &registry, false);
     let short = ruled.iter().find(|r| r.id == "local/short").unwrap();
     assert_eq!(short.title, "Notes are short");
+    assert!(short.tier.is_some());
     assert!(ruled.iter().any(|r| r.id == "core/max-lines"));
 
-    let all = lighthouse_session::decision_rows(&session.catalog, &registry, true);
+    let all = lighthouse_session::decision_rows(&session, &registry, true);
     assert!(all.len() >= ruled.len());
     let short = all.iter().find(|r| r.id == "local/short").unwrap();
     assert_eq!(short.severity, "warn");
