@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use lighthouse_model::{
     Span,
-    ucm::{EdgeKind, Node, Resolution, Step, Symbol, SymbolId, Target},
+    ucm::{EdgeKind, Model, Node, Resolution, Step, Symbol, SymbolId, Target},
 };
 use serde_json::{Map, Value, json};
 
@@ -37,7 +37,7 @@ impl Builder<'_> {
         if summary.steps.is_empty() {
             return Value::Null;
         }
-        let resolved = self.resolved_calls(&symbol.id);
+        let resolved = resolved_calls(self.project, &symbol.id);
         let entries = summary
             .steps
             .iter()
@@ -109,18 +109,6 @@ impl Builder<'_> {
         })
     }
 
-    /// The resolved calls of a function to a project function, by site.
-    fn resolved_calls(&self, id: &SymbolId) -> Vec<(&Span, &SymbolId)> {
-        self.project
-            .edges_from(id)
-            .filter(|e| e.kind == EdgeKind::Calls && e.resolution != Resolution::Heuristic)
-            .filter_map(|e| match (&e.to, e.site.as_ref()) {
-                (Target::Resolved(Node::Symbol(to)), Some(site)) => Some((site, to)),
-                _ => None,
-            })
-            .collect()
-    }
-
     /// The calls of a step, each matched by its site to a resolved call.
     fn called(&self, resolved: &[(&Span, &SymbolId)], step: &Step) -> Vec<Called> {
         step.calls
@@ -134,4 +122,19 @@ impl Builder<'_> {
             })
             .collect()
     }
+}
+
+/// The resolved calls of a function to a project function, by site.
+pub(super) fn resolved_calls<'a>(
+    project: &'a dyn Model,
+    id: &SymbolId,
+) -> Vec<(&'a Span, &'a SymbolId)> {
+    project
+        .edges_from(id)
+        .filter(|e| e.kind == EdgeKind::Calls && e.resolution != Resolution::Heuristic)
+        .filter_map(|e| match (&e.to, e.site.as_ref()) {
+            (Target::Resolved(Node::Symbol(to)), Some(site)) => Some((site, to)),
+            _ => None,
+        })
+        .collect()
 }

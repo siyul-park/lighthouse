@@ -36,6 +36,7 @@ pub mod metrics;
 #[doc(hidden)]
 pub mod probe;
 
+pub use builder::level;
 pub use bundled::{ids, registry, registry_of};
 pub use checks::Checks;
 pub use compose::{Composition, Entry, compose, compose_from};

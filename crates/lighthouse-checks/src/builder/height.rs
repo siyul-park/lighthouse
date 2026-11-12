@@ -50,7 +50,7 @@ pub fn heights(project: &dyn Model) -> BTreeMap<SymbolId, Fact> {
 /// impl) counts for that one only; otherwise the name decides, and an inherent
 /// method of the same name does not count. `None` for a method with a body or
 /// one of no interface.
-fn implementations(project: &dyn Model, id: &SymbolId) -> Option<Vec<SymbolId>> {
+pub(super) fn implementations(project: &dyn Model, id: &SymbolId) -> Option<Vec<SymbolId>> {
     let symbol = project.symbol(id)?;
     if symbol.kind != SymbolKind::Method || project.function(id).is_some() {
         return None;

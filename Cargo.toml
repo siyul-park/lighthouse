@@ -28,6 +28,7 @@ libc = "0.2"
 nix = { version = "=0.31.3", default-features = false, features = ["socket", "user"] }
 lz4_flex = { version = "0.14", default-features = false, features = ["std"] }
 ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "api-24", "download-binaries", "tls-native"] }
+petgraph = { version = "=0.8.3", default-features = false }
 postcard = { version = "1", default-features = false, features = ["use-std"] }
 predicates = "3"
 proc-macro2 = { version = "1", features = ["span-locations"] }

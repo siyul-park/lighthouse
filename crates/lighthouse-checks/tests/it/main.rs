@@ -19,6 +19,8 @@ mod fixes;
 mod func_facts;
 mod go;
 mod layout;
+mod level_solve;
+mod levels;
 mod library;
 mod line_widths;
 mod model_selects;
