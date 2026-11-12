@@ -2,6 +2,10 @@
 //! it. `F` is formal: a cel check the translator reads as a query. `O`
 //! orders code: its fix moves or reorders declarations. `T` is the rest, with
 //! the reason, so that what widening the fragment would buy can be counted.
+//!
+//! Known limit: a `move` to `before(x)` or `after(x)` is O even when `x` is in
+//! another file; only the `start` and `end` anchors, which name a file, are
+//! read as placement.
 
 #[cfg(test)]
 mod tests;
@@ -93,7 +97,7 @@ pub fn tier(env: &Env, decision: &Decision) -> Classified {
     }
     match translate(env, cel, select.variable()) {
         Ok(_) => classified(Tier::F, "translated"),
-        Err(reject) => classified(Tier::T, format!("outside-fragment:{}", reject.construct)),
+        Err(reject) => classified(Tier::T, format!("outside-fragment:{}", reject.construct())),
     }
 }
 

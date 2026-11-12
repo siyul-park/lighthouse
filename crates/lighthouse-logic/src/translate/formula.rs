@@ -4,7 +4,7 @@
 
 use crate::ir::{Atom, Cmp, Cq, Path};
 
-use super::{R, Reject};
+use super::{Construct, R};
 
 /// The most conjunctions a decision may expand to.
 const MAX_CQS: usize = 4096;
@@ -83,10 +83,7 @@ impl F {
                             let literals =
                                 cq.atoms.len() + cq.cmps.len() + cq.empties.len() + cq.filled.len();
                             if literals > MAX_LITERALS {
-                                return Err(Reject::new(
-                                    "expansion",
-                                    "a conjunction of too many conditions",
-                                ));
+                                return Err(Construct::Conjunction.into());
                             }
                             Ok(cq)
                         })
@@ -100,10 +97,7 @@ impl F {
 
 fn too_many(size: usize) -> R<()> {
     if size > MAX_CQS {
-        return Err(Reject::new(
-            "expansion",
-            "a condition that expands to too many cases",
-        ));
+        return Err(Construct::Cases.into());
     }
     Ok(())
 }

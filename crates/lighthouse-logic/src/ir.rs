@@ -3,31 +3,39 @@
 
 use std::fmt;
 
-/// A value written in the expression, or an option list.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Const {
-    Null,
-    Bool(bool),
-    Int(i64),
-    Str(String),
-    List(Vec<Const>),
+/// The violations of a decision: a subject violates it when it satisfies any
+/// conjunction.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Ucq {
+    pub cqs: Vec<Cq>,
+    pub binders: usize,
 }
 
-/// What a path starts from: the selected subject, the file it is in, or a
-/// member of a child relation an atom binds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Root {
-    Subject,
-    File,
-    Binder(usize),
+/// One conjunction: the atoms bind members, and the comparisons and the empty
+/// relations hold of them.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Cq {
+    pub atoms: Vec<Atom>,
+    pub cmps: Vec<Cmp>,
+    /// Containers with no element: `size(path) == 0`.
+    pub empties: Vec<Path>,
+    /// Containers with some element: `size(path) > 0`.
+    pub filled: Vec<Path>,
 }
 
-/// A field of a root, plus an integer offset (`x + 1`).
+/// `binder` is a member of the child relation `list`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Path {
-    pub root: Root,
-    pub fields: Vec<String>,
-    pub offset: i64,
+pub struct Atom {
+    pub binder: usize,
+    pub list: Path,
+}
+
+/// `left op right`; at most one side is a path.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cmp {
+    pub left: Operand,
+    pub op: Op,
+    pub right: Operand,
 }
 
 /// A side of a comparison. An option is a constant once the project's options
@@ -39,6 +47,7 @@ pub enum Operand {
     Const(Const),
 }
 
+/// A comparison operator, with the negations that make `not` unnecessary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
     Eq,
@@ -55,6 +64,33 @@ pub enum Op {
     NotEnds,
     Contains,
     NotContains,
+}
+
+/// A field of a root, plus an integer offset (`x + 1`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Path {
+    pub root: Root,
+    pub fields: Vec<String>,
+    pub offset: i64,
+}
+
+/// What a path starts from: the selected subject, the file it is in, or a
+/// member of a child relation an atom binds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Root {
+    Subject,
+    File,
+    Binder(usize),
+}
+
+/// A value written in the expression, or an option list.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Const {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Str(String),
+    List(Vec<Const>),
 }
 
 impl Op {
@@ -75,6 +111,19 @@ impl Op {
             Self::NotEnds => Self::Ends,
             Self::Contains => Self::NotContains,
             Self::NotContains => Self::Contains,
+        }
+    }
+
+    /// The operator without its negation, and whether the original is the
+    /// operator itself (`true`) or its negation (`false`).
+    pub fn polarity(self) -> (Self, bool) {
+        match self {
+            Self::Ne => (Self::Eq, false),
+            Self::NotIn => (Self::In, false),
+            Self::NotStarts => (Self::Starts, false),
+            Self::NotEnds => (Self::Ends, false),
+            Self::NotContains => (Self::Contains, false),
+            _ => (self, true),
         }
     }
 
@@ -108,41 +157,6 @@ impl Op {
             Self::NotContains => "not contains",
         }
     }
-}
-
-/// `left op right`; at most one side is a path.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Cmp {
-    pub left: Operand,
-    pub op: Op,
-    pub right: Operand,
-}
-
-/// `binder` is a member of the child relation `list`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Atom {
-    pub binder: usize,
-    pub list: Path,
-}
-
-/// One conjunction: the atoms bind members, and the comparisons and the empty
-/// relations hold of them.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Cq {
-    pub atoms: Vec<Atom>,
-    pub cmps: Vec<Cmp>,
-    /// Containers with no element: `size(path) == 0`.
-    pub empties: Vec<Path>,
-    /// Containers with some element: `size(path) > 0`.
-    pub filled: Vec<Path>,
-}
-
-/// The violations of a decision: a subject violates it when it satisfies any
-/// conjunction.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct Ucq {
-    pub cqs: Vec<Cq>,
-    pub binders: usize,
 }
 
 impl fmt::Display for Const {
@@ -183,6 +197,23 @@ impl fmt::Display for Path {
     }
 }
 
+impl Path {
+    /// The same path, `k` further along: `None` when the offset overflows.
+    pub fn shifted(mut self, k: i64) -> Option<Self> {
+        self.offset = self.offset.checked_add(k)?;
+        Some(self)
+    }
+
+    /// The root itself: no field, no offset.
+    pub fn of(root: Root) -> Self {
+        Self {
+            root,
+            fields: Vec::new(),
+            offset: 0,
+        }
+    }
+}
+
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -190,6 +221,13 @@ impl fmt::Display for Operand {
             Self::Option(fields) => write!(f, "options.{}", fields.join(".")),
             Self::Const(value) => write!(f, "{value}"),
         }
+    }
+}
+
+impl Operand {
+    /// An integer constant.
+    pub fn int(n: i64) -> Self {
+        Self::Const(Const::Int(n))
     }
 }
 

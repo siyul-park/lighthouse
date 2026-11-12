@@ -2,7 +2,7 @@
 //! `cel` crate ships, and the official ones it lacks (see `ext`).
 
 use cel::Value;
-use lighthouse_spec::{Env, children};
+use lighthouse_spec::{Env, children, is_empty_list};
 
 fn cel() -> Env {
     lighthouse_test_support::cel()
@@ -184,4 +184,14 @@ fn new() {
     assert!(cel.is_namespace("mine"));
     assert!(cel.is_namespace("math"), "the namespaces of the cel crate");
     assert!(!cel.is_namespace("other"));
+}
+
+#[test]
+fn is_empty_list_holds_of_the_list_without_elements_only() {
+    let holds = |source: &str| is_empty_list(cel().compile(source).unwrap().expression());
+
+    assert!(holds("[]"));
+    assert!(!holds("[1]"));
+    assert!(!holds("{}"));
+    assert!(!holds("a"));
 }
