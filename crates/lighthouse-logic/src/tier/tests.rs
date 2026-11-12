@@ -69,8 +69,15 @@ fn a_decision_without_a_check_or_with_a_model_or_a_command_is_text() {
 }
 
 #[test]
-fn a_check_that_only_asks_a_model_is_text() {
-    assert_eq!(classify(&cel("false"), "").1, "no-condition");
+fn a_where_of_false_without_abstain_is_no_condition() {
+    assert_eq!(
+        classify(&cel("false"), ""),
+        (Tier::T, "no-condition".to_owned())
+    );
+}
+
+#[test]
+fn a_check_that_abstains_is_text() {
     let abstain = format!("{}    abstain: 'true'\n", cel("symbol.n > 1"));
     assert_eq!(classify(&abstain, "").1, "abstain");
 }
@@ -98,14 +105,16 @@ fn a_fix_that_moves_or_reorders_makes_a_decision_an_order() {
 }
 
 #[test]
-fn a_check_of_where_code_belongs_is_placement_even_when_it_fits_the_fragment() {
+fn a_move_to_the_edge_of_a_file_is_placement() {
+    let across = fix("[move(symbol, end(symbol.file))]");
+
     assert_eq!(
-        classify(&cel("symbol.owner_home.owner_file != symbol.file_stem"), "").1,
-        "placement"
+        classify(&cel("symbol.n > 1"), &across),
+        (Tier::T, "placement".to_owned())
     );
     assert_eq!(
-        classify(&cel("has(symbol.owned) && symbol.n > 1"), "").1,
-        "placement"
+        classify(&cel("symbol.n > 1"), &fix("[move(symbol, before(symbol))]")).0,
+        Tier::O
     );
 }
 
@@ -113,9 +122,14 @@ fn a_check_of_where_code_belongs_is_placement_even_when_it_fits_the_fragment() {
 fn what_leaves_the_fragment_names_the_construct() {
     assert_eq!(
         classify(&cel("symbol.a > symbol.b"), ""),
-        (
-            Tier::T,
-            "outside-fragment:a comparison of two fields".to_owned()
-        )
+        (Tier::T, "outside-fragment:two-fields".to_owned())
+    );
+}
+
+#[test]
+fn as_str_names_a_tier_by_its_letter() {
+    assert_eq!(
+        [Tier::F, Tier::O, Tier::T].map(Tier::as_str),
+        ["F", "O", "T"]
     );
 }

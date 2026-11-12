@@ -297,7 +297,7 @@ fn the_query_of_every_translated_decision_agrees_with_its_cel() {
         let ucq = match lighthouse_logic::translate(comp.cel(), check, select.variable()) {
             Ok(ucq) => ucq,
             Err(reject) => {
-                rejected.insert(id, reject.0);
+                rejected.insert(id, reject.construct);
                 continue;
             }
         };
@@ -394,7 +394,7 @@ fn the_forms_production_parses_are_translated() {
             .unwrap()
             .holds(&json!({"n": 3}), &json!(null), &json!({}))
     );
-    assert_eq!(regex.unwrap_err().0, "the call `regex.matches`");
+    assert_eq!(regex.unwrap_err().construct, "regex.matches");
 }
 
 /// What the CEL says of the subject, `None` when it fails on it (an

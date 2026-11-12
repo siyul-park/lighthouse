@@ -37,21 +37,12 @@ type R<T> = Result<T, Reject>;
 
 /// The construct that leaves the fragment.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reject(pub String);
-
-impl Reject {
-    fn new(construct: impl Into<String>) -> Self {
-        Self(construct.into())
-    }
+pub struct Reject {
+    /// A stable token naming the construct: `ternary`, `index`, `flatten`,
+    /// `two-fields`, `computed-comprehension` and so on.
+    pub construct: String,
+    prose: String,
 }
-
-impl fmt::Display for Reject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "outside the fragment: {}", self.0)
-    }
-}
-
-impl std::error::Error for Reject {}
 
 /// What a name stands for while an expression is read.
 #[derive(Clone)]
@@ -73,102 +64,10 @@ type Used = Option<Rc<Cell<bool>>>;
 /// A body read with its names bound, and the values to check once it is read.
 type Applied<'a> = (&'a IdedExpr, Scope<'a>, Vec<Rc<Cell<bool>>>);
 
-fn mark(used: &Used) {
-    if let Some(flag) = used {
-        flag.set(true);
-    }
-}
-
-/// `read`, unless a value it bound was never read.
-fn settled<T>(flags: &[Rc<Cell<bool>>], read: R<T>) -> R<T> {
-    let read = read?;
-    if flags.iter().any(|f| !f.get()) {
-        return Err(Reject::new("a bound value that is never read"));
-    }
-    Ok(read)
-}
-
-/// How a call is named in a rejection: by the construct, not the operator.
-fn named(name: &str, target: Option<&IdedExpr>) -> String {
-    let operator = match name {
-        "_?_:_" => "ternary",
-        "_+_" => "concatenation or arithmetic",
-        "_-_" | "-_" => "subtraction",
-        "_*_" => "multiplication",
-        "_/_" => "division",
-        "_%_" => "modulo",
-        "_[_]" | "_[?_]" => "index",
-        "@in" => "in",
-        _ => "",
-    };
-    if !operator.is_empty() {
-        return operator.to_owned();
-    }
-    match target.map(|t| &t.expr) {
-        Some(Expr::Ident(space)) => format!("the call `{space}.{name}`"),
-        _ => format!("the call `{name}`"),
-    }
-}
-
 struct Node<'a> {
     name: &'a str,
     binding: Binding<'a>,
     parent: Scope<'a>,
-}
-
-fn bind<'a>(scope: &Scope<'a>, name: &'a str, binding: Binding<'a>) -> Scope<'a> {
-    Some(Rc::new(Node {
-        name,
-        binding,
-        parent: scope.clone(),
-    }))
-}
-
-fn lookup<'a>(scope: &Scope<'a>, name: &str) -> Option<Binding<'a>> {
-    let mut at = scope.as_ref();
-    while let Some(node) = at {
-        if node.name == name {
-            return Some(node.binding.clone());
-        }
-        at = node.parent.as_ref();
-    }
-    None
-}
-
-/// The query for `check`, whose selected value is the variable `subject`
-/// (`symbol`, `func`, ...).
-pub fn translate(env: &Env, check: &CelCheck, subject: &str) -> R<Ucq> {
-    let programs: Vec<Program> = check
-        .variables
-        .iter()
-        .map(|v| env.compile(&v.expression))
-        .collect::<Result<_, _>>()
-        .map_err(|e| Reject::new(format!("an expression that does not compile: {e}")))?;
-    let condition = env
-        .compile(&check.condition)
-        .map_err(|e| Reject::new(format!("an expression that does not compile: {e}")))?;
-    let mut scope: Scope = None;
-    for (variable, program) in check.variables.iter().zip(&programs) {
-        scope = bind(&scope, &variable.name, binding(variable, program, &scope));
-    }
-    let translator = Translator {
-        subject,
-        next: Cell::new(0),
-        steps: Cell::new(0),
-    };
-    let cqs = translator.formula(condition.expression(), &scope)?.dnf()?;
-    Ok(Ucq {
-        cqs,
-        binders: translator.next.get(),
-    })
-}
-
-fn binding<'a>(variable: &'a Variable, program: &'a Program, scope: &Scope<'a>) -> Binding<'a> {
-    if variable.params.is_empty() {
-        Binding::Value(program.expression(), scope.clone(), None)
-    } else {
-        Binding::Macro(&variable.params, program.expression())
-    }
 }
 
 struct Translator<'s> {
@@ -192,11 +91,28 @@ enum Shape<'a> {
     Filter(usize, Path, F),
 }
 
+impl Reject {
+    fn new(construct: impl Into<String>, prose: impl Into<String>) -> Self {
+        Self {
+            construct: construct.into(),
+            prose: prose.into(),
+        }
+    }
+}
+
+impl fmt::Display for Reject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "outside the fragment: {}", self.prose)
+    }
+}
+
+impl std::error::Error for Reject {}
+
 impl<'a> Translator<'_> {
     fn step(&self) -> R<()> {
         self.steps.set(self.steps.get() + 1);
         if self.steps.get() > MAX_STEPS {
-            return Err(Reject::new("a condition that expands too far"));
+            return Err(Reject::new("expansion", "a condition that expands too far"));
         }
         Ok(())
     }
@@ -221,9 +137,10 @@ impl<'a> Translator<'_> {
             return None;
         };
         if params.len() != args.len() {
-            return Some(Err(Reject::new(format!(
-                "`{name}` called with other arguments"
-            ))));
+            return Some(Err(Reject::new(
+                "arguments",
+                format!("`{name}` called with other arguments"),
+            )));
         }
         let mut inner: Scope = None;
         let mut flags = Vec::new();
@@ -275,17 +192,21 @@ impl<'a> Translator<'_> {
                     self.term(x, &inner)
                 }
                 Some(Binding::Binder(id)) => Ok(Operand::Path(Self::path(Root::Binder(id)))),
-                Some(Binding::Macro(..)) => Err(Reject::new(format!("`{name}` without arguments"))),
+                Some(Binding::Macro(..)) => Err(Reject::new(
+                    "arguments",
+                    format!("`{name}` without arguments"),
+                )),
                 None if name == self.subject => Ok(Operand::Path(Self::path(Root::Subject))),
                 None if name == "file" => Ok(Operand::Path(Self::path(Root::File))),
                 None if name == "options" => Ok(Operand::Option(Vec::new())),
-                None => Err(Reject::new(format!(
-                    "undefined name or pack variable `{name}`"
-                ))),
+                None => Err(Reject::new(
+                    "pack-variable",
+                    format!("undefined name or pack variable `{name}`"),
+                )),
             },
             Expr::Select(select) if !select.test => match self.term(&select.operand, scope)? {
                 Operand::Path(path) if path.offset != 0 => {
-                    Err(Reject::new("arithmetic outside a comparison"))
+                    Err(Reject::new("arithmetic", "arithmetic outside a comparison"))
                 }
                 Operand::Path(mut path) => {
                     path.fields.push(select.field.clone());
@@ -295,7 +216,7 @@ impl<'a> Translator<'_> {
                     fields.push(select.field.clone());
                     Ok(Operand::Option(fields))
                 }
-                Operand::Const(_) => Err(Reject::new("a field of a constant")),
+                Operand::Const(_) => Err(Reject::new("constant-field", "a field of a constant")),
             },
             Expr::List(list) => {
                 let items = list
@@ -303,7 +224,7 @@ impl<'a> Translator<'_> {
                     .iter()
                     .map(|item| match self.term(item, scope)? {
                         Operand::Const(value) => Ok(value),
-                        _ => Err(Reject::new("a list that is not constant")),
+                        _ => Err(Reject::new("computed-list", "a list that is not constant")),
                     })
                     .collect::<R<Vec<_>>>()?;
                 Ok(Operand::Const(Const::List(items)))
@@ -316,10 +237,16 @@ impl<'a> Translator<'_> {
             ),
             Expr::Comprehension(c) => match self.shape(c, scope)? {
                 Shape::Bind(inner, used) => settled(&[used], self.term(&c.result, &inner)),
-                _ => Err(Reject::new("a comprehension as a value")),
+                _ => Err(Reject::new(
+                    "computed-comprehension",
+                    "a comprehension as a value",
+                )),
             },
-            Expr::Select(_) => Err(Reject::new("has()")),
-            _ => Err(Reject::new("an expression that is not a value")),
+            Expr::Select(_) => Err(Reject::new("has", "has()")),
+            _ => Err(Reject::new(
+                "expression",
+                "an expression that is not a value",
+            )),
         }
     }
 
@@ -348,13 +275,13 @@ impl<'a> Translator<'_> {
                         .checked_neg()
                         .map(|n| Operand::Const(Const::Int(n)))
                         .ok_or_else(overflow),
-                    _ => Err(Reject::new("negation of a field")),
+                    _ => Err(Reject::new("negated-field", "negation of a field")),
                 };
             }
-            other => return Err(Reject::new(named(other, target))),
+            other => return Err(named(other, target)),
         };
         let [a, b] = args else {
-            return Err(Reject::new("arithmetic"));
+            return Err(Reject::new("arithmetic", "arithmetic"));
         };
         let shift = |k: i64| k.checked_mul(sign).ok_or_else(overflow);
         match (self.term(a, scope)?, self.term(b, scope)?) {
@@ -371,9 +298,9 @@ impl<'a> Translator<'_> {
                 Ok(Operand::Path(p))
             }
             (Operand::Const(Const::Str(_)), _) | (_, Operand::Const(Const::Str(_))) => {
-                Err(Reject::new("concatenation"))
+                Err(Reject::new("concatenation", "concatenation"))
             }
-            _ => Err(Reject::new("arithmetic of fields")),
+            _ => Err(Reject::new("arithmetic", "arithmetic of fields")),
         }
     }
 
@@ -402,9 +329,12 @@ impl<'a> Translator<'_> {
                     list,
                     cond: Box::new(cond),
                 }),
-                Shape::Filter(..) => Err(Reject::new("a list as a condition")),
+                Shape::Filter(..) => Err(Reject::new("list-condition", "a list as a condition")),
             },
-            _ => Err(Reject::new("an expression that is not a condition")),
+            _ => Err(Reject::new(
+                "expression",
+                "an expression that is not a condition",
+            )),
         }
     }
 
@@ -457,14 +387,14 @@ impl<'a> Translator<'_> {
             (IN, [a, b]) => {
                 let (left, right) = (self.term(a, scope)?, self.term(b, scope)?);
                 if matches!(right, Operand::Path(_)) {
-                    return Err(Reject::new("membership in a field"));
+                    return Err(Reject::new("membership", "membership in a field"));
                 }
                 compare(left, Op::In, right)
             }
             ("startsWith", [a, b]) => self.comparison(Op::Starts, a, b, scope),
             ("endsWith", [a, b]) => self.comparison(Op::Ends, a, b, scope),
             ("contains", [a, b]) => self.comparison(Op::Contains, a, b, scope),
-            (other, _) => Err(Reject::new(named(other, target))),
+            (other, _) => Err(named(other, target)),
         }
     }
 
@@ -479,12 +409,16 @@ impl<'a> Translator<'_> {
     fn comparison(&self, op: Op, a: &'a IdedExpr, b: &'a IdedExpr, scope: &Scope<'a>) -> R<F> {
         let (counted, other, op) = match (size_of(a), size_of(b)) {
             (Some(x), _) => (Some(x), b, op),
-            (None, Some(x)) => (Some(x), a, op.flipped().ok_or_else(|| Reject::new("size"))?),
+            (None, Some(x)) => (
+                Some(x),
+                a,
+                op.flipped().ok_or_else(|| Reject::new("size", "size"))?,
+            ),
             (None, None) => (None, b, op),
         };
         if let Some(counted) = counted {
             let Operand::Const(Const::Int(k)) = self.term(other, scope)? else {
-                return Err(Reject::new("a size compared with a non-literal"));
+                return Err(Reject::new("size", "a size compared with a non-literal"));
             };
             return self.sized(self.members(counted, scope)?, op, k);
         }
@@ -501,7 +435,10 @@ impl<'a> Translator<'_> {
             F::Empty(path) => Ok(F::Filled(path)),
             F::Filled(path) => Ok(F::Empty(path)),
             F::Has { list, cond, .. } if matches!(*cond, F::Lit(true)) => Ok(F::Empty(list)),
-            F::Has { .. } => Err(Reject::new("negation of an exists with a condition")),
+            F::Has { .. } => Err(Reject::new(
+                "negated-exists",
+                "negation of an exists with a condition",
+            )),
             F::And(parts) => Ok(F::Or(
                 parts
                     .into_iter()
@@ -555,7 +492,10 @@ impl<'a> Translator<'_> {
         match holds {
             [false, true, true] => Ok(has),
             [true, false, false] => none(),
-            _ => Err(Reject::new("a count of members other than none or some")),
+            _ => Err(Reject::new(
+                "count",
+                "a count of members other than none or some",
+            )),
         }
     }
 
@@ -568,7 +508,10 @@ impl<'a> Translator<'_> {
                     .iter()
                     .any(|item| !matches!(item.expr, Expr::Literal(_)))
                 {
-                    return Err(Reject::new("a list literal of computed elements"));
+                    return Err(Reject::new(
+                        "computed-list",
+                        "a list literal of computed elements",
+                    ));
                 }
                 Ok(Members::Literal(
                     i64::try_from(list.elements.len()).map_err(|_| overflow())?,
@@ -601,25 +544,25 @@ impl<'a> Translator<'_> {
                         let (body, inner, flags) = applied?;
                         settled(&flags, self.members(body, &inner))
                     }
-                    None => Err(Reject::new(named(&call.func_name, None))),
+                    None => Err(named(&call.func_name, None)),
                 }
             }
             Expr::Comprehension(c) => match self.shape(c, scope)? {
                 Shape::Bind(inner, used) => settled(&[used], self.members(&c.result, &inner)),
                 Shape::Filter(binder, list, cond) => Ok(Members::Filter { binder, list, cond }),
-                Shape::Exists(..) => Err(Reject::new("a condition as a list")),
+                Shape::Exists(..) => Err(Reject::new("condition-list", "a condition as a list")),
             },
-            _ => Err(Reject::new("a list that is computed")),
+            _ => Err(Reject::new("computed-list", "a list that is computed")),
         }
     }
 
     fn members_path(&self, e: &'a IdedExpr, scope: &Scope<'a>) -> R<Members> {
         match self.term(e, scope)? {
             Operand::Path(path) if path.offset != 0 => {
-                Err(Reject::new("arithmetic outside a comparison"))
+                Err(Reject::new("arithmetic", "arithmetic outside a comparison"))
             }
             Operand::Path(path) => Ok(Members::Path(path)),
-            _ => Err(Reject::new("a list that is not a field")),
+            _ => Err(Reject::new("computed-list", "a list that is not a field")),
         }
     }
 
@@ -637,7 +580,7 @@ impl<'a> Translator<'_> {
         }
         let step = match &c.loop_step.expr {
             Expr::Call(call) => call,
-            _ => return Err(Reject::new("a comprehension")),
+            _ => return Err(Reject::new("comprehension", "a comprehension")),
         };
         let wanted = if literal(&c.accu_init, false) && step.func_name == LOGICAL_OR {
             step.args.get(1)
@@ -645,15 +588,25 @@ impl<'a> Translator<'_> {
             step.args.first()
         } else {
             let all = literal(&c.accu_init, true) && step.func_name == LOGICAL_AND;
-            return Err(Reject::new(if all { "all" } else { "a comprehension" }));
+            return Err(Reject::new(
+                if all { "all" } else { "comprehension" },
+                if all { "all" } else { "a comprehension" },
+            ));
         };
         let Some(cond) = wanted else {
-            return Err(Reject::new("a comprehension"));
+            return Err(Reject::new("comprehension", "a comprehension"));
         };
         let list = match self.term(&c.iter_range, scope)? {
             Operand::Path(list) if list.offset == 0 => list,
-            Operand::Path(_) => return Err(Reject::new("arithmetic outside a comparison")),
-            _ => return Err(Reject::new("a comprehension over a computed list")),
+            Operand::Path(_) => {
+                return Err(Reject::new("arithmetic", "arithmetic outside a comparison"));
+            }
+            _ => {
+                return Err(Reject::new(
+                    "computed-comprehension",
+                    "a comprehension over a computed list",
+                ));
+            }
         };
         let binder = self.fresh();
         let inner = bind(scope, &c.iter_var, Binding::Binder(binder));
@@ -663,6 +616,110 @@ impl<'a> Translator<'_> {
         } else {
             Shape::Filter(binder, list, cond)
         })
+    }
+}
+
+/// The query for `check`, whose selected value is the variable `subject`
+/// (`symbol`, `func`, ...).
+pub fn translate(env: &Env, check: &CelCheck, subject: &str) -> R<Ucq> {
+    let programs: Vec<Program> = check
+        .variables
+        .iter()
+        .map(|v| env.compile(&v.expression))
+        .collect::<Result<_, _>>()
+        .map_err(|e| {
+            Reject::new(
+                "compile",
+                format!("an expression that does not compile: {e}"),
+            )
+        })?;
+    let condition = env.compile(&check.condition).map_err(|e| {
+        Reject::new(
+            "compile",
+            format!("an expression that does not compile: {e}"),
+        )
+    })?;
+    let mut scope: Scope = None;
+    for (variable, program) in check.variables.iter().zip(&programs) {
+        scope = bind(&scope, &variable.name, binding(variable, program, &scope));
+    }
+    let translator = Translator {
+        subject,
+        next: Cell::new(0),
+        steps: Cell::new(0),
+    };
+    let cqs = translator.formula(condition.expression(), &scope)?.dnf()?;
+    Ok(Ucq {
+        cqs,
+        binders: translator.next.get(),
+    })
+}
+
+fn mark(used: &Used) {
+    if let Some(flag) = used {
+        flag.set(true);
+    }
+}
+
+/// `read`, unless a value it bound was never read.
+fn settled<T>(flags: &[Rc<Cell<bool>>], read: R<T>) -> R<T> {
+    let read = read?;
+    if flags.iter().any(|f| !f.get()) {
+        return Err(Reject::new(
+            "unused-bind",
+            "a bound value that is never read",
+        ));
+    }
+    Ok(read)
+}
+
+/// How a call is named in a rejection: by the construct, not the operator.
+fn named(name: &str, target: Option<&IdedExpr>) -> Reject {
+    let operator = match name {
+        "_?_:_" => Some(("ternary", "ternary")),
+        "_+_" => Some(("concatenation", "concatenation or arithmetic")),
+        "_-_" | "-_" => Some(("arithmetic", "subtraction")),
+        "_*_" => Some(("arithmetic", "multiplication")),
+        "_/_" => Some(("arithmetic", "division")),
+        "_%_" => Some(("arithmetic", "modulo")),
+        "_[_]" | "_[?_]" => Some(("index", "index")),
+        "@in" => Some(("in", "in")),
+        _ => None,
+    };
+    match (operator, target.map(|t| &t.expr)) {
+        (Some((construct, prose)), _) => Reject::new(construct, prose),
+        (None, Some(Expr::Ident(space))) => Reject::new(
+            format!("{space}.{name}"),
+            format!("the call `{space}.{name}`"),
+        ),
+        (None, _) => Reject::new(name, format!("the call `{name}`")),
+    }
+}
+
+fn bind<'a>(scope: &Scope<'a>, name: &'a str, binding: Binding<'a>) -> Scope<'a> {
+    Some(Rc::new(Node {
+        name,
+        binding,
+        parent: scope.clone(),
+    }))
+}
+
+fn lookup<'a>(scope: &Scope<'a>, name: &str) -> Option<Binding<'a>> {
+    let mut at = scope.as_ref();
+    while let Some(node) = at {
+        if node.name == name {
+            return Some(node.binding.clone());
+        }
+        at = node.parent.as_ref();
+    }
+    None
+}
+
+fn binding<'a>(variable: &'a Variable, program: &'a Program, scope: &Scope<'a>) -> Binding<'a> {
+    if variable.params.is_empty() {
+        Binding::Value(program.expression(), scope.clone(), None)
+    } else {
+        Binding::Macro(&variable.params, program.expression())
     }
 }
 
@@ -688,6 +745,7 @@ fn constant(value: &LiteralValue) -> R<Const> {
         LiteralValue::Int(i) => Ok(Const::Int(*i.inner())),
         LiteralValue::String(s) => Ok(Const::Str(s.inner().to_owned())),
         _ => Err(Reject::new(
+            "literal",
             "a literal that is not a bool, int, string or null",
         )),
     }
@@ -698,12 +756,12 @@ fn constant(value: &LiteralValue) -> R<Const> {
 fn compare(mut left: Operand, mut op: Op, mut right: Operand) -> R<F> {
     match (&left, &right) {
         (Operand::Path(_), Operand::Path(_)) => {
-            return Err(Reject::new("a comparison of two fields"));
+            return Err(Reject::new("two-fields", "a comparison of two fields"));
         }
         (_, Operand::Path(_)) => {
             op = op
                 .flipped()
-                .ok_or_else(|| Reject::new("a field on the right of `in`"))?;
+                .ok_or_else(|| Reject::new("membership", "a field on the right of `in`"))?;
             std::mem::swap(&mut left, &mut right);
         }
         _ => {}
@@ -717,13 +775,19 @@ fn compare(mut left: Operand, mut op: Op, mut right: Operand) -> R<F> {
                 path.offset = 0;
             }
             Operand::Option(_) if !matches!(op, Op::In | Op::NotIn) => {}
-            _ => return Err(Reject::new("arithmetic outside a comparison with a number")),
+            _ => {
+                return Err(Reject::new(
+                    "arithmetic",
+                    "arithmetic outside a comparison with a number",
+                ));
+            }
         }
     }
     if matches!(op, Op::Lt | Op::Le | Op::Gt | Op::Ge)
         && matches!(&right, Operand::Const(c) if !matches!(c, Const::Int(_) | Const::Str(_)))
     {
         return Err(Reject::new(
+            "order",
             "an order between values that are not numbers or texts",
         ));
     }
@@ -731,5 +795,5 @@ fn compare(mut left: Operand, mut op: Op, mut right: Operand) -> R<F> {
 }
 
 fn overflow() -> Reject {
-    Reject::new("an integer that overflows")
+    Reject::new("overflow", "an integer that overflows")
 }

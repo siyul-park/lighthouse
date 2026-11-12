@@ -221,6 +221,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
               ]
             },
             "tier": {
+              "description": "How far a decision can be reasoned about without running it.",
               "oneOf": [
                 {
                   "const": "F",
@@ -234,13 +235,13 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
                 },
                 {
                   "const": "T",
-                  "description": "A check no formal engine reads: a model, a command, a placement\nacross files, or CEL outside the fragment.",
+                  "description": "A check no formal engine reads: a model, a command, a move across\nfiles, or CEL outside the fragment.",
                   "type": "string"
                 }
               ]
             },
             "tierReason": {
-              "description": "`translated` for F; `fix:move` or `fix:reorder` for O; for T one of\n`no-check`, `no-select`, `model`, `command`, `abstain`, `no-condition`,\n`placement` or `outside-fragment:<construct>`.",
+              "description": "`translated` for F; `fix:move` or `fix:reorder` for O; for T one of\n`no-check`, `no-select`, `model`, `command`, `abstain`, `no-condition`,\n`placement` or `outside-fragment:<construct>`, the construct a stable token\nsuch as `ternary`, `index`, `flatten`, `two-fields`.",
               "type": "string"
             },
             "title": {

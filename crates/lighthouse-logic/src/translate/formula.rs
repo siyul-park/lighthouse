@@ -83,7 +83,10 @@ impl F {
                             let literals =
                                 cq.atoms.len() + cq.cmps.len() + cq.empties.len() + cq.filled.len();
                             if literals > MAX_LITERALS {
-                                return Err(Reject::new("a conjunction of too many conditions"));
+                                return Err(Reject::new(
+                                    "expansion",
+                                    "a conjunction of too many conditions",
+                                ));
                             }
                             Ok(cq)
                         })
@@ -97,7 +100,10 @@ impl F {
 
 fn too_many(size: usize) -> R<()> {
     if size > MAX_CQS {
-        return Err(Reject::new("a condition that expands to too many cases"));
+        return Err(Reject::new(
+            "expansion",
+            "a condition that expands to too many cases",
+        ));
     }
     Ok(())
 }

@@ -16,25 +16,38 @@ use serde::Serialize;
 
 use crate::translate;
 
-/// The fields that say where code belongs: a check reading one judges the
-/// placement of a declaration among files, which no single file shows.
-const PLACEMENT: [&str; 4] = ["owner_home", "owner_file", "owned", "pair"];
-
 /// The operations of a fix that order declarations.
 const ORDERING: [&str; 2] = ["move", "reorder"];
 
+/// The anchors of `move` that name a file, so the declaration may leave its own.
+const FILE_ANCHORS: [&str; 2] = ["start", "end"];
+
+/// A tier and why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Classified {
+    pub tier: Tier,
+    /// `translated` for F; `fix:move` or `fix:reorder` for O; for T one of
+    /// `no-check`, `no-select`, `model`, `command`, `abstain`, `no-condition`,
+    /// `placement` or `outside-fragment:<construct>`, the construct a stable token
+    /// such as `ternary`, `index`, `flatten`, `two-fields`.
+    pub tier_reason: String,
+}
+
+/// How far a decision can be reasoned about without running it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 pub enum Tier {
     /// A formal check: a union of conjunctive queries with comparisons.
     F,
     /// An order check: its fix moves or reorders declarations.
     O,
-    /// A check no formal engine reads: a model, a command, a placement
-    /// across files, or CEL outside the fragment.
+    /// A check no formal engine reads: a model, a command, a move across
+    /// files, or CEL outside the fragment.
     T,
 }
 
 impl Tier {
+    /// The letter of the tier: `F`, `O` or `T`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::F => "F",
@@ -44,22 +57,12 @@ impl Tier {
     }
 }
 
-/// A tier and why.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Classified {
-    pub tier: Tier,
-    /// `translated` for F; `fix:move` or `fix:reorder` for O; for T one of
-    /// `no-check`, `no-select`, `model`, `command`, `abstain`, `no-condition`,
-    /// `placement` or `outside-fragment:<construct>`.
-    pub tier_reason: String,
-}
-
-fn classified(tier: Tier, reason: impl Into<String>) -> Classified {
-    Classified {
-        tier,
-        tier_reason: reason.into(),
-    }
+/// How a fix orders declarations.
+enum Ordering {
+    /// Within the file: `move` to a declaration's side, or `reorder`.
+    Within(&'static str),
+    /// A `move` to the start or end of a file, which may be another.
+    Across,
 }
 
 /// The tier of `decision`, read from its document alone.
@@ -81,15 +84,23 @@ pub fn tier(env: &Env, decision: &Decision) -> Classified {
     if never(env, cel) {
         return classified(Tier::T, "no-condition");
     }
-    if let Some(operation) = orders(env, decision) {
-        return classified(Tier::O, format!("fix:{operation}"));
-    }
-    if reads_placement(env, cel) {
-        return classified(Tier::T, "placement");
+    match orders(env, decision) {
+        Some(Ordering::Across) => return classified(Tier::T, "placement"),
+        Some(Ordering::Within(operation)) => {
+            return classified(Tier::O, format!("fix:{operation}"));
+        }
+        None => {}
     }
     match translate(env, cel, select.variable()) {
         Ok(_) => classified(Tier::F, "translated"),
-        Err(reject) => classified(Tier::T, format!("outside-fragment:{}", reject.0)),
+        Err(reject) => classified(Tier::T, format!("outside-fragment:{}", reject.construct)),
+    }
+}
+
+fn classified(tier: Tier, reason: impl Into<String>) -> Classified {
+    Classified {
+        tier,
+        tier_reason: reason.into(),
     }
 }
 
@@ -101,36 +112,30 @@ fn never(env: &Env, cel: &CelCheck) -> bool {
     })
 }
 
-/// Whether the variables or the `where` read a field of `PLACEMENT`.
-fn reads_placement(env: &Env, cel: &CelCheck) -> bool {
-    let sources = cel
-        .variables
-        .iter()
-        .map(|v| v.expression.as_str())
-        .chain([cel.condition.as_str()]);
-    sources
-        .filter_map(|source| env.compile(source).ok())
-        .any(|program| {
-            visit(
-                program.expression(),
-                &|e| matches!(&e.expr, Expr::Select(s) if PLACEMENT.contains(&s.field.as_str())),
-            )
-        })
-}
-
-/// The ordering operation the fix's edits call, if they call one.
-fn orders(env: &Env, decision: &Decision) -> Option<&'static str> {
+/// The ordering the fix's edits call, if they call one.
+fn orders(env: &Env, decision: &Decision) -> Option<Ordering> {
     let fix = decision.fix.as_ref()?;
     let FixKind::Cel { edits, .. } = &fix.kind else {
         return None;
     };
     let program: Program = env.compile(edits).ok()?;
-    ORDERING.into_iter().find(|operation| {
-        visit(
-            program.expression(),
-            &|e| matches!(&e.expr, Expr::Call(call) if call.func_name == *operation),
-        )
-    })
+    let root = program.expression();
+    if visit(root, &|e| {
+        matches!(&e.expr, Expr::Call(call) if call.func_name == "move"
+        && call.args.get(1).is_some_and(|anchor| matches!(&anchor.expr,
+            Expr::Call(a) if FILE_ANCHORS.contains(&a.func_name.as_str()))))
+    }) {
+        return Some(Ordering::Across);
+    }
+    ORDERING
+        .into_iter()
+        .find(|operation| {
+            visit(
+                root,
+                &|e| matches!(&e.expr, Expr::Call(call) if call.func_name == *operation),
+            )
+        })
+        .map(Ordering::Within)
 }
 
 /// Whether `found` holds of the expression or any part of it.

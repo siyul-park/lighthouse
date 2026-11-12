@@ -55,13 +55,18 @@ fn the_order_decisions_are_those_whose_fix_moves_declarations() {
 }
 
 #[test]
-fn the_owner_file_decisions_are_placement() {
+fn the_owner_file_decisions_name_the_construct_that_leaves_the_fragment() {
     let tiers = classified();
 
-    for id in ["design/owner-file", "testing/owner-file"] {
-        assert_eq!(tiers[id].tier_reason, "placement", "{id}");
-        assert_eq!(tiers[id].tier, Tier::T, "{id}");
-    }
+    assert_eq!(
+        tiers["design/owner-file"].tier_reason,
+        "outside-fragment:computed-list"
+    );
+    assert_eq!(
+        tiers["testing/owner-file"].tier_reason,
+        "outside-fragment:index"
+    );
+    assert!(tiers.values().all(|c| c.tier_reason != "placement"));
 }
 
 #[test]

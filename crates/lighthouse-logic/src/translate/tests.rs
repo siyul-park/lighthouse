@@ -19,7 +19,9 @@ fn query(subject: &str, variables: Value, condition: &str) -> Result<Ucq, Reject
 }
 
 fn rejected(condition: &str) -> String {
-    query("symbol", json!([]), condition).unwrap_err().0
+    query("symbol", json!([]), condition)
+        .unwrap_err()
+        .to_string()
 }
 
 #[test]
@@ -254,8 +256,18 @@ fn a_chain_of_variables_that_doubles_is_refused_past_a_cap() {
     };
 
     assert!(chain(4).is_ok());
-    assert!(chain(10).unwrap_err().0.contains("too many conditions"));
-    assert!(chain(16).unwrap_err().0.contains("expands too far"));
+    assert!(
+        chain(10)
+            .unwrap_err()
+            .to_string()
+            .contains("too many conditions")
+    );
+    assert!(
+        chain(16)
+            .unwrap_err()
+            .to_string()
+            .contains("expands too far")
+    );
 }
 
 #[test]
@@ -273,7 +285,9 @@ fn a_bound_value_that_is_never_read_is_refused() {
     let variables = json!([{"name": "f", "params": ["x"], "expression": "true"}]);
 
     let unused_bind = rejected("cel.bind(k, symbol.x.y, true)");
-    let unused_param = query("symbol", variables, "f(symbol.a)").unwrap_err().0;
+    let unused_param = query("symbol", variables, "f(symbol.a)")
+        .unwrap_err()
+        .to_string();
 
     assert!(unused_bind.contains("never read"), "{unused_bind}");
     assert!(unused_param.contains("never read"), "{unused_param}");

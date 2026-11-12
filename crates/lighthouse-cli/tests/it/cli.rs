@@ -324,7 +324,10 @@ fn decision_list_json_gives_the_tier_and_its_reason() {
     assert_eq!(item("core/max-lines")["tier"], "F");
     assert_eq!(item("core/max-lines")["tierReason"], "translated");
     assert_eq!(item("design/declaration-groups")["tier"], "O");
-    assert_eq!(item("design/owner-file")["tierReason"], "placement");
+    assert_eq!(
+        item("design/owner-file")["tierReason"],
+        "outside-fragment:computed-list"
+    );
 }
 
 #[test]

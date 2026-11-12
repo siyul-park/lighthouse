@@ -5,32 +5,32 @@ expression: report
 93 decisions: F 10, O 4, T 79
 
 core/allow-reason	T	outside-fragment:index
-core/decision-naming	T	outside-fragment:concatenation or arithmetic
+core/decision-naming	T	outside-fragment:concatenation
 core/formatted	T	command
 core/max-len	F	translated
 core/max-lines	F	translated
 core/no-unused-allow	F	translated
-design/abbreviations	T	outside-fragment:a comprehension over a computed list
+design/abbreviations	T	outside-fragment:computed-comprehension
 design/abstraction-level	T	model
-design/complexity	T	outside-fragment:concatenation or arithmetic
+design/complexity	T	outside-fragment:concatenation
 design/consistent-terms	T	abstain
 design/constructor-validation	T	model
 design/consumer-interfaces	T	model
 design/context-first	T	outside-fragment:ternary
 design/coupling	T	outside-fragment:ternary
-design/declaration-blocks	T	outside-fragment:the call `flatten`
+design/declaration-blocks	T	outside-fragment:flatten
 design/declaration-groups	O	fix:move
 design/encapsulated-platform	T	model
 design/encapsulated-state	T	model
 design/error-categories	T	model
 design/error-identity	T	outside-fragment:ternary
 design/error-translation	T	model
-design/exported-doc	T	outside-fragment:a comprehension over a computed list
+design/exported-doc	T	outside-fragment:computed-comprehension
 design/feature-envy	T	abstain
 design/file-placement	T	model
 design/general-extraction	T	model
 design/layers	T	outside-fragment:ternary
-design/max-name-words	T	outside-fragment:the call `size`
+design/max-name-words	T	outside-fragment:size
 design/meaningful-separation	T	abstain
 design/module-layout	T	abstain
 design/module-placement	T	model
@@ -44,18 +44,18 @@ design/no-hybrid-type	T	model
 design/no-mutable-globals	T	abstain
 design/no-noise-comment	T	abstain
 design/no-panic	T	outside-fragment:ternary
-design/no-private-types	T	outside-fragment:arithmetic of fields
-design/no-redundant-qualifier	T	outside-fragment:concatenation or arithmetic
+design/no-private-types	T	outside-fragment:arithmetic
+design/no-redundant-qualifier	T	outside-fragment:concatenation
 design/no-redundant-symbol	T	abstain
-design/no-single-line-bodies	T	outside-fragment:a comparison of two fields
+design/no-single-line-bodies	T	outside-fragment:two-fields
 design/no-speculative-generality	T	model
 design/no-state-in-errors	T	model
 design/no-stored-context	F	translated
-design/no-todo	T	outside-fragment:the call `split`
-design/no-type-encoding	T	outside-fragment:a comprehension over a computed list
+design/no-todo	T	outside-fragment:split
+design/no-type-encoding	T	outside-fragment:computed-comprehension
 design/no-unused-symbol	F	translated
 design/optional-options	T	model
-design/owner-file	T	placement
+design/owner-file	T	outside-fragment:computed-list
 design/plural-collections	T	model
 design/predicate-names	T	model
 design/prefer-method	F	translated
@@ -64,7 +64,7 @@ design/reserved-verbs	T	abstain
 design/resource-owner	T	model
 design/scoped-borrows	T	model
 design/short-names	T	abstain
-design/signature-size	T	outside-fragment:concatenation or arithmetic
+design/signature-size	T	outside-fragment:concatenation
 design/single-responsibility	T	abstain
 design/state-owner	T	model
 design/stateless-layout	T	model
@@ -87,7 +87,7 @@ testing/no-hidden-target	T	abstain
 testing/no-missing-owner	T	outside-fragment:ternary
 testing/no-polling-after-teardown	T	model
 testing/no-structure-tests	T	model
-testing/owner-file	T	placement
+testing/owner-file	T	outside-fragment:index
 testing/path-parity	T	model
 testing/prefer-table	T	model
 testing/public-boundary	F	translated
@@ -96,4 +96,4 @@ testing/scenario-cases	T	model
 testing/self-validating	T	model
 testing/simple-tables	T	model
 testing/specific-evidence	T	model
-testing/standard-assertions	T	outside-fragment:a comprehension over a computed list
+testing/standard-assertions	T	outside-fragment:computed-comprehension
