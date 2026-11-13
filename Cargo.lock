@@ -2021,6 +2021,7 @@ name = "lighthouse-logic"
 version = "0.1.0"
 dependencies = [
  "cel",
+ "lighthouse-protocol",
  "lighthouse-spec",
  "schemars",
  "serde",
