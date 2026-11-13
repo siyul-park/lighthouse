@@ -36,6 +36,7 @@ mod file_uses;
 mod forward;
 mod gap;
 pub mod height;
+mod holding;
 pub(crate) mod homonyms;
 pub(crate) mod imports;
 pub mod level;
@@ -91,6 +92,8 @@ pub(crate) struct Builder<'a> {
     related: RefCell<BTreeMap<SymbolId, Value>>,
     /// What each file needs of its own declarations as it loads, found once.
     loads: RefCell<BTreeMap<PathBuf, Rc<Vec<LoadNeed>>>>,
+    /// The holding graph of each file, found once.
+    holdings: RefCell<BTreeMap<PathBuf, Rc<holding::Holding>>>,
     related_needs: Needs,
 }
 
@@ -145,6 +148,7 @@ impl<'a> Builder<'a> {
             declared: RefCell::default(),
             related: RefCell::default(),
             loads: RefCell::default(),
+            holdings: RefCell::default(),
             related_needs: needs.of_related(),
         }
     }

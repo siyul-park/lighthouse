@@ -24,6 +24,7 @@ impl Builder<'_> {
         if needs.field("file_uses") {
             map.insert("file_uses".to_owned(), self.file_uses(symbol));
         }
+        self.holding_facts(map, symbol, needs);
     }
 
     /// The ids of the declarations of the same file that use `symbol`, tests too.

@@ -13,8 +13,10 @@ spec:
     as a field, directly or inside a pointer, slice, map or generic type, follows
     the type that holds it; no tool orders types this way, and the severity is the
     decision's. A group order of `design/declaration-groups` wins (a public type
-    before the private type that holds it is fine), and types that hold each other
-    are not ordered. TypeScript and JavaScript are not covered, since ESLint `no-use-before-define`,
+    before the private type that holds it is fine), and types that hold each other,
+    directly or through others, are not ordered, as
+    functions that call each other are not, since step-down orders what depends on
+    what only across a cycle and never inside it. TypeScript and JavaScript are not covered, since ESLint `no-use-before-define`,
     whose default warns on every reference to a function before
     its declaration, asks for the opposite order, and neither the Google TypeScript
     Style Guide nor the TypeScript Handbook orders functions by their callers.
@@ -44,28 +46,10 @@ spec:
     variables:
     - name: local
       expression: "symbol.func != null ? symbol.local_callers : []"
-    - name: mentions
-      params: [f, b]
-      expression: |-
-        f.type != null && (f.type.symbol == b.id.split('#')[0]
-          || (f.type.symbol == '' && regex.matches(f.type.text,
-                b.lang == 'go'
-                ? (b.module == '.' ? '\\.' : '/' + b.module.replace('.', '\\.') + '\\.')
-                  + b.name + '($|[^A-Za-z0-9_])'
-                : '(^|[^A-Za-z0-9_])' + b.name + '($|[^A-Za-z0-9_])')))
-    # Per file, [holder id, held id] for every type that a field of another type
-    # of the file mentions.
-    - name: holds
-      expression: |-
-        cel.bind(types, file.symbols.filter(t, t.kind == 'type'),
-          file.symbols.filter(f, f.kind == 'field')
-            .map(f, types.filter(b, b.id != f.owner_key && mentions(f, b)).map(b, [f.owner_key, b.id]))
-            .flatten())
+    # The types of the file that hold this one, but not those in a cycle of
+    # holding with it: inside a cycle there is no order to keep.
     - name: held_by
-      expression: |-
-        symbol.kind == 'type'
-          ? holds.filter(h, h[1] == symbol.id && !holds.exists(g, g[0] == symbol.id && g[1] == h[0])).map(h, h[0])
-          : []
+      expression: "symbol.kind == 'type' ? symbol.holders.filter(h, !(h in symbol.hold_cycle)) : []"
     - name: holders
       expression: "size(held_by) == 0 ? [] : file.symbols.filter(a, a.kind == 'type' && a.id in held_by)"
     - name: users
@@ -269,6 +253,134 @@ spec:
 
         // Edge is part of the example.
         type Edge struct{ To *Node }
+  - name: types-that-hold-each-other-in-a-cycle
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // Account is part of the example.
+        type Account struct{ Owner *Owner }
+
+        // Owner is part of the example.
+        type Owner struct{ Group *Group }
+
+        // Group is part of the example.
+        type Group struct{ Members []*Account }
+  - name: rust-types-that-hold-each-other-in-a-cycle
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Part of the example.
+        pub struct Account {
+            owner: Option<Box<Owner>>,
+        }
+
+        /// Part of the example.
+        pub struct Owner {
+            group: Option<Box<Group>>,
+        }
+
+        /// Part of the example.
+        pub struct Group {
+            members: Vec<Account>,
+        }
+  - name: a-long-cycle-of-types
+    language: go
+    kind: valid
+    files:
+    - path: example.go
+      body: |-
+        package sample
+
+        // N0 is part of the example.
+        type N0 struct{ Next *N1 }
+
+        // N1 is part of the example.
+        type N1 struct{ Next *N2 }
+
+        // N2 is part of the example.
+        type N2 struct{ Next *N3 }
+
+        // N3 is part of the example.
+        type N3 struct{ Next *N4 }
+
+        // N4 is part of the example.
+        type N4 struct{ Next *N5 }
+
+        // N5 is part of the example.
+        type N5 struct{ Next *N6 }
+
+        // N6 is part of the example.
+        type N6 struct{ Next *N7 }
+
+        // N7 is part of the example.
+        type N7 struct{ Next *N8 }
+
+        // N8 is part of the example.
+        type N8 struct{ Next *N9 }
+
+        // N9 is part of the example.
+        type N9 struct{ Next *N0 }
+  - name: rust-a-long-cycle-of-types
+    language: rust
+    kind: valid
+    files:
+    - path: src/lib.rs
+      body: |-
+        /// Part of the example.
+        pub struct N0 {
+            next: Option<Box<N1>>,
+        }
+
+        /// Part of the example.
+        pub struct N1 {
+            next: Option<Box<N2>>,
+        }
+
+        /// Part of the example.
+        pub struct N2 {
+            next: Option<Box<N3>>,
+        }
+
+        /// Part of the example.
+        pub struct N3 {
+            next: Option<Box<N4>>,
+        }
+
+        /// Part of the example.
+        pub struct N4 {
+            next: Option<Box<N5>>,
+        }
+
+        /// Part of the example.
+        pub struct N5 {
+            next: Option<Box<N6>>,
+        }
+
+        /// Part of the example.
+        pub struct N6 {
+            next: Option<Box<N7>>,
+        }
+
+        /// Part of the example.
+        pub struct N7 {
+            next: Option<Box<N8>>,
+        }
+
+        /// Part of the example.
+        pub struct N8 {
+            next: Option<Box<N9>>,
+        }
+
+        /// Part of the example.
+        pub struct N9 {
+            next: Option<Box<N0>>,
+        }
   - name: public-type-before-the-private-type-that-holds-it
     language: go
     kind: valid
