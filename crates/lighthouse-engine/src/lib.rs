@@ -26,7 +26,8 @@ pub use fix::{
     FixRun, FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, ToolCounts, brief, unified_diff,
 };
 pub use tester::{
-    Alphabet, Arrangement, Decl, Edge, ExampleRun, Incomplete, Kind, Language, MAX_BOUND, Relation,
-    RuleTester, Scratch, Shape, Spent, Tested, Unit, Visibility, enumerate,
+    Alphabet, Arrangement, Basis, Bounded, Cell, Contradiction, Decl, Edge, ExampleRun, Flagged,
+    Forced, Incomplete, Kind, Language, MAX_BOUND, Oracle, Relation, RuleTester, Scratch, Searched,
+    Shape, Single, Spent, Tested, Unit, Verdict, Visibility, Witness, enumerate,
 };
 pub use timings::{Detect, FixTimings, Timings};

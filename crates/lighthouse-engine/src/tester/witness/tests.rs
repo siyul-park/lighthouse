@@ -1,9 +1,14 @@
-use std::{collections::BTreeMap, path::Path, process::Command, time::Instant};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+    process::Command,
+    time::Instant,
+};
 
 use lighthouse_test_support::{bundled, go_root};
 use serde_json::{Map, json};
 
-use super::*;
+use super::{analysis::judge, *};
 
 const GO: Alphabet = Alphabet {
     tests: false,
@@ -44,7 +49,7 @@ fn shapes_are_counted_once_up_to_renaming() {
     );
     assert_eq!(
         counts(Language::Go, GO_TESTS),
-        [(9, 9), (111, 199), (1916, 10168)]
+        [(10, 10), (138, 255), (2800, 16320)]
     );
     assert_eq!(
         counts(Language::Rust, RUST),
@@ -52,7 +57,7 @@ fn shapes_are_counted_once_up_to_renaming() {
     );
     assert_eq!(
         counts(Language::Rust, RUST_TESTS),
-        [(8, 8), (89, 157), (1487, 7817)]
+        [(9, 9), (114, 209), (2262, 13285)]
     );
 }
 
@@ -185,7 +190,7 @@ fn tests_are_ordered_too() {
         edges: Vec::new(),
     };
 
-    assert_eq!(shape.size(), 4);
+    assert_eq!(shape.size(), 2, "the tests do not count");
     assert_eq!(
         shape.arrangements().len(),
         2,
@@ -219,6 +224,107 @@ fn language_of_an_id() {
 fn language_id() {
     assert_eq!(Language::Go.id(), "go");
     assert_eq!(Language::of(Language::Rust.id()), Ok(Language::Rust));
+}
+
+#[test]
+fn setting_new() {
+    let provenance = Provenance {
+        renderer: "r".to_owned(),
+        provider: "p@1".to_owned(),
+        tool: "t".to_owned(),
+        injected: String::new(),
+    };
+    let setting = Setting::new(Language::Go, GO, 2, provenance);
+
+    assert_eq!(
+        (setting.language.as_str(), setting.bound, setting.tests),
+        ("go", 2, false)
+    );
+    assert_eq!(setting.hook.as_deref(), Some("Clone"));
+}
+
+#[test]
+fn verdict_incomplete() {
+    let verdict = Verdict::incomplete(vec!["why".to_owned()]);
+
+    assert!(verdict.contradictions.is_empty() && verdict.single.is_empty());
+    assert_eq!(verdict.basis, Basis::Incomplete(vec!["why".to_owned()]));
+}
+
+#[test]
+fn scratch_digest() {
+    let shapes = enumerate(Language::Rust, RUST, 2).unwrap();
+    let digest = Scratch::digest(Language::Rust, RUST, &shapes);
+
+    assert_eq!(digest, Scratch::digest(Language::Rust, RUST, &shapes));
+    assert_ne!(digest, Scratch::digest(Language::Rust, RUST, &shapes[1..]));
+    let go = enumerate(Language::Go, GO, 2).unwrap();
+    assert_ne!(digest, Scratch::digest(Language::Go, GO, &go));
+    assert_ne!(
+        Scratch::digest(Language::Go, GO, &go),
+        Scratch::digest(
+            Language::Go,
+            NO_HOOK,
+            &enumerate(Language::Go, NO_HOOK, 2).unwrap()
+        )
+    );
+}
+
+#[test]
+fn a_decision_unsatisfiable_by_itself_hides_every_pair_that_holds_it() {
+    let (d, e) = (assumption("D"), assumption("E"));
+    let setting = Setting {
+        language: "rust".to_owned(),
+        bound: 2,
+        tests: false,
+        hook: Some("Drop".to_owned()),
+        renderer: String::new(),
+        provider: String::new(),
+        tool: String::new(),
+        injected: String::new(),
+    };
+    let shapes = enumerate(Language::Rust, RUST, 2).unwrap();
+    let mut base = 0;
+    let mut pairs = Vec::new();
+    for shape in &shapes {
+        let count = shape.arrangements().len();
+        if shape.size() == 2 && count == 2 {
+            pairs.push(base);
+        }
+        base += count;
+    }
+    // D and E flag one arrangement each of an early shape; D flags both
+    // arrangements of a later one.
+    let early = pairs[0];
+    let late = pairs[1];
+    let together = BTreeMap::from([
+        (d.clone(), BTreeSet::from([early, late, late + 1])),
+        (e.clone(), BTreeSet::from([early + 1])),
+    ]);
+    let pair_only = BTreeMap::from([
+        (d.clone(), BTreeSet::from([early])),
+        (e.clone(), BTreeSet::from([early + 1])),
+    ]);
+
+    let alone = judge(&setting, &together);
+    let both = judge(&setting, &pair_only);
+
+    assert!(
+        alone.contradictions.is_empty(),
+        "{:?}",
+        alone.contradictions
+    );
+    assert_eq!(
+        alone
+            .single
+            .iter()
+            .map(|s| s.decision.as_str())
+            .collect::<Vec<_>>(),
+        ["D"]
+    );
+    assert_eq!(both.contradictions.len(), 1);
+    assert_eq!(both.contradictions[0].decisions, ["D", "E"]);
+    assert!(both.single.is_empty());
 }
 
 #[test]
@@ -518,6 +624,14 @@ fn the_cost_of_the_bound_three() {
     }
 }
 
+/// The assumption of a decision with this uid.
+fn assumption(uid: &str) -> lighthouse_logic::Assumption {
+    lighthouse_logic::Assumption {
+        uid: uid.to_owned(),
+        digest: "1".to_owned(),
+    }
+}
+
 /// A declaration of this kind, not tested.
 fn decl(kind: Kind, visibility: Visibility) -> Decl {
     Decl {
@@ -527,8 +641,8 @@ fn decl(kind: Kind, visibility: Visibility) -> Decl {
     }
 }
 
-/// Every multiset of the labels of up to three declarations, with tests
-/// counting, each in label order.
+/// Every multiset of the labels of up to three declarations, each in label
+/// order.
 fn multisets(labels: &[Decl]) -> Vec<Vec<Decl>> {
     let mut all = Vec::new();
     for (i, a) in labels.iter().enumerate() {
@@ -540,7 +654,6 @@ fn multisets(labels: &[Decl]) -> Vec<Vec<Decl>> {
             }
         }
     }
-    all.retain(|decls| decls.iter().map(|d| d.size()).sum::<usize>() <= 3);
     all
 }
 

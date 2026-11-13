@@ -7,12 +7,22 @@
 use std::collections::BTreeSet;
 
 use lighthouse_spec::Decision;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+mod analysis;
 mod build;
+mod oracle;
+mod run;
 mod scratch;
+mod search;
 mod text;
 
+pub use analysis::{
+    Basis, Bounded, CellKey, Contradiction, FLAGS, Flagged, Flags, FlagsKey, Forced, Provenance,
+    Setting, Single, VERDICT, Verdict, Witness,
+};
+pub use oracle::{Cell, Oracle, Searched};
 pub use scratch::{Scratch, Unit};
 
 /// The largest bound the enumeration offers. It grows with the factorial of
@@ -28,24 +38,25 @@ const GO_HOOKS: [&str; 4] = ["Clone", "String", "GoString", "Error"];
 
 /// A set of declarations and the edges between them. Declarations are in a
 /// canonical order and edges are sorted, so equal shapes are equal values.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Shape {
     pub decls: Vec<Decl>,
     pub edges: Vec<Edge>,
 }
 
 /// One declaration of a shape.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Decl {
     pub kind: Kind,
     pub visibility: Visibility,
-    /// A test in the test file names it as its target. The test counts toward
-    /// the size of the shape.
+    /// A test in the test file names it as its target. The test does not count
+    /// toward the size of the shape; its place in the test file is an order
+    /// of its own.
     pub tested: bool,
 }
 
 /// What one declaration is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Kind {
     Type,
     Func,
@@ -67,14 +78,14 @@ pub enum Kind {
 }
 
 /// Whether a declaration is visible outside its package.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Visibility {
     Public,
     Private,
 }
 
 /// A directed relation between two declarations of a shape, by index.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Edge {
     pub from: usize,
     pub to: usize,
@@ -82,7 +93,7 @@ pub struct Edge {
 }
 
 /// How one declaration relates to another.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Relation {
     /// A method belongs to a type.
     Owner,
@@ -96,7 +107,7 @@ pub enum Relation {
 
 /// An order of the declarations of a shape in its source file, and of the
 /// tests that name them in its test file.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Arrangement {
     /// Declaration indices, in source order.
     pub source: Vec<usize>,
@@ -140,6 +151,26 @@ pub enum Incomplete {
     Options { decision: String, reason: String },
     /// The bound is above [`MAX_BOUND`].
     Bound(usize),
+}
+
+impl std::fmt::Display for Incomplete {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoRenderer(language) => write!(f, "no renderer for `{language}`"),
+            Self::Alphabet {
+                decision,
+                language,
+                group,
+            } => write!(
+                f,
+                "`{decision}` orders `{group}`, which the {language} alphabet cannot produce"
+            ),
+            Self::Options { decision, reason } => {
+                write!(f, "the options of `{decision}` do not resolve: {reason}")
+            }
+            Self::Bound(bound) => write!(f, "a bound of {bound} is above {MAX_BOUND}"),
+        }
+    }
 }
 
 impl Language {
@@ -309,16 +340,13 @@ impl Decl {
     fn testable(self) -> bool {
         self.visibility == Visibility::Public && matches!(self.kind, Kind::Func | Kind::Method)
     }
-
-    fn size(self) -> usize {
-        1 + usize::from(self.tested)
-    }
 }
 
 impl Shape {
-    /// Declarations and tests together.
+    /// The number of declarations: the tests that name them do not count,
+    /// they only add an order of their own.
     pub fn size(&self) -> usize {
-        self.decls.iter().map(|decl| decl.size()).sum()
+        self.decls.len()
     }
 
     /// Every distinct order of the declarations and of the tests: orders that
@@ -405,12 +433,12 @@ fn collect_multisets(
     out: &mut Vec<Vec<Decl>>,
 ) {
     for (i, &label) in labels.iter().enumerate().skip(from) {
-        if label.size() > budget {
-            continue;
+        if budget == 0 {
+            return;
         }
         current.push(label);
         out.push(current.clone());
-        collect_multisets(labels, i, budget - label.size(), current, out);
+        collect_multisets(labels, i, budget - 1, current, out);
         current.pop();
     }
 }
@@ -464,6 +492,15 @@ fn names<'a>(options: &'a Map<String, Value>, key: &str) -> Vec<&'a str> {
         .and_then(Value::as_array)
         .map(|list| list.iter().filter_map(Value::as_str).collect())
         .unwrap_or_default()
+}
+
+/// The hook named `name`, if it is one a language renders.
+fn hook_named(name: &str) -> Option<&'static str> {
+    GO_HOOKS
+        .iter()
+        .copied()
+        .chain(["Drop"])
+        .find(|hook| *hook == name)
 }
 
 /// Every order of `0..n`.

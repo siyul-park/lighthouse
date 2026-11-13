@@ -14,6 +14,7 @@ ignore.workspace = true
 postcard.workspace = true
 regex.workspace = true
 lighthouse-graph.workspace = true
+lighthouse-logic.workspace = true
 lighthouse-model.workspace = true
 lighthouse-plugin.workspace = true
 lighthouse-process.workspace = true

@@ -14,6 +14,7 @@ use std::{
 
 use lighthouse_model::ExampleScope;
 use lighthouse_spec::{Decision, Example};
+use serde_json::{Map, Value};
 use similar::TextDiff;
 
 use super::{RuleTester, rules_config};
@@ -59,7 +60,8 @@ impl RuleTester<'_> {
         dir: &Path,
     ) -> Result<Engine, String> {
         let registry = (self.registry)();
-        let rules: Vec<(&Decision, Option<&Example>)> = others.iter().map(|d| (*d, None)).collect();
+        let rules: Vec<(&Decision, Option<&Map<String, Value>>)> =
+            others.iter().map(|d| (*d, None)).collect();
         let config = rules_config(
             self.catalog,
             &registry,

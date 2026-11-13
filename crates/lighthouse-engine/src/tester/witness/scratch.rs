@@ -58,6 +58,27 @@ impl Scratch {
         Ok(Self { dir, units })
     }
 
+    /// The digest of the text that [`render`](Self::render) writes for these
+    /// shapes: every package's file names and texts, in order. It identifies
+    /// the renderer by what it does, so no version is kept by hand.
+    pub fn digest(language: Language, alphabet: Alphabet, shapes: &[Shape]) -> String {
+        let mut hasher = blake3::Hasher::new();
+        let mut packages = 0;
+        for shape in shapes {
+            for arrangement in shape.arrangements() {
+                let package = format!("p{packages}");
+                packages += 1;
+                for (name, body) in text::files(language, alphabet, shape, &arrangement, &package) {
+                    for part in [name, body] {
+                        hasher.update(part.as_bytes());
+                        hasher.update(&[0]);
+                    }
+                }
+            }
+        }
+        hasher.finalize().to_hex()[..16].to_owned()
+    }
+
     /// The directory of the project.
     pub fn root(&self) -> &Path {
         self.dir.path()

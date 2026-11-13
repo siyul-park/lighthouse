@@ -23,3 +23,5 @@ mod scope;
 mod support;
 mod tester;
 mod tool_findings;
+mod witness;
+mod witness_catalog;

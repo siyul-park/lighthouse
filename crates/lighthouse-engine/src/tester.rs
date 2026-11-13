@@ -12,7 +12,7 @@ use tempfile::TempDir;
 
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, Fix};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
 
@@ -21,8 +21,9 @@ mod witness;
 
 use cross::{cross, hits_in, introduced, judge, model_only};
 pub use witness::{
-    Alphabet, Arrangement, Decl, Edge, Incomplete, Kind, Language, MAX_BOUND, Relation, Scratch,
-    Shape, Unit, Visibility, enumerate,
+    Alphabet, Arrangement, Basis, Bounded, Cell, Contradiction, Decl, Edge, Flagged, Forced,
+    Incomplete, Kind, Language, MAX_BOUND, Oracle, Relation, Scratch, Searched, Shape, Single,
+    Unit, Verdict, Visibility, Witness, enumerate,
 };
 
 /// Stack of a worker that checks decisions: the engine under an example
@@ -289,7 +290,8 @@ impl<'a> RuleTester<'a> {
         let started = Instant::now();
         let registry = (self.registry)();
         let shared: &[&Decision] = if fixing { &[] } else { &others };
-        let mut configured: Vec<(&Decision, Option<&Example>)> = vec![(decision, Some(example))];
+        let mut configured: Vec<(&Decision, Option<&Map<String, Value>>)> =
+            vec![(decision, Some(&example.options))];
         configured.extend(shared.iter().map(|other| (*other, None)));
         let config = rules_config(
             self.catalog,
@@ -536,7 +538,7 @@ fn found(run: &Run) -> Vec<(u32, &str)> {
 fn rules_config(
     catalog: &Catalog,
     registry: &Registry,
-    rules: &[(&Decision, Option<&Example>)],
+    rules: &[(&Decision, Option<&Map<String, Value>>)],
     extends: &[String],
 ) -> Result<Config, String> {
     let mut table = toml::Table::new();
@@ -567,7 +569,7 @@ fn rules_config(
             .map(|s| decision.inheriting(s))
             .and_then(|d| d.options.as_ref().map(|options| options.inherited.clone()));
         let (mut own, mut read) = (toml::Table::new(), toml::Table::new());
-        for (key, value) in example.iter().flat_map(|e| &e.options) {
+        for (key, value) in example.iter().flat_map(|options| options.iter()) {
             let into = if inherited.as_ref().is_some_and(|keys| keys.contains(key)) {
                 &mut read
             } else {
