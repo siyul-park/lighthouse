@@ -17,8 +17,13 @@ use serde_json::Value;
 use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
 
 mod cross;
+mod witness;
 
 use cross::{cross, hits_in, introduced, judge, model_only};
+pub use witness::{
+    Alphabet, Arrangement, Decl, Edge, Incomplete, Kind, Language, MAX_BOUND, Relation, Scratch,
+    Shape, Unit, Visibility, enumerate,
+};
 
 /// Stack of a worker that checks decisions: the engine under an example
 /// recurses deeply.

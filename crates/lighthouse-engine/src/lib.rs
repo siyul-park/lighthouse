@@ -25,5 +25,8 @@ pub use fix::{
     AppliedFix, BatchTrace, DeclinedFix, EditUsage, FileChange, FixBinding, FixPlan, FixReport,
     FixRun, FixedBy, MAX_ROUNDS, ModelCounts, PreviewedFix, ToolCounts, brief, unified_diff,
 };
-pub use tester::{ExampleRun, RuleTester, Spent, Tested};
+pub use tester::{
+    Alphabet, Arrangement, Decl, Edge, ExampleRun, Incomplete, Kind, Language, MAX_BOUND, Relation,
+    RuleTester, Scratch, Shape, Spent, Tested, Unit, Visibility, enumerate,
+};
 pub use timings::{Detect, FixTimings, Timings};

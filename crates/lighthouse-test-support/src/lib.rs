@@ -118,6 +118,8 @@ static LANG_GO: OnceLock<Option<PathBuf>> = OnceLock::new();
 static LANG_TYPESCRIPT: OnceLock<Option<PathBuf>> = OnceLock::new();
 static LANG_PYTHON: OnceLock<Option<PathBuf>> = OnceLock::new();
 
+static GO_ROOT: OnceLock<Option<PathBuf>> = OnceLock::new();
+
 static LANG_RUST: OnceLock<PathBuf> = OnceLock::new();
 
 static LANG_YAML: OnceLock<PathBuf> = OnceLock::new();
@@ -162,6 +164,14 @@ pub fn listing(config: &str, plugin: &str) -> String {
         .expect("plugins is a list")
         .push(entry);
     project(&toml::to_string(spec).expect("a spec is TOML"))
+}
+
+/// The `GOROOT` of the Go toolchain that runs in `plugins/lang-go` (the one of
+/// `.go-version`), whose `bin/go` a test runs. `None` after printing a skip
+/// message when no such toolchain runs, unless `CI` or `LIGHTHOUSE_REQUIRE_GO`
+/// is set, where a missing toolchain panics.
+pub fn go_root() -> Option<PathBuf> {
+    GO_ROOT.get_or_init(find_go_root).clone()
 }
 
 /// Directory of the `lang-go` plugin (manifest and binary, the layout
@@ -279,7 +289,7 @@ fn quoted(key: &str) -> String {
     toml::Value::String(key.to_owned()).to_string()
 }
 
-fn build_lang_go() -> Option<PathBuf> {
+fn find_go_root() -> Option<PathBuf> {
     let source = workspace().join("plugins/lang-go");
     let version = Command::new("go")
         .arg("version")
@@ -293,6 +303,12 @@ fn build_lang_go() -> Option<PathBuf> {
         eprintln!("skipping: no Go toolchain runs in plugins/lang-go (see .go-version)");
         return None;
     }
+    Some(PathBuf::from(goroot(&source)))
+}
+
+fn build_lang_go() -> Option<PathBuf> {
+    let source = workspace().join("plugins/lang-go");
+    let root = go_root()?;
     let out = workspace().join("target/plugins-test/lang-go");
     fs::create_dir_all(&out).expect("create plugin dir");
     install(&out.join("lang-go"), |tmp| {
@@ -305,7 +321,7 @@ fn build_lang_go() -> Option<PathBuf> {
             .expect("run go build");
         assert!(status.success(), "go build of plugins/lang-go failed");
     });
-    install_manifest(&source, &out, &goroot(&source));
+    install_manifest(&source, &out, &root.to_string_lossy());
     Some(out)
 }
 

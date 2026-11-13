@@ -102,6 +102,7 @@ lint: plugins cli
 decisions: plugins cli
 	$(call test-examples,)
 	cargo test --release -p lighthouse-checks --test it -- --ignored the_query_holds_of_the_subjects_the_decision_reports_on_this_repository
+	cargo test --release -p lighthouse-engine --lib -- --ignored every_rendered
 
 docs: cli
 	LIGHTHOUSE_TRUST=1 $(LIGHTHOUSE) docs check
