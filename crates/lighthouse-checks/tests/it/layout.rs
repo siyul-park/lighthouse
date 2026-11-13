@@ -77,7 +77,7 @@ fn declarations_lists_each_module_of_a_file_in_source_order() {
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
         batch: &Default::default(),
-        documents: &[],
+        documents: &lighthouse_plugin::NO_DOCUMENTS,
         queries: &lighthouse_plugin::NoQueries,
     };
 

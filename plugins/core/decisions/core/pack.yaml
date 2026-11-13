@@ -27,6 +27,12 @@ spec:
       decision names consistent.
     decisions:
     - decision-naming
+  - name: consistency
+    title: Consistency
+    intro: Decisions that are each reasonable can still be impossible to satisfy
+      together; the engine looks for the smallest code that shows it.
+    decisions:
+    - no-contradictory-decisions
   - name: format
     title: Formatting
     intro: Source formatting is decided by the language standard, not by review.

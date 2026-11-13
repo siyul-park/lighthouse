@@ -212,6 +212,13 @@ impl Rule for Check {
         }
     }
 
+    fn reads_documents(&self) -> Vec<String> {
+        match &*self.kind {
+            Kind::Cel(rule) => rule.reads_documents(),
+            Kind::Command(_) => Vec::new(),
+        }
+    }
+
     fn batch(
         &self,
         ctx: &Context,

@@ -4,6 +4,8 @@
 //! kept in the graph under everything they depend on, so an unchanged
 //! decision is never run again.
 
+use std::sync::Arc;
+
 use lighthouse_graph::{Durability, Graph};
 use lighthouse_logic::Assumption;
 use lighthouse_plugin::Registry;
@@ -17,7 +19,7 @@ use super::{
 
 /// Runs the decisions of a cell over the shapes that can break their order.
 pub struct Oracle<'a> {
-    registry: Box<dyn Fn() -> Registry + Send + Sync + 'a>,
+    registry: Box<dyn Fn() -> Arc<Registry> + Send + Sync + 'a>,
     catalog: &'a Catalog,
 }
 
@@ -48,7 +50,16 @@ impl<'a> Oracle<'a> {
     /// for every run.
     pub fn new(registry: impl Fn() -> Registry + Send + Sync + 'a, catalog: &'a Catalog) -> Self {
         Self {
-            registry: Box::new(registry),
+            registry: Box::new(move || Arc::new(registry())),
+            catalog,
+        }
+    }
+
+    /// An oracle that runs every search over `registry`, the one a project's
+    /// own engine runs with, shared between the runs.
+    pub fn sharing(registry: Arc<Registry>, catalog: &'a Catalog) -> Self {
+        Self {
+            registry: Box::new(move || Arc::clone(&registry)),
             catalog,
         }
     }

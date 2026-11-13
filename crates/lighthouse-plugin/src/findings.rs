@@ -19,14 +19,15 @@ use std::{
 
 use lighthouse_graph::{Durability, Error, Graph, Input, Query, VERSION};
 use lighthouse_model::{
-    Diagnostic, Document, Options,
+    Diagnostic, Options,
     ucm::{Applicability, HOST, Held, Host, Model, View},
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Annotations, Batch, Context, Error as PluginError, Facts, Models, NoModels, Notices, Queries,
-    Rule, Runtime, Text, Workspace, analysis::required, queries::NoQueries,
+    Annotations, Batch, Context, Documents, Error as PluginError, Facts, Models, NO_DOCUMENTS,
+    NoModels, Notices, Queries, Rule, Runtime, Text, Workspace, analysis::required,
+    queries::NoQueries,
 };
 
 /// The kind of the answer of a batch, as a rule pulls it.
@@ -113,7 +114,7 @@ pub struct Judging<'a> {
     pub models: &'a dyn Models,
     pub annotations: &'a Annotations,
     pub workspace: Option<&'a Workspace>,
-    pub documents: &'a [Document],
+    pub documents: &'a Documents,
 }
 
 /// What the runs of the programs of a graph's rules are collected and kept
@@ -353,7 +354,7 @@ fn findings(
         models: &NoModels,
         annotations: &Annotations::default(),
         workspace: None,
-        documents: &[],
+        documents: &NO_DOCUMENTS,
     };
     judge(graph, rule, file, &judged, &judging)
 }
@@ -446,7 +447,7 @@ fn run_batch(
         notices: &notices,
         applies: judged.applies.clone(),
         batch: &Batch::default(),
-        documents: &[],
+        documents: &NO_DOCUMENTS,
         models: &NoModels,
         queries: &queries,
     };

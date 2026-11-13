@@ -37,7 +37,7 @@ fn file_fact() {
         applies: Applicability::default(),
         models: &NoModels,
         batch: &Default::default(),
-        documents: &[],
+        documents: &lighthouse_plugin::NO_DOCUMENTS,
         queries: &NoQueries,
     };
 

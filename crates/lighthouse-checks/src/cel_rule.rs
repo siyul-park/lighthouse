@@ -167,6 +167,19 @@ impl CelRule {
         Some((subject, self.needs.reads()))
     }
 
+    /// The fields of a document that the engine works out which the
+    /// expressions read: only a check that selects decisions reads documents.
+    pub(crate) fn reads_documents(&self) -> Vec<String> {
+        if self.select != Select::Decision {
+            return Vec::new();
+        }
+        facts::COMPUTED_DOCUMENT_FACTS
+            .iter()
+            .filter(|field| self.needs.field(field))
+            .map(|field| (*field).to_owned())
+            .collect()
+    }
+
     /// The analyzers whose facts the expressions read.
     pub(crate) fn analyzers(&self) -> Vec<String> {
         if self.needs.field("metrics") {

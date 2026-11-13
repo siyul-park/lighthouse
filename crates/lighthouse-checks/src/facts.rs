@@ -21,6 +21,10 @@ use serde_json::{Value, json};
 
 const POS_LINE: u64 = 1 << 20;
 
+/// The fields of a document that no file states and the engine works out, for
+/// a run in which a check reads them: what a decision conflicts with.
+pub(crate) const COMPUTED_DOCUMENT_FACTS: [&str; 1] = ["conflicts"];
+
 /// The span of a declaration whose place the model does not hold.
 const UNPLACED: Span = Span {
     start: Position { line: 1, col: 1 },
@@ -174,10 +178,11 @@ pub(crate) fn edge(project: &dyn Model, e: &Edge) -> Value {
 }
 
 /// A document of the project, such as a decision: its name, the pack its name
-/// puts it in, and where it is written.
-pub(crate) fn document(d: &Document) -> Value {
+/// puts it in, and where it is written, with the fields in `known`, the facts
+/// the engine worked out for it (an object, merged in).
+pub(crate) fn document(d: &Document, known: Option<&Value>) -> Value {
     let pack = d.name.split_once('/').map_or(d.name.as_str(), |(p, _)| p);
-    json!({
+    let mut value = json!({
         "name": d.name,
         "kind": d.kind,
         "pack": pack,
@@ -185,7 +190,11 @@ pub(crate) fn document(d: &Document) -> Value {
         "uid": d.uid.clone().unwrap_or_default(),
         "file": path(&d.file),
         "line": d.at.line,
-    })
+    });
+    if let (Some(fields), Some(map)) = (known.and_then(Value::as_object), value.as_object_mut()) {
+        map.extend(fields.iter().map(|(k, v)| (k.clone(), v.clone())));
+    }
+    value
 }
 
 pub(crate) fn module(m: &Module, declared: &Declared) -> Value {

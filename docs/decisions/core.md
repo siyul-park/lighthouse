@@ -161,6 +161,98 @@ metadata:
   name: design/prefer-method
 ```
 
+## Consistency
+
+Decisions that are each reasonable can still be impossible to satisfy together; the engine looks for the smallest code that shows it.
+
+| id | title | check | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`core/no-contradictory-decisions`](#decisions-do-not-contradict-each-other) | Decisions do not contradict each other | error · cel |  |  |
+
+### Decisions do not contradict each other
+
+`core/no-contradictory-decisions` · decision · error · cel · go, rust
+
+*Two decisions about the order of declarations can each be right and still be impossible to satisfy together: one wants types above functions, the other functions above types, so every order of such a file is flagged by one of them. Nobody finds this by reading, and the contradiction costs a fix that undoes the other's. The engine looks for it: it renders every small set of declarations (up to two of them) and every order they can be written in, runs the order decisions in force over them, and reports the smallest set of declarations whose every order is flagged, with the decisions that, between them, flag it. Removing any one of those decisions makes the set satisfiable (de Kleer's minimal inconsistent environments). What is found is proven by that code, and nothing beyond the bound is claimed: the absence of a finding is not a proof that the decisions agree. A decision that flags every order of a set of declarations by itself is reported the same way, alone. A contradiction that one of its decisions settles by superseding the other is a note, not a finding. The search holds the decisions whose fix moves or reorders declarations within a file, in the languages it can render (Go and Rust); the contradictions among the packs that ship are checked where the packs are authored, so a project is told only of those that involve a decision it writes itself. The search is on by default. It starts only when the project writes a decision of that kind, runs once per distinct configuration of a language and is kept in the project's graph (the cache), so a project without such a decision never pays for it; a cold search of the order decisions of this repository costs about a second and a half (Go and Rust), and a warm one a few milliseconds. The bundled decisions have no contradiction up to two declarations. When the search of a language cannot be done in full (a decision whose behaviour needs more than two declarations to show, or a language without a renderer), the run says so in a notice that names the language and why, and says nothing of what it did not search.*
+
+The order decisions in force together MUST be satisfiable: for every set of up to two declarations some order must exist that none of them flags.
+
+Derived from: de Kleer, An Assumption-based TMS, Artificial Intelligence 28(2) (1986); Vasconcelos, Kollingbaum and Norman, Normative conflict resolution in multi-agent systems, Autonomous Agents and Multi-Agent Systems 19(2) (2009); van Lamsweerde, Darimont and Letier, Managing conflicts in goal-driven requirements engineering, IEEE Transactions on Software Engineering 24(11) (1998); Jackson, Software Abstractions (2006)
+
+```yaml invalid decisions/functions-first.yaml
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/functions-first
+spec:
+  title: Functions come first
+  context: Readers meet the functions a file defines before the types they work on.
+  scope:
+    subject: symbol
+  requirement: A function MUST be declared above the types of its file.
+  severity: warn
+  check:
+    type: cel
+    select: symbol
+    where: "symbol.kind == 'type' && file.symbols.exists(f, f.kind == 'function' && f.pos > symbol.pos)"
+    message: "type {{ symbol.name }} is declared above a function"
+    identity:
+      subject: symbol.id
+  fix:
+    type: cel
+    safety: unsafe
+    edits: "[move(symbol, after(file.symbols.filter(f, f.kind == 'function')[0]))]"
+  examples:
+    - name: bad
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: x }]
+      fixed: [{ path: a.txt, body: y }]
+      expect: [{ line: 1 }]
+    - name: good
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: x }]
+```
+
+```yaml valid decisions/public-first.yaml
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/public-first
+spec:
+  title: Public functions come first
+  context: Readers meet the public functions of a file before its private ones.
+  scope:
+    subject: symbol
+  requirement: A public function MUST be declared above the private functions of its file.
+  severity: warn
+  check:
+    type: cel
+    select: symbol
+    where: "symbol.kind == 'function' && symbol.visibility == 'private' && file.symbols.exists(f, f.kind == 'function' && f.visibility == 'public' && f.pos > symbol.pos)"
+    message: "private function {{ symbol.name }} is declared above a public function"
+    identity:
+      subject: symbol.id
+  fix:
+    type: cel
+    safety: unsafe
+    edits: "[move(symbol, after(file.symbols.filter(f, f.kind == 'function' && f.visibility == 'public')[0]))]"
+  examples:
+    - name: bad
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: x }]
+      fixed: [{ path: a.txt, body: y }]
+      expect: [{ line: 1 }]
+    - name: good
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: x }]
+```
+
+Also: rust
+
 ## Formatting
 
 Source formatting is decided by the language standard, not by review.

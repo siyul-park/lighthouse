@@ -354,18 +354,67 @@ fn engine_errors_in_an_example_are_failures_not_panics() {
 }
 
 #[test]
-fn rule_tester_check() {
+fn rule_tester_tested() {
     let catalog = catalog(HOLDING);
     let decision = catalog.decision("fake/marker").unwrap();
     assert!(
         RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
-            .check(decision)
+            .tested(decision)
+            .failures
             .is_empty()
     );
     let failures = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
         .language("go")
-        .check(decision);
+        .tested(decision)
+        .failures;
     assert_eq!(failures, ["fake/marker: no example for language `go`"]);
+}
+
+#[test]
+fn rule_tester_planting_runs_an_example_with_the_registry_and_catalog_it_plants() {
+    let planting = "  - name: planted
+    language: notes
+    kind: valid
+    files:
+      - path: a.txt
+        body: fine
+      - path: decisions/mine.yaml
+        body: |-
+          apiVersion: lighthouse/v1alpha1
+          kind: Decision
+          metadata:
+            name: local/mine
+";
+    let catalog = catalog(&format!("{HOLDING}{planting}"));
+    let decision = catalog.decision("fake/marker").unwrap();
+    let plant: lighthouse_engine::Plant<'_> = Box::new(|files| {
+        assert_eq!(files.keys().collect::<Vec<_>>(), ["mine.yaml"]);
+        Ok(lighthouse_engine::Planted {
+            registry: registry(),
+            catalog: catalog.clone(),
+        })
+    });
+    let bare = RuleTester::new(
+        Registry::default,
+        &catalog,
+        lighthouse_test_support::bundled(),
+    );
+    let planting = RuleTester::new(
+        Registry::default,
+        &catalog,
+        lighthouse_test_support::bundled(),
+    )
+    .planting(plant, std::sync::Arc::new(|_| false));
+
+    let planted = |tester: &RuleTester<'_>| {
+        tester
+            .tested(decision)
+            .failures
+            .iter()
+            .any(|failure| failure.contains("planted"))
+    };
+    assert!(planted(&bare));
+    assert!(!planted(&planting));
 }
 
 const MISSING_TOOL: &str = "apiVersion: lighthouse/v1alpha1
@@ -435,10 +484,16 @@ fn a_decision_has_nothing_to_show_in_a_language_it_does_not_apply_to() {
     let decision = catalog.decision("fake/marker").unwrap();
     let tester = || RuleTester::new(registry, &catalog, lighthouse_test_support::bundled());
 
-    assert!(tester().language("go").check(decision).is_empty());
+    assert!(tester().language("go").tested(decision).failures.is_empty());
     assert!(!tester().language("go").applies(decision));
     assert!(tester().language("notes").applies(decision));
-    assert!(tester().language("notes").check(decision).is_empty());
+    assert!(
+        tester()
+            .language("notes")
+            .tested(decision)
+            .failures
+            .is_empty()
+    );
 }
 
 const FIX: &str = "fix:
@@ -535,6 +590,7 @@ fn example_run_checks_an_example_with_the_given_configuration() {
         catalog: &catalog,
         trusted: false,
         models: ModelOptions::default(),
+        conflicts: None,
     };
 
     let outcome = run.run("fake/marker", &decision.examples[0]).unwrap();

@@ -205,7 +205,9 @@ impl Engine {
         }
         let found = Documents::scan(&self.ws.root, &listing.files, overlays);
         run.notices.extend(found.notices);
-        Ok(Some((inputs, project.with_documents(found.documents))))
+        let facts = self.document_facts((selected, &inputs), &found.documents, &mut run.notices);
+        let documents = lighthouse_plugin::Documents::new(found.documents, facts);
+        Ok(Some((inputs, project.with_documents(documents))))
     }
 
     /// Applies the rules and keeps what they found, noticed and could not

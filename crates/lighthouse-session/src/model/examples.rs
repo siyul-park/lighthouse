@@ -35,6 +35,7 @@ pub(super) fn labels(
             catalog: &session.catalog,
             trusted: session.trusted(),
             models: models.clone(),
+            conflicts: None,
         }
         .run(rule, example)
         .map_err(|e| format!("{} {}: {e}", decision.id(), example.name))?;

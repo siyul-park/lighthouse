@@ -4,17 +4,19 @@ use std::{
     fs,
     ops::{Add, AddAssign},
     path::Path,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use rayon::prelude::*;
 use tempfile::TempDir;
 
+use lighthouse_model::{Document, Format};
 use lighthouse_plugin::Registry;
-use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, Fix};
+use lighthouse_spec::{Catalog, CheckKind, Config, Decision, Example, ExampleKind, Files, Fix};
 use serde_json::{Map, Value};
 
-use crate::{Engine, FixPlan, FixRun, ModelOptions, Run, unified_diff};
+use crate::{Conflicts, Engine, FixPlan, FixRun, ModelOptions, Orders, Run, unified_diff};
 
 mod cross;
 mod witness;
@@ -29,6 +31,9 @@ pub use witness::{
 /// Stack of a worker that checks decisions: the engine under an example
 /// recurses deeply.
 const WORKER_STACK: usize = 8 << 20;
+
+/// The prefix of the ids of the decisions an example plants: local decisions.
+const PLANTED: &str = "local/";
 
 /// Language of examples that need no language provider.
 const NEUTRAL: &str = "text";
@@ -45,6 +50,26 @@ pub struct RuleTester<'a> {
     bundled: &'a Catalog,
     language: Option<String>,
     trusted: bool,
+    planting: Option<Planting<'a>>,
+}
+
+/// How an example plants decisions of its own, and which of them order
+/// declarations.
+struct Planting<'a> {
+    plant: Plant<'a>,
+    orders: Orders,
+}
+
+/// Builds the registry and catalog of an example that writes local decisions
+/// of its own, given their files by file name, so that a decision about
+/// decisions can be shown on decisions of its own: the registry holds their
+/// rules and the catalog the decisions.
+pub type Plant<'a> = Box<dyn Fn(Files) -> Result<Planted, String> + Send + Sync + 'a>;
+
+/// The rules and decisions an example plants.
+pub struct Planted {
+    pub registry: Registry,
+    pub catalog: Catalog,
 }
 
 impl<'a> RuleTester<'a> {
@@ -62,7 +87,16 @@ impl<'a> RuleTester<'a> {
             bundled: shipped,
             language: None,
             trusted: false,
+            planting: None,
         }
+    }
+
+    /// Lets the examples that write decisions of their own run with them, as
+    /// `plant` registers them; `orders` says which of them order
+    /// declarations, for the search of contradictions among decisions.
+    pub fn planting(mut self, plant: Plant<'a>, orders: Orders) -> Self {
+        self.planting = Some(Planting { plant, orders });
+        self
     }
 
     /// Lets fix examples run commands, as a trusted project does.
@@ -109,7 +143,7 @@ impl<'a> RuleTester<'a> {
     /// must show what it does in every language it applies to. A command check
     /// that names the `files` it is run for is the exception: it has examples
     /// for the languages of those files only.
-    pub fn check(&self, decision: &Decision) -> Vec<String> {
+    fn check(&self, decision: &Decision) -> Vec<String> {
         self.tested(decision).failures
     }
 
@@ -288,13 +322,20 @@ impl<'a> RuleTester<'a> {
             Vec::new()
         };
         let started = Instant::now();
-        let registry = (self.registry)();
+        let (registry, own) = self.built(example)?;
+        let catalog = own.as_ref().unwrap_or(self.catalog);
         let shared: &[&Decision] = if fixing { &[] } else { &others };
         let mut configured: Vec<(&Decision, Option<&Map<String, Value>>)> =
             vec![(decision, Some(&example.options))];
         configured.extend(shared.iter().map(|other| (*other, None)));
+        configured.extend(
+            own.iter()
+                .flat_map(Catalog::decisions)
+                .filter(|d| d.id().starts_with(PLANTED))
+                .map(|d| (d, None)),
+        );
         let config = rules_config(
-            self.catalog,
+            catalog,
             &registry,
             &configured,
             &self.extends(&example.language),
@@ -308,9 +349,14 @@ impl<'a> RuleTester<'a> {
         let (mut together, engine, dir) = ExampleRun {
             registry,
             config,
-            catalog: self.catalog,
+            catalog,
             trusted: self.trusted,
             models: ModelOptions::default(),
+            conflicts: self
+                .planting
+                .as_ref()
+                .zip(own.as_ref())
+                .map(|(p, own)| Conflicts::new(Arc::new(own.clone()), Arc::clone(&p.orders))),
         }
         .run_rules(&rules, example)?;
         // What stops the others from running does not stop the decision: an
@@ -355,6 +401,20 @@ impl<'a> RuleTester<'a> {
                 judge(example, &introduced(example, dir.path(), &before, after))
             }
         }
+    }
+
+    /// The registry an example runs with, and the catalog it plants when it
+    /// writes decisions of its own.
+    fn built(&self, example: &Example) -> Result<(Registry, Option<Catalog>), String> {
+        let files = local_decisions(example);
+        let planted = match (&self.planting, files.is_empty()) {
+            (Some(planting), false) => Some((planting.plant)(files)?),
+            _ => None,
+        };
+        Ok(planted.map_or_else(
+            || ((self.registry)(), None),
+            |planted| (planted.registry, Some(planted.catalog)),
+        ))
     }
 
     /// Applies the decision's fix to the written example and holds it to the
@@ -471,6 +531,9 @@ pub struct ExampleRun<'a> {
     pub catalog: &'a Catalog,
     pub trusted: bool,
     pub models: ModelOptions,
+    /// The search for contradictions between decisions, when the example is
+    /// about them.
+    pub conflicts: Option<Conflicts>,
 }
 
 impl ExampleRun<'_> {
@@ -493,13 +556,34 @@ impl ExampleRun<'_> {
         example: &Example,
     ) -> Result<(Run, Engine, TempDir), String> {
         let dir = materialize(example)?;
-        let engine = Engine::new(self.registry, self.config, self.catalog, dir.path())
+        let mut engine = Engine::new(self.registry, self.config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted)
             .with_models(self.models);
+        if let Some(conflicts) = self.conflicts {
+            engine = engine.with_conflicts(conflicts);
+        }
         let run = engine.check(&[], rules).map_err(|e| e.to_string())?;
         Ok((run, engine, dir))
     }
+}
+
+/// The files of the example that write local decisions, by file name.
+pub fn local_decisions(example: &Example) -> Files {
+    example
+        .files
+        .iter()
+        .filter_map(|file| {
+            let path = Path::new(&file.path);
+            let format = Format::of_path(path)?;
+            let (documents, _) = Document::list(format, path, file.text());
+            let writes = documents
+                .iter()
+                .any(|d| d.kind == "Decision" && d.name.starts_with(PLANTED));
+            let name = path.file_name()?.to_string_lossy().into_owned();
+            writes.then(|| (name, file.text().to_owned()))
+        })
+        .collect()
 }
 
 /// A directory holding the files of `example`.

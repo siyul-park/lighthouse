@@ -12,6 +12,7 @@ use serde_json::{Map, Value};
 
 mod analysis;
 mod build;
+mod describe;
 mod oracle;
 mod run;
 mod scratch;

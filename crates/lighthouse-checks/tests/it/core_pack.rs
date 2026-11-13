@@ -54,7 +54,7 @@ fn run_rule(text: &str, options: &Options) -> Result<Vec<lighthouse_model::Diagn
         applies: lighthouse_model::ucm::Applicability::default(),
         models: &lighthouse_plugin::NoModels,
         batch: &Default::default(),
-        documents: &[],
+        documents: &lighthouse_plugin::NO_DOCUMENTS,
         queries: &lighthouse_plugin::NoQueries,
     };
     registry

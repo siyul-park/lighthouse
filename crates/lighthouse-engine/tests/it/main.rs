@@ -4,6 +4,7 @@ mod availability;
 mod brief;
 mod cache;
 mod cache_store;
+mod conflicts;
 mod detect;
 mod engine;
 mod fix;

@@ -2,13 +2,14 @@
 source: crates/lighthouse-checks/tests/it/tiers.rs
 expression: report
 ---
-93 decisions: F 10, O 4, T 79
+94 decisions: F 11, O 4, T 79
 
 core/allow-reason	T	outside-fragment:index
 core/decision-naming	T	outside-fragment:concatenation
 core/formatted	T	command
 core/max-len	F	translated
 core/max-lines	F	translated
+core/no-contradictory-decisions	F	translated
 core/no-unused-allow	F	translated
 design/abbreviations	T	outside-fragment:computed-comprehension
 design/abstraction-level	T	model

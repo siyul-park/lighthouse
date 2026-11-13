@@ -26,9 +26,8 @@ fn registry() -> Registry {
 
 #[test]
 fn every_checked_decision_passes_its_rust_examples() {
-    let failures = lighthouse_engine::RuleTester::new(
+    let failures = crate::support::tester(
         lighthouse_test_support::pooled(lighthouse_test_support::registry, &config()),
-        lighthouse_test_support::bundled(),
         lighthouse_test_support::bundled(),
     )
     .language("rust")

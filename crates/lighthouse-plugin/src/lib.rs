@@ -4,6 +4,7 @@
 mod analysis;
 mod annotations;
 mod cel;
+mod documents;
 mod error;
 mod findings;
 mod fix;
@@ -23,7 +24,7 @@ use std::{
 };
 
 use lighthouse_model::{
-    Diagnostic, Document, Fingerprint, GeneratedSpec, Incomplete, Options, RunScope, Severity,
+    Diagnostic, Fingerprint, GeneratedSpec, Incomplete, Options, RunScope, Severity,
     ucm::{Applicability, Capability, File, Fragment, Methods, Model as CodeModel},
 };
 use lighthouse_process::Policy;
@@ -36,6 +37,7 @@ pub use annotations::Annotations;
 pub use cel::{
     CatalogFunction, CelCatalog, CelLibrary, CelLibraryManifest, Function, Overload, Precedence,
 };
+pub use documents::{Documents, NO_DOCUMENTS};
 pub use error::Error;
 pub use findings::{
     BATCH, BATCHED, Batched, COMMAND, FINDINGS, Findings, JUDGED, Judged, Judging, Key, PATHS,
@@ -134,7 +136,7 @@ pub struct Context<'a> {
     pub batch: &'a Batch,
     /// The project's own documents, found by the engine for the rules that are
     /// about them.
-    pub documents: &'a [Document],
+    pub documents: &'a Documents,
     /// The models rules may put subjects to.
     pub models: &'a dyn Models,
     /// The graph the run's facts and indexes are pulled from.
@@ -484,6 +486,12 @@ pub trait Rule: Send + Sync {
     /// that reads no fact of a subject.
     fn reads(&self) -> Option<(&'static str, Reads)> {
         None
+    }
+    /// The fields of a project document the rule reads that no file states
+    /// and the engine works out (see [`Documents`]); a run that selects the
+    /// rule works them out, and a run that does not never does.
+    fn reads_documents(&self) -> Vec<String> {
+        Vec::new()
     }
 }
 

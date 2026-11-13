@@ -9,16 +9,14 @@ use std::{
 };
 
 use lighthouse_graph::{Error, Graph};
-use lighthouse_model::{
-    Document,
-    ucm::{File, stated_files},
-};
+use lighthouse_model::ucm::{File, stated_files};
+use lighthouse_plugin::Documents;
 
 #[derive(Debug, Default)]
 pub(super) struct Stated {
     files: Vec<File>,
     tested: BTreeSet<PathBuf>,
-    documents: Vec<Document>,
+    documents: Documents,
 }
 
 impl Stated {
@@ -38,12 +36,12 @@ impl Stated {
         Ok(Self {
             files,
             tested,
-            documents: Vec::new(),
+            documents: Documents::none(),
         })
     }
 
     /// The same with the project's own documents.
-    pub(super) fn with_documents(self, documents: Vec<Document>) -> Self {
+    pub(super) fn with_documents(self, documents: Documents) -> Self {
         Self { documents, ..self }
     }
 
@@ -67,7 +65,7 @@ impl Stated {
     }
 
     /// The documents of the project that are not code, in file order.
-    pub(super) fn documents(&self) -> &[Document] {
+    pub(super) fn documents(&self) -> &Documents {
         &self.documents
     }
 }

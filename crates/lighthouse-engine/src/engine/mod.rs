@@ -37,6 +37,7 @@ use serde_json::Value;
 mod availability;
 mod client;
 mod config;
+mod conflicts;
 mod index;
 mod injections;
 mod judging;
@@ -58,6 +59,7 @@ use config::{
     Inherited, constructors, inheritance, io_error, load_languages, options_at, test_naming,
     validate_config,
 };
+pub use conflicts::{Conflicts, Orders};
 use models::RunModels;
 pub(crate) use phases::in_pool;
 pub(crate) use route::{Member, Refusal, Route, Usage};
@@ -356,6 +358,9 @@ pub struct Engine {
     pub(crate) held: std::sync::Mutex<Held>,
     /// What the run may do with models.
     models: ModelOptions,
+    /// What the search for contradictions between decisions needs; without it
+    /// a rule that reads `decision.conflicts` finds none.
+    conflicts: Option<Conflicts>,
 }
 
 /// Where the engine keeps the findings of its runs, and how much.
@@ -409,11 +414,12 @@ impl Engine {
     /// `catalog` supplies the projects `extends` names and which decisions are
     /// in force; a rule no decision of it describes is in force.
     pub fn new(
-        registry: Registry,
+        registry: impl Into<Arc<Registry>>,
         config: Config,
         catalog: &Catalog,
         root: &Path,
     ) -> Result<Self, Error> {
+        let registry: Arc<Registry> = registry.into();
         let projects = catalog.projects().clone();
         let config = config.inheriting(&projects)?;
         let binding = config.models(&projects)?;
@@ -449,7 +455,7 @@ impl Engine {
         let mut setup = Hasher::new();
         setup.update(format!("{config:?}"));
         Ok(Self {
-            registry: Arc::new(registry),
+            registry,
             setup: setup.hex(),
             config,
             projects,
@@ -478,6 +484,7 @@ impl Engine {
             graph: std::sync::Mutex::new(None),
             held: std::sync::Mutex::new(Held::default()),
             models: ModelOptions::default(),
+            conflicts: None,
         })
     }
 
@@ -496,6 +503,13 @@ impl Engine {
     /// project: `commands` builds the client of one.
     pub fn with_commands(mut self, commands: CommandModels) -> Self {
         self.commands = Some(commands);
+        self
+    }
+
+    /// Lets a run search for contradictions between the decisions of the
+    /// project, for the rules that read them (see [`Conflicts`]).
+    pub fn with_conflicts(mut self, conflicts: Conflicts) -> Self {
+        self.conflicts = Some(conflicts);
         self
     }
 

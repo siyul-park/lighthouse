@@ -85,7 +85,7 @@ Do not memorize decision text; ask for it when a finding names a rule.
 - `lighthouse://config` is the effective configuration.
 - `review_history` shows every judgment recorded on a finding.
 
-## Active decisions (51)
+## Active decisions (52)
 
 A decision declares the severity of its findings: `error` is definitive, so it needs no review and only a directive in the code suppresses it; `warn` and `info` are review tasks, and a judgment can hide them whatever level the configuration reports them at. `fixable: safe|unsafe` marks a decision with a fixer and the safety of its fix.
 
@@ -95,6 +95,7 @@ A decision declares the severity of its findings: `error` is definitive, so it n
 - `core/allow-reason` (error) Allow a finding in source, with a reason
 - `core/no-unused-allow` (warn, fixable: unsafe) Allow annotations suppress something
 - `core/decision-naming` (warn) Decision names follow the ESLint convention
+- `core/no-contradictory-decisions` (error) Decisions do not contradict each other
 - `core/formatted` (error, fixable: safe) Source files use their standard formatter
 
 ### design

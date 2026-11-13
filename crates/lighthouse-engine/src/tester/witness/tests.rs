@@ -693,6 +693,28 @@ fn isomorphic(decls: &[Decl], a: &[Edge], b: &[Edge]) -> bool {
     })
 }
 
+#[test]
+fn shape_describe_names_each_declaration_and_how_it_relates_to_the_others() {
+    let public = |kind| Decl {
+        kind,
+        visibility: Visibility::Public,
+        tested: false,
+    };
+    let shape = Shape {
+        decls: vec![public(Kind::Type), public(Kind::Method)],
+        edges: vec![Edge {
+            from: 1,
+            to: 0,
+            relation: Relation::Owner,
+        }],
+    };
+
+    assert_eq!(
+        shape.describe(),
+        "a public type A, a public method B owned by A"
+    );
+}
+
 fn read(root: &Path, file: &Path) -> String {
     std::fs::read_to_string(root.join(file)).unwrap()
 }

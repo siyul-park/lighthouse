@@ -2,10 +2,10 @@
 //! model, checked through the whole engine with one rule.
 #![allow(dead_code)]
 
-use std::{collections::BTreeMap, fs};
+use std::{collections::BTreeMap, fs, sync::Arc};
 
 use lighthouse_checks::{Checks, metrics::Metrics};
-use lighthouse_engine::Engine;
+use lighthouse_engine::{Engine, Planted, RuleTester};
 use lighthouse_model::{
     Position, Span,
     ucm::{
@@ -587,4 +587,25 @@ impl World {
             })
             .collect()
     }
+}
+
+/// A tester of the examples of `catalog` over registries from `fresh`, that
+/// also plants the local decisions an example writes, as `decision test`
+/// does.
+pub fn tester<'a>(
+    fresh: impl Fn() -> Registry + Send + Sync + 'a,
+    catalog: &'a Catalog,
+) -> RuleTester<'a> {
+    let fresh = Arc::new(fresh);
+    let own = Arc::clone(&fresh);
+    let comp = lighthouse_test_support::composition();
+    let cel = comp.cel().clone();
+    let plant = Box::new(move |files| {
+        let (registry, catalog) = lighthouse_checks::planted(&comp, fresh(), catalog, files)?;
+        Ok(Planted { registry, catalog })
+    });
+    let orders = Arc::new(move |decision: &lighthouse_spec::Decision| {
+        lighthouse_logic::tier(&cel, decision).tier == lighthouse_logic::Tier::O
+    });
+    RuleTester::new(move || own(), catalog, catalog).planting(plant, orders)
 }

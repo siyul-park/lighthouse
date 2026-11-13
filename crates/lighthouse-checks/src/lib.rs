@@ -28,6 +28,7 @@ mod local;
 mod manifest;
 mod modules;
 mod naming;
+mod planting;
 mod text;
 
 pub mod command;
@@ -41,3 +42,4 @@ pub use bundled::{ids, registry, registry_of};
 pub use checks::Checks;
 pub use compose::{Composition, Entry, compose, compose_from};
 pub use error::Error;
+pub use planting::{planted, with_local};

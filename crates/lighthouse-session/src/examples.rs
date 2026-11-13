@@ -5,7 +5,7 @@
 
 use std::{collections::BTreeSet, sync::Mutex, time::Duration};
 
-use lighthouse_engine::{RuleTester, Spent, Tested};
+use lighthouse_engine::{Plant, Planted, RuleTester, Spent, Tested};
 use lighthouse_plugin::Registry;
 use lighthouse_rpc::Started;
 use lighthouse_spec::{Catalog, Decision};
@@ -56,11 +56,16 @@ pub(crate) fn run(
 ) -> Result<Found> {
     let failed = Mutex::new(None);
     let bundled = session.comp.bundled().map_err(|e| e.to_string())?;
-    let fresh = || registry(session, plugins, &failed);
+    let fresh = || registry(session, plugins, &failed, true);
     let testers: Vec<(&String, RuleTester<'_>)> = languages
         .iter()
         .map(|language| {
-            let tester = RuleTester::new(fresh, catalog, &session.base).bundled(bundled);
+            let tester = RuleTester::new(fresh, catalog, &session.base)
+                .bundled(bundled)
+                .planting(
+                    plant(session, catalog, (plugins, &failed)),
+                    session.orders(),
+                );
             (
                 language,
                 tester.language(language).trusted(session.trusted()),
@@ -130,26 +135,57 @@ fn merge(units: Vec<Unit>) -> Found {
     found
 }
 
-/// A registry over the processes of the start the calling worker uses; when
-/// it cannot be built, the in-process rules alone, and `failed` says why.
-fn registry(session: &Session, plugins: &[Started], failed: &Mutex<Option<String>>) -> Registry {
+/// A registry over the processes of the start the calling worker uses, with
+/// the project's local decisions when `own`; when it cannot be built, the
+/// in-process rules alone, and `failed` says why.
+fn registry(
+    session: &Session,
+    plugins: &[Started],
+    failed: &Mutex<Option<String>>,
+    own: bool,
+) -> Registry {
     let lane = rayon::current_thread_index().unwrap_or(0) % plugins.len().max(1);
     let note = |e: String| {
         if let Ok(mut failed) = failed.lock() {
             failed.get_or_insert(e);
         }
     };
-    plugins
-        .get(lane)
-        .map_or_else(
-            || session.in_process_registry(),
-            |started| session.registry_from(started),
-        )
-        .unwrap_or_else(|e| {
+    let alone = || {
+        if own {
+            session.in_process_registry()
+        } else {
+            session.bare_registry()
+        }
+    };
+    let over = alone().and_then(|mut registry| {
+        if let Some(started) = plugins.get(lane) {
+            started.register(&mut registry)?;
+        }
+        Ok(registry)
+    });
+    over.unwrap_or_else(|e| {
+        note(e.to_string());
+        alone().unwrap_or_else(|e| {
             note(e.to_string());
-            session.in_process_registry().unwrap_or_else(|e| {
-                note(e.to_string());
-                Registry::default()
-            })
+            Registry::default()
         })
+    })
+}
+
+/// The planting of examples: the local decisions an example writes are loaded
+/// over `catalog` and their rules registered, in a registry over the processes
+/// of the start the calling worker uses and without the project's own local
+/// decisions, so that a decision about decisions is shown on decisions of its
+/// own.
+fn plant<'a>(
+    session: &'a Session,
+    catalog: &'a Catalog,
+    (plugins, failed): (&'a [Started], &'a Mutex<Option<String>>),
+) -> Plant<'a> {
+    Box::new(move |files| {
+        let registry = registry(session, plugins, failed, false);
+        let (registry, catalog) =
+            lighthouse_checks::planted(&session.comp, registry, catalog, files)?;
+        Ok(Planted { registry, catalog })
+    })
 }

@@ -1,5 +1,6 @@
 //! The plugin registry, one binary.
 
+mod documents;
 mod findings;
 mod libraries;
 mod models;

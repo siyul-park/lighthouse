@@ -10,8 +10,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lighthouse_checks::{Checks, Composition};
-use lighthouse_engine::{CommandModels, Engine};
+use lighthouse_checks::Composition;
+use lighthouse_engine::{CommandModels, Conflicts, Engine, Orders};
 use lighthouse_model::Format;
 use lighthouse_plugin::{ModelClient, Registry};
 use lighthouse_rpc::{CommandModel, PluginCatalog, Registered, StartOptions, Started};
@@ -305,6 +305,14 @@ impl Session {
             .with_commands(commands))
     }
 
+    /// Which decisions of a catalog order declarations.
+    pub(crate) fn orders(&self) -> Orders {
+        let cel = self.comp.cel().clone();
+        Arc::new(move |decision| {
+            lighthouse_logic::tier(&cel, decision).tier == lighthouse_logic::Tier::O
+        })
+    }
+
     /// The engine of the project with its plugins started, and what starting
     /// them had to say. It trusts what the user trusts and runs the models the
     /// project's providers name.
@@ -333,7 +341,8 @@ impl Session {
         let config = self.enabled_in(&registry);
         let engine = self
             .engine_with(registry, config, &self.catalog, &self.root)?
-            .with_incomplete(started.registered.incomplete.clone());
+            .with_incomplete(started.registered.incomplete.clone())
+            .with_conflicts(self.conflicts());
         let listed = permitted(&self.config, &self.catalog, &|id| engine.active(id))?;
         let mut notices = started.registered.notices.clone();
         if !sandbox.enabled {
@@ -341,6 +350,13 @@ impl Session {
         }
         notices.extend(listed.warnings);
         Ok((engine, notices, started))
+    }
+
+    /// What a run needs to search for contradictions between the decisions of
+    /// the catalog: the ones whose fix orders declarations are held to each
+    /// other.
+    fn conflicts(&self) -> Conflicts {
+        Conflicts::new(Arc::clone(&self.catalog), self.orders())
     }
 
     /// The configuration with every plugin of `registry` enabled: those the
@@ -445,16 +461,20 @@ impl Session {
     /// decisions. Nothing is started, so it is cheap and cannot fail on a
     /// language plugin.
     pub fn in_process_registry(&self) -> Result<Registry> {
-        let mut registry =
-            lighthouse_checks::registry_of(&self.comp, &self.base, crate::libraries()?)
-                .map_err(|e| e.to_string())?;
+        let mut registry = self.bare_registry()?;
         if let Some(local) = &self.local {
-            let plugin = Checks::new(&self.comp, "local", local)?;
-            if !plugin.is_empty() {
-                registry.register(&plugin)?;
-            }
+            lighthouse_checks::with_local(&self.comp, &mut registry, local)?;
         }
         Ok(registry)
+    }
+
+    /// The registry of the bundled and listed checks alone: without the
+    /// project's local decisions.
+    pub(crate) fn bare_registry(&self) -> Result<Registry> {
+        Ok(
+            lighthouse_checks::registry_of(&self.comp, &self.base, crate::libraries()?)
+                .map_err(|e| e.to_string())?,
+        )
     }
 
     /// How long signals are kept, in seconds.

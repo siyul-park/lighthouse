@@ -472,14 +472,10 @@ fn every_checked_decision_passes_its_catalog_examples() {
     }
     let config = listed(&go_plugin().expect("checked above"));
     let registry = lighthouse_test_support::pooled(lighthouse_test_support::registry, &config);
-    let failures = lighthouse_engine::RuleTester::new(
-        registry,
-        lighthouse_test_support::full(),
-        lighthouse_test_support::full(),
-    )
-    .language("go")
-    .trusted(true)
-    .check_all();
+    let failures = crate::support::tester(registry, lighthouse_test_support::full())
+        .language("go")
+        .trusted(true)
+        .check_all();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 

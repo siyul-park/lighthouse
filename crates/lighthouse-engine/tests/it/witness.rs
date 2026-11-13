@@ -539,3 +539,16 @@ fn a_decision_that_is_unsatisfiable_alone_keeps_its_pairs_out() {
         ]]
     );
 }
+
+#[test]
+fn oracle_sharing_searches_over_the_registry_it_is_given() {
+    let catalog = catalog("a");
+    let ids = ["toy/pub-then-priv", "toy/priv-then-pub"];
+    let sharing = Oracle::sharing(std::sync::Arc::new(registry(false)), &catalog);
+
+    let found = sharing.search(&mut graph(), &cell(&catalog, "rust", &ids), 2);
+
+    let own = search(&catalog, &mut graph(), &ids, 2);
+    assert_eq!(found.verdict, own.verdict);
+    assert_eq!(found.verdict.contradictions.len(), 1);
+}

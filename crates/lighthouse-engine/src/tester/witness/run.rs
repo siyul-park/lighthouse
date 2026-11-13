@@ -1,7 +1,7 @@
 //! One engine run over the scratch project of all the shapes: the packages
 //! each decision flags.
 
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Config, Decision};
@@ -17,7 +17,7 @@ use crate::{Engine, tester::rules_config};
 /// not read says nothing.
 pub(super) fn flags(
     catalog: &Catalog,
-    registry: Registry,
+    registry: Arc<Registry>,
     setting: (Language, Alphabet, usize),
     decisions: &[(&Decision, &Map<String, Value>)],
 ) -> Result<BTreeMap<String, Vec<usize>>, String> {

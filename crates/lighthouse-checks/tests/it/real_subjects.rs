@@ -470,6 +470,47 @@ fn report(what: &str, tallies: &BTreeMap<String, Tally>, excluded: &[String]) {
     eprintln!("{what}, excluded: {excluded:#?}");
 }
 
+/// What an example that writes decisions of its own is planted into.
+struct Planting<'a, F: Fn() -> Registry> {
+    bundled: &'a Catalog,
+    bare: &'a F,
+    comp: &'a lighthouse_checks::Composition,
+}
+
+/// An engine over an example that writes decisions of its own, which the
+/// search for contradictions between decisions reads: the probe of the
+/// decision is planted with them, in a registry that has no probes.
+fn planted_engine<F: Fn() -> Registry>(
+    planting: &Planting<'_, F>,
+    p: &Probed,
+    example: &Example,
+    mut files: lighthouse_spec::Files,
+    dir: &Path,
+) -> Engine {
+    let id = p.decision.id();
+    let name = p.probe.trim_start_matches("local/");
+    files.insert(format!("{name}.yaml"), probe_text(p, name));
+    let (registry, catalog) =
+        lighthouse_checks::planted(planting.comp, (planting.bare)(), planting.bundled, files)
+            .unwrap_or_else(|e| panic!("{id} {}: {e}", example.name));
+    let none = Map::new();
+    let mut ruled: Vec<(String, &Map<String, Value>)> = catalog
+        .decisions()
+        .filter(|d| d.id().starts_with("local/") && d.id() != p.probe)
+        .map(|d| (d.id().to_owned(), &none))
+        .collect();
+    ruled.push((id.to_owned(), &example.options));
+    ruled.push((p.probe.clone(), &example.options));
+    let config = rules_toml(listed(&registry), &ruled);
+    let cel = planting.comp.cel().clone();
+    let orders =
+        std::sync::Arc::new(move |d: &Decision| lighthouse_logic::tier(&cel, d).tier == Tier::O);
+    let conflicts = lighthouse_engine::Conflicts::new(std::sync::Arc::new(catalog.clone()), orders);
+    Engine::new(registry, config, &catalog, dir)
+        .unwrap_or_else(|e| panic!("{id} {}: {e}", example.name))
+        .with_conflicts(conflicts)
+}
+
 #[test]
 fn the_query_holds_of_the_subjects_the_decision_reports_on_the_source_of_its_examples() {
     let bundled = lighthouse_test_support::bundled();
@@ -484,6 +525,15 @@ fn the_query_holds_of_the_subjects_the_decision_reports_on_the_source_of_its_exa
     let startup = rules_toml(started(&plugins), &[]);
     let pool = lighthouse_test_support::pooled(base, &startup);
     let known = languages_of(&pool());
+    let bare = std::cell::LazyCell::new(|| {
+        lighthouse_test_support::pooled(
+            || {
+                lighthouse_checks::registry_of(&comp, bundled, lighthouse_test_support::libraries())
+                    .unwrap_or_else(|e| panic!("{e}"))
+            },
+            &startup,
+        )
+    });
     let mut tallies = BTreeMap::<String, Tally>::new();
     let mut skipped = Vec::new();
     for p in &probes {
@@ -498,16 +548,34 @@ fn the_query_holds_of_the_subjects_the_decision_reports_on_the_source_of_its_exa
             }
             let dir = tempfile::tempdir().unwrap();
             write(dir.path(), example);
-            let registry = pool();
-            let config = rules_toml(
-                listed(&registry),
-                &[
-                    (id.to_owned(), &example.options),
-                    (p.probe.clone(), &example.options),
-                ],
-            );
-            let engine = Engine::new(registry, config, &catalog, dir.path())
-                .unwrap_or_else(|e| panic!("{id} {}: {e}", example.name));
+            let files = lighthouse_engine::local_decisions(example);
+            let reads = pool()
+                .rule(&p.probe)
+                .is_some_and(|r| !r.reads_documents().is_empty());
+            let engine = if reads && !files.is_empty() {
+                planted_engine(
+                    &Planting {
+                        bundled,
+                        bare: &*bare,
+                        comp: &comp,
+                    },
+                    p,
+                    example,
+                    files,
+                    dir.path(),
+                )
+            } else {
+                let registry = pool();
+                let config = rules_toml(
+                    listed(&registry),
+                    &[
+                        (id.to_owned(), &example.options),
+                        (p.probe.clone(), &example.options),
+                    ],
+                );
+                Engine::new(registry, config, &catalog, dir.path())
+                    .unwrap_or_else(|e| panic!("{id} {}: {e}", example.name))
+            };
             let run = engine
                 .check(&[], &[id.to_owned(), p.probe.clone()])
                 .unwrap_or_else(|e| panic!("{id} {}: {e}", example.name));

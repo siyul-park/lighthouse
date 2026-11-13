@@ -3,7 +3,7 @@
 
 use std::{cell::LazyCell, path::Path};
 
-use lighthouse_model::Document;
+use lighthouse_plugin::Documents;
 
 use super::*;
 
@@ -201,10 +201,10 @@ impl Evaluation<'_> {
     }
 
     /// The decision documents of the project that are subjects.
-    fn check_decisions(&self, documents: &[Document]) -> Result<Vec<Diagnostic>, PluginError> {
+    fn check_decisions(&self, documents: &Documents) -> Result<Vec<Diagnostic>, PluginError> {
         let mut found = Vec::new();
-        for document in documents.iter().filter(|d| d.kind == "Decision") {
-            let value = cel_fact(&facts::document(document));
+        for document in documents.list().iter().filter(|d| d.kind == "Decision") {
+            let value = cel_fact(&facts::document(document, documents.facts_of(document)));
             let place = Anchor {
                 file: document.file.clone(),
                 span: Span {

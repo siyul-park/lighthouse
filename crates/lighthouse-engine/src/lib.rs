@@ -17,8 +17,8 @@ mod tools;
 pub mod cache;
 
 pub use engine::{
-    Availability, CommandModels, EXIT_INCOMPLETE, Engine, FailOn, ModelOptions, Needs, Outcome,
-    Overlays, Run, active,
+    Availability, CommandModels, Conflicts, EXIT_INCOMPLETE, Engine, FailOn, ModelOptions, Needs,
+    Orders, Outcome, Overlays, Run, active,
 };
 pub use error::Error;
 pub use fix::{
@@ -27,7 +27,8 @@ pub use fix::{
 };
 pub use tester::{
     Alphabet, Arrangement, Basis, Bounded, Cell, Contradiction, Decl, Edge, ExampleRun, Flagged,
-    Forced, Incomplete, Kind, Language, MAX_BOUND, Oracle, Relation, RuleTester, Scratch, Searched,
-    Shape, Single, Spent, Tested, Unit, Verdict, Visibility, Witness, enumerate,
+    Forced, Incomplete, Kind, Language, MAX_BOUND, Oracle, Plant, Planted, Relation, RuleTester,
+    Scratch, Searched, Shape, Single, Spent, Tested, Unit, Verdict, Visibility, Witness, enumerate,
+    local_decisions,
 };
 pub use timings::{Detect, FixTimings, Timings};

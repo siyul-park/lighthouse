@@ -33,7 +33,7 @@ fn fact(project: &Project, name: &str) -> Value {
         applies: Applicability::default(),
         models: &lighthouse_plugin::NoModels,
         batch: &Default::default(),
-        documents: &[],
+        documents: &lighthouse_plugin::NO_DOCUMENTS,
         queries: &lighthouse_plugin::NoQueries,
     };
     probe::symbol_fact(

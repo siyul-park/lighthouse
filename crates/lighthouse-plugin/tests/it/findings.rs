@@ -284,7 +284,7 @@ fn judge_runs_the_rule() {
             models: &NoModels,
             annotations: &annotations,
             workspace: None,
-            documents: &[],
+            documents: &lighthouse_plugin::NO_DOCUMENTS,
         },
     )
     .unwrap();
