@@ -511,6 +511,22 @@ fn decision_inheriting() {
 }
 
 #[test]
+fn decision_seen_among() {
+    let layout = bundled("design/top-down-order");
+    let source = bundled("design/declaration-groups");
+    let groups = json!(["type", "public-function"]);
+    let given = Map::from_iter([("groups".to_owned(), groups.clone())]);
+    let none = Map::new();
+
+    let (view, options) = layout.seen_among(&none, &[(source, &given)]);
+    let (alone, kept) = layout.seen_among(&none, &[]);
+
+    assert_eq!(options["groups"], groups, "it has what its source is given");
+    assert!(view.resolve_options(&options, None).is_ok());
+    assert!(kept.is_empty() && alone.resolve_options(&kept, None).is_ok());
+}
+
+#[test]
 fn decision_resolve_options() {
     let decision = bundled("core/max-lines").clone().map_spec(|mut spec| {
         spec.languages

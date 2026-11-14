@@ -168,6 +168,7 @@ Decisions that are each reasonable can still be impossible to satisfy together; 
 | id | title | check | fix | requirement |
 | --- | --- | --- | --- | --- |
 | [`core/no-contradictory-decisions`](#decisions-do-not-contradict-each-other) | Decisions do not contradict each other | error · cel |  |  |
+| [`core/no-conflicting-decisions`](#decisions-do-not-conflict-with-each-other) | Decisions do not conflict with each other | warn · cel |  |  |
 
 ### Decisions do not contradict each other
 
@@ -252,6 +253,110 @@ spec:
 ```
 
 Also: rust
+
+### Decisions do not conflict with each other
+
+`core/no-conflicting-decisions` · decision · warn · cel
+
+*A decision whose example shows another decision reporting on it, or whose fix introduces a finding of another, is in conflict with that decision: following one breaks the other. The example that shows it declares the conflict (`conflicts`), which keeps it from failing the decision's own test, and what is declared is a candidate: an example showed it, nothing proved it. This decision keeps the candidates in sight in the project that holds them, as a warning, until somebody settles each by superseding one of the two decisions or by changing one of them. A candidate that the search for contradictions proves (an order that no arrangement of the code satisfies, see `core/no-contradictory-decisions`) is reported there, as an error, and no longer here: one decision, one severity. A candidate that one of the two decisions settles by superseding the other is not reported. The bundled catalog declares none. The decision reads the decisions of the project (its own decision documents), so a project that writes no decision never pays for anything here; it is on by default.*
+
+A decision SHOULD NOT be known to conflict with another decision that does not supersede it: a conflict declared by an example is settled by superseding one decision or by changing one of the two.
+
+Derived from: Vasconcelos, Kollingbaum and Norman, Normative conflict resolution in multi-agent systems, Autonomous Agents and Multi-Agent Systems 19(2) (2009); van Lamsweerde, Darimont and Letier, Managing conflicts in goal-driven requirements engineering, IEEE Transactions on Software Engineering 24(11) (1998)
+
+```yaml invalid decisions/small-files.yaml
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/small-files
+spec:
+  title: Files are small
+  context: Readers hold a small file in mind.
+  scope:
+    subject: symbol
+  requirement: A file MUST stay short.
+  severity: warn
+  check:
+    type: cel
+    select: symbol
+    where: "symbol.kind == 'type' && symbol.name == 'small-files'"
+    message: "type {{ symbol.name }} is not allowed"
+    identity:
+      subject: symbol.id
+  examples:
+    - name: bad
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: x }]
+      expect: [{ line: 1 }]
+    - name: good
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: x }]
+      conflicts: [local/many-types]
+```
+
+```yaml invalid decisions/many-types.yaml
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/many-types
+spec:
+  title: Types are grouped
+  context: Readers find the types of a file together.
+  scope:
+    subject: symbol
+  requirement: A file MUST hold its types together.
+  severity: warn
+  check:
+    type: cel
+    select: symbol
+    where: "symbol.kind == 'type' && symbol.name == 'many-types'"
+    message: "type {{ symbol.name }} is not allowed"
+    identity:
+      subject: symbol.id
+  examples:
+    - name: bad
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: x }]
+      expect: [{ line: 1 }]
+    - name: good
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: x }]
+```
+
+```yaml valid
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: local/small-files
+spec:
+  title: Files are small
+  context: Readers hold a small file in mind.
+  scope:
+    subject: symbol
+  requirement: A file MUST stay short.
+  severity: warn
+  check:
+    type: cel
+    select: symbol
+    where: "symbol.kind == 'type' && symbol.name == 'small-files'"
+    message: "type {{ symbol.name }} is not allowed"
+    identity:
+      subject: symbol.id
+  examples:
+    - name: bad
+      language: text
+      kind: invalid
+      files: [{ path: a.txt, body: x }]
+      expect: [{ line: 1 }]
+    - name: good
+      language: text
+      kind: valid
+      files: [{ path: a.txt, body: x }]
+```
 
 ## Formatting
 

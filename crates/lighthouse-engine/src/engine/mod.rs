@@ -59,7 +59,7 @@ use config::{
     Inherited, constructors, inheritance, io_error, load_languages, options_at, test_naming,
     validate_config,
 };
-pub use conflicts::{Conflicts, Orders};
+pub use conflicts::{Conflicts, Contradicted, Contradictions, Found, Nogood, Orders};
 use models::RunModels;
 pub(crate) use phases::in_pool;
 pub(crate) use route::{Member, Refusal, Route, Usage};

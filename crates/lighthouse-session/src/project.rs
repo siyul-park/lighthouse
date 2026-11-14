@@ -288,7 +288,7 @@ impl Session {
     /// providers name.
     pub fn engine_with(
         &self,
-        registry: Registry,
+        registry: impl Into<Arc<Registry>>,
         config: Config,
         catalog: &Catalog,
         root: &Path,
@@ -355,7 +355,7 @@ impl Session {
     /// What a run needs to search for contradictions between the decisions of
     /// the catalog: the ones whose fix orders declarations are held to each
     /// other.
-    fn conflicts(&self) -> Conflicts {
+    pub(crate) fn conflicts(&self) -> Conflicts {
         Conflicts::new(Arc::clone(&self.catalog), self.orders())
     }
 

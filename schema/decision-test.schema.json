@@ -22,6 +22,13 @@
       },
       "type": "array"
     },
+    "incomplete": {
+      "description": "One line per search for contradictions among the decisions that could\nnot be done in full, with why; the search found no contradiction there,\nand says nothing of what it did not search. Not a failure.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "languages": {
       "format": "uint",
       "minimum": 0,
@@ -112,7 +119,8 @@
     "runs",
     "failures",
     "skipped",
-    "conflicts"
+    "conflicts",
+    "incomplete"
   ],
   "title": "DecisionTest",
   "type": "object"

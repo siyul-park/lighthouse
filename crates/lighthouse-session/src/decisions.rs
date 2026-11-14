@@ -89,6 +89,10 @@ pub struct DecisionTest {
     /// One line per conflict with another decision that an example declares
     /// and still has: a candidate for a contradiction, not a failure.
     pub conflicts: Vec<String>,
+    /// One line per search for contradictions among the decisions that could
+    /// not be done in full, with why; the search found no contradiction there,
+    /// and says nothing of what it did not search. Not a failure.
+    pub incomplete: Vec<String>,
     /// Where the time went; reported on request.
     #[serde(skip)]
     pub timings: TestTimings,
@@ -335,6 +339,7 @@ pub(crate) fn test_catalog(
         failures: found.failures,
         skipped,
         conflicts: found.conflicts,
+        incomplete: found.incomplete,
         timings: TestTimings {
             plugin_start: start.as_secs_f64(),
             check: found.spent.check.as_secs_f64(),

@@ -33,6 +33,9 @@ pub fn validate(config: Option<&Path>, paths: &[PathBuf], examples: bool) -> Res
     for problem in &report.problems {
         println!("{}: {}", problem.path, problem.message);
     }
+    for notice in &report.notices {
+        println!("note: {notice}");
+    }
     println!(
         "validated {} document(s) in {} file(s): {} problem(s)",
         report.documents,

@@ -85,7 +85,13 @@ impl<'a> Oracle<'a> {
         let language = Language::of(cell.language).map_err(|why| why.to_string())?;
         let pairs: Vec<(&Decision, &Map<String, Value>)> =
             cell.decisions.iter().map(|(d, o)| (*d, o)).collect();
-        let alphabet = Alphabet::of(language, &pairs).map_err(|why| why.to_string())?;
+        let seen: Vec<_> = pairs
+            .iter()
+            .map(|&(decision, options)| decision.seen_among(options, &pairs))
+            .collect();
+        let viewed: Vec<(&Decision, &Map<String, Value>)> =
+            seen.iter().map(|(d, o)| (d, o)).collect();
+        let alphabet = Alphabet::of(language, &viewed).map_err(|why| why.to_string())?;
         let registry = (self.registry)();
         let shapes = enumerate(language, alphabet, bound).map_err(|why| why.to_string())?;
         let provenance = Provenance {
@@ -95,7 +101,7 @@ impl<'a> Oracle<'a> {
             injected: run::injected(self.catalog, language)?,
         };
         let setting = Setting::new(language, alphabet, bound, provenance);
-        let members = members(language, &pairs)?;
+        let members = members(language, &pairs, &viewed)?;
         let missing = missing(graph, &setting, &members)?;
         let ran: Vec<String> = missing.iter().map(|m| m.assumption.uid.clone()).collect();
         if !missing.is_empty() {
@@ -129,11 +135,12 @@ impl<'a> Oracle<'a> {
 fn members<'d>(
     language: Language,
     pairs: &[(&'d Decision, &'d Map<String, Value>)],
+    viewed: &[(&Decision, &Map<String, Value>)],
 ) -> Result<Vec<Member<'d>>, String> {
     let mut members = Vec::new();
-    for &(decision, options) in pairs {
-        let assumption = Assumption::of(decision, options, Some(language.id()))
-            .map_err(|why| why.to_string())?;
+    for (&(decision, options), &(view, seen)) in pairs.iter().zip(viewed) {
+        let assumption =
+            Assumption::of(view, seen, Some(language.id())).map_err(|why| why.to_string())?;
         members.push(Member {
             assumption,
             decision,

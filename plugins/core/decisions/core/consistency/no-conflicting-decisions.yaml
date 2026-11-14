@@ -1,0 +1,157 @@
+# yaml-language-server: $schema=../../../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: core/no-conflicting-decisions
+  uid: dfbf332b-4e4a-40e1-9530-b044eb22d218
+spec:
+  title: Decisions do not conflict with each other
+  context: >-
+    A decision whose example shows another decision reporting on it, or whose
+    fix introduces a finding of another, is in conflict with that decision:
+    following one breaks the other. The example that shows it declares the
+    conflict (`conflicts`), which keeps it from failing the decision's own
+    test, and what is declared is a candidate: an example showed it, nothing
+    proved it. This decision keeps the candidates in sight in the project that
+    holds them, as a warning, until somebody settles each by superseding one
+    of the two decisions or by changing one of them.
+
+
+    A candidate that the search for contradictions proves (an order that no
+    arrangement of the code satisfies, see `core/no-contradictory-decisions`)
+    is reported there, as an error, and no longer here: one decision, one
+    severity. A candidate that one of the two decisions settles by superseding
+    the other is not reported. The bundled catalog declares none.
+
+
+    The decision reads the decisions of the project (its own decision
+    documents), so a project that writes no decision never pays for anything
+    here; it is on by default.
+  scope:
+    subject: decision
+  requirement: >-
+    A decision SHOULD NOT be known to conflict with another decision that does
+    not supersede it: a conflict declared by an example is settled by
+    superseding one decision or by changing one of the two.
+  severity: warn
+  check:
+    type: cel
+    select: decision
+    variables:
+      - name: open
+        expression: "decision.candidates.filter(c, !c.resolved)"
+    where: size(open) > 0
+    message: "`{{ decision.name }}` is known to conflict with {{ open.map(c, c.with.join(', ')).join(', ') }}, which no search proved"
+    evidence:
+      with: open.map(c, c.with.join(', ')).join(', ')
+      example: open[0].witness.example
+    identity:
+      subject: "decision.uid != '' ? decision.uid : decision.name"
+  provenance:
+    wasDerivedFrom:
+      - Vasconcelos, Kollingbaum and Norman, Normative conflict resolution in multi-agent systems, Autonomous Agents and Multi-Agent Systems 19(2) (2009)
+      - van Lamsweerde, Darimont and Letier, Managing conflicts in goal-driven requirements engineering, IEEE Transactions on Software Engineering 24(11) (1998)
+  examples:
+    - name: declared-conflict
+      language: text
+      kind: invalid
+      files:
+        - path: decisions/small-files.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: local/small-files
+            spec:
+              title: Files are small
+              context: Readers hold a small file in mind.
+              scope:
+                subject: symbol
+              requirement: A file MUST stay short.
+              severity: warn
+              check:
+                type: cel
+                select: symbol
+                where: "symbol.kind == 'type' && symbol.name == 'small-files'"
+                message: "type {{ symbol.name }} is not allowed"
+                identity:
+                  subject: symbol.id
+              examples:
+                - name: bad
+                  language: text
+                  kind: invalid
+                  files: [{ path: a.txt, body: x }]
+                  expect: [{ line: 1 }]
+                - name: good
+                  language: text
+                  kind: valid
+                  files: [{ path: a.txt, body: x }]
+                  conflicts: [local/many-types]
+        - path: decisions/many-types.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: local/many-types
+            spec:
+              title: Types are grouped
+              context: Readers find the types of a file together.
+              scope:
+                subject: symbol
+              requirement: A file MUST hold its types together.
+              severity: warn
+              check:
+                type: cel
+                select: symbol
+                where: "symbol.kind == 'type' && symbol.name == 'many-types'"
+                message: "type {{ symbol.name }} is not allowed"
+                identity:
+                  subject: symbol.id
+              examples:
+                - name: bad
+                  language: text
+                  kind: invalid
+                  files: [{ path: a.txt, body: x }]
+                  expect: [{ line: 1 }]
+                - name: good
+                  language: text
+                  kind: valid
+                  files: [{ path: a.txt, body: x }]
+      expect:
+        - line: 4
+          message: is known to conflict with local/many-types
+    - name: no-declared-conflict
+      language: text
+      kind: valid
+      canonical: true
+      files:
+        - path: decisions/small-files.yaml
+          body: |-
+            apiVersion: lighthouse/v1alpha1
+            kind: Decision
+            metadata:
+              name: local/small-files
+            spec:
+              title: Files are small
+              context: Readers hold a small file in mind.
+              scope:
+                subject: symbol
+              requirement: A file MUST stay short.
+              severity: warn
+              check:
+                type: cel
+                select: symbol
+                where: "symbol.kind == 'type' && symbol.name == 'small-files'"
+                message: "type {{ symbol.name }} is not allowed"
+                identity:
+                  subject: symbol.id
+              examples:
+                - name: bad
+                  language: text
+                  kind: invalid
+                  files: [{ path: a.txt, body: x }]
+                  expect: [{ line: 1 }]
+                - name: good
+                  language: text
+                  kind: valid
+                  files: [{ path: a.txt, body: x }]

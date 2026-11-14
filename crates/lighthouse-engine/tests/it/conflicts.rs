@@ -15,6 +15,7 @@ use lighthouse_test_support::{bundled, registry};
 
 const READING: &str = "core/no-contradictory-decisions";
 const NOT_READING: &str = "core/decision-naming";
+const CANDIDATES: &str = "core/no-conflicting-decisions";
 
 /// An engine over a project that writes one decision of the bundled catalog,
 /// with both decisions on, searching with a test that counts its questions.
@@ -27,7 +28,7 @@ fn engine() -> (Engine, Arc<AtomicUsize>, tempfile::TempDir) {
     )
     .unwrap();
     let config = Config::parse_inline(&format!(
-        "plugins = [\"core\"]\n[rules.\"{READING}\"]\nlevel = \"error\"\n[rules.\"{NOT_READING}\"]\nlevel = \"warn\"\n"
+        "plugins = [\"core\"]\n[rules.\"{READING}\"]\nlevel = \"error\"\n[rules.\"{NOT_READING}\"]\nlevel = \"warn\"\n[rules.\"{CANDIDATES}\"]\nlevel = \"warn\"\n"
     ))
     .unwrap();
     let asked = Arc::new(AtomicUsize::new(0));
@@ -66,6 +67,16 @@ fn a_run_with_the_decision_starts_the_search() {
 }
 
 #[test]
+fn a_run_with_the_decision_about_declared_conflicts_starts_the_search_too() {
+    let (engine, asked, _dir) = engine();
+
+    let run = engine.check(&[], &[CANDIDATES.to_owned()]).unwrap();
+
+    assert!(run.diagnostics.is_empty());
+    assert!(asked.load(Ordering::SeqCst) > 0);
+}
+
+#[test]
 fn engine_with_conflicts_keeps_the_search_it_is_given() {
     let (engine, asked, _dir) = engine();
 
@@ -88,4 +99,14 @@ fn a_search_that_cannot_be_done_in_full_is_a_notice_naming_the_language_and_why(
             && n.contains("decisions is incomplete: no renderer for")
     });
     assert!(told, "{:?}", run.notices);
+}
+
+#[test]
+fn engine_contradictions() {
+    let (engine, asked, _dir) = engine();
+
+    let found = engine.contradictions().unwrap();
+
+    assert!(found.found.is_empty(), "{:?}", found.found);
+    assert!(asked.load(Ordering::SeqCst) > 0 || found.notices.is_empty());
 }

@@ -309,6 +309,34 @@ impl Decision {
         Self::new(self.metadata().clone(), spec)
     }
 
+    /// This decision, configured with `options`, as the others it runs with
+    /// see it: when it reads the options of one of them (`options.from`) it is
+    /// [`inheriting`](Self::inheriting) it, and has the values that decision
+    /// is configured with for the options it inherits. What the decision does
+    /// is keyed by all of that.
+    #[must_use]
+    pub fn seen_among(
+        &self,
+        options: &Map<String, Value>,
+        others: &[(&Decision, &Map<String, Value>)],
+    ) -> (Self, Map<String, Value>) {
+        let source = self
+            .options_from()
+            .and_then(|from| others.iter().find(|(other, _)| other.id() == from));
+        let Some(&(source, given)) = source else {
+            return (self.clone(), options.clone());
+        };
+        let view = self.inheriting(source);
+        let mut all = options.clone();
+        let inherited = view.options.iter().flat_map(|o| o.inherited.iter());
+        for key in inherited {
+            if let Some(value) = given.get(key) {
+                all.insert(key.clone(), value.clone());
+            }
+        }
+        (view, all)
+    }
+
     /// Defaults filled in and configured keys checked against the declared
     /// options; `language` selects its option values over the defaults.
     pub fn resolve_options(

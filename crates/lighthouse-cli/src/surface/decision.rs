@@ -292,6 +292,9 @@ pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Re
         for conflict in &report.ran.conflicts {
             let _ = writeln!(out, "CONFLICT {conflict}");
         }
+        for incomplete in &report.ran.incomplete {
+            let _ = writeln!(out, "INCOMPLETE {incomplete}");
+        }
         let _ = writeln!(
             out,
             "decision test: {} decision(s) in {} language(s), {} run(s), {} failure(s), {} skipped, {} conflict(s)",

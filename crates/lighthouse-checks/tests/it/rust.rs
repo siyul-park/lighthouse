@@ -67,10 +67,9 @@ fn the_design_decisions_have_rust_examples() {
 #[test]
 fn a_language_a_decision_does_not_list_asks_nothing_of_it() {
     let catalog = lighthouse_test_support::bundled();
-    let failures =
-        lighthouse_engine::RuleTester::new(registry, catalog, lighthouse_test_support::bundled())
-            .language("cobol")
-            .check_all();
+    let failures = crate::support::tester(registry, catalog)
+        .language("cobol")
+        .check_all();
     assert!(failures.is_empty(), "{failures:?}");
     assert!(
         catalog

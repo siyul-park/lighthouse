@@ -1,26 +1,33 @@
 //! The contradictions between the decisions of a project, worked out for a run
-//! in which a rule reads `decision.conflicts`: the oracle searches the order
-//! decisions of each cell (an effective configuration of a language) and the
-//! nogoods it finds are handed to the decision documents that are members of
-//! them, as the document's `conflicts` field. A run in which no rule reads the
-//! field never starts the search.
+//! in which a rule reads `decision.conflicts` or `decision.candidates`: the
+//! oracle searches the order decisions of each cell (an effective
+//! configuration of a language) and the nogoods it finds are handed to the
+//! decision documents that are members of them, as the document's `conflicts`
+//! field. A run in which no rule reads either never starts the search. The
+//! same search, [`Conflicts::search`], answers `spec validate` (the cells of a
+//! project, [`Engine::contradictions`]) and `decision test` (the cells of a
+//! catalog): there is no other path to a contradiction.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
 
-use lighthouse_graph::Graph;
+use lighthouse_graph::{Graph, Options as GraphOptions};
 use lighthouse_model::{Document, Options};
-use lighthouse_plugin::{Documents, Rule};
+use lighthouse_plugin::{Documents, Registry, Rule};
 use lighthouse_spec::{Catalog, Decision, Rules};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use super::{Engine, Input};
-use crate::{Basis, Cell, Oracle, Verdict, Witness};
+use crate::{Basis, Cell, Error, Oracle, Run, Verdict, Witness};
 
 /// The field of a document the search answers.
 const FIELD: &str = "conflicts";
+
+/// The field of a document that lists the conflicts its examples declare, the
+/// ones that no search proved.
+const CANDIDATES: &str = "candidates";
 
 /// The bound of the search a run makes: shapes of up to this many
 /// declarations. The gate and `make decisions` go further.
@@ -39,19 +46,44 @@ pub struct Conflicts {
 pub type Orders = Arc<dyn Fn(&Decision) -> bool + Send + Sync>;
 
 /// What the search of a cell found, and why it could not be done in full.
-struct Found<'a> {
-    nogoods: Vec<Nogood<'a>>,
+pub struct Found<'a> {
+    pub nogoods: Vec<Nogood<'a>>,
     /// The decisions of nogoods that the catalog does not hold.
-    lost: Vec<String>,
-    incomplete: Vec<String>,
+    pub lost: Vec<String>,
+    /// Why the search could not be done in full; empty when it was.
+    pub incomplete: Vec<String>,
 }
 
 /// A set of decisions that cannot hold together, as one of its members sees
 /// it.
-struct Nogood<'a> {
-    members: Vec<&'a Decision>,
-    kind: &'static str,
-    witness: Value,
+pub struct Nogood<'a> {
+    pub members: Vec<&'a Decision>,
+    pub kind: &'static str,
+    pub witness: Value,
+}
+
+/// What the search finds over the files of a project.
+#[derive(Debug, Default)]
+pub struct Contradictions {
+    pub found: Vec<Contradicted>,
+    /// What could not be searched in full, or at all.
+    pub notices: BTreeSet<String>,
+}
+
+/// A contradiction found among the decisions in force for a language.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Contradicted {
+    pub language: String,
+    /// The decisions that cannot hold together, sorted; one for a decision
+    /// that flags every order of some declarations alone.
+    pub names: Vec<String>,
+    pub kind: &'static str,
+    pub witness: Value,
+    /// A member supersedes another: the order of the decisions settles it.
+    pub resolved: bool,
+    /// Whether the same decisions run with their default options contradict
+    /// too: then the options and overrides of the project do not make it.
+    pub at_defaults: bool,
 }
 
 impl Conflicts {
@@ -96,13 +128,7 @@ impl Conflicts {
                             decision.applies_to(&file.lang) && (self.orders)(decision)
                         })
                 })
-                .map(|(id, c)| {
-                    let mut c = c.clone();
-                    c.options =
-                        super::config::options_at(&engine.inherited, &rules, id, &c.options)
-                            .into_owned();
-                    (id.clone(), c)
-                })
+                .map(|(id, c)| (id.clone(), c.clone()))
                 .collect();
             if !order.is_empty() {
                 cells.push((file.lang.clone(), order));
@@ -111,23 +137,31 @@ impl Conflicts {
         cells
     }
 
-    /// What the search finds among the order decisions of the cell, in the
-    /// graph of the engine.
-    fn nogoods(
+    /// The catalog the decisions are told by.
+    pub fn catalog(&self) -> &Catalog {
+        &self.catalog
+    }
+
+    /// Whether the search holds `decision` to the others.
+    pub fn orders(&self, decision: &Decision) -> bool {
+        (self.orders)(decision)
+    }
+
+    /// What the search finds among `decisions`, the order decisions of one
+    /// language with the options they run with, over the rules of `registry`
+    /// and in `graph`.
+    pub fn search(
         &self,
-        engine: &Engine,
+        registry: &Arc<Registry>,
         graph: &mut Graph,
-        (language, rules): &(String, Rules),
+        language: &str,
+        decisions: Vec<(&Decision, Options)>,
     ) -> Found<'_> {
-        let decisions: Vec<(&Decision, Options)> = rules
-            .iter()
-            .filter_map(|(id, c)| Some((self.catalog.decision(id)?, c.options.clone())))
-            .collect();
         let cell = Cell {
             language,
             decisions,
         };
-        let oracle = Oracle::sharing(Arc::clone(&engine.registry), &self.catalog);
+        let oracle = Oracle::sharing(Arc::clone(registry), &self.catalog);
         let verdict = oracle.search(graph, &cell, BOUND).verdict;
         let incomplete = match &verdict.basis {
             Basis::Incomplete(reasons) => reasons.clone(),
@@ -140,84 +174,77 @@ impl Conflicts {
             incomplete,
         }
     }
+
+    /// Like [`search`](Self::search), in a graph that lives as long as the
+    /// call: what a command that has no engine and no cache asks for.
+    pub fn search_once(
+        &self,
+        registry: &Arc<Registry>,
+        language: &str,
+        decisions: Vec<(&Decision, Options)>,
+    ) -> Found<'_> {
+        match Graph::in_memory(GraphOptions::default()) {
+            Ok(mut graph) => self.search(registry, &mut graph, language, decisions),
+            Err(why) => Found {
+                nogoods: Vec::new(),
+                lost: Vec::new(),
+                incomplete: vec![format!(
+                    "the search has no graph to keep its flags in: {why}"
+                )],
+            },
+        }
+    }
+
+    /// What the search finds among the decisions of a cell.
+    fn nogoods(
+        &self,
+        engine: &Engine,
+        graph: &mut Graph,
+        (language, rules): &(String, Rules),
+    ) -> Found<'_> {
+        let decisions = rules
+            .iter()
+            .filter_map(|(id, c)| Some((self.catalog.decision(id)?, c.options.clone())))
+            .collect();
+        self.search(&engine.registry, graph, language, decisions)
+    }
 }
 
-impl Engine {
-    /// The facts of the decision documents that the engine works out, by
-    /// document, when a selected rule reads them: every decision document has
-    /// the field, empty unless it is a member of a contradiction.
-    pub(super) fn document_facts(
-        &self,
-        (selected, inputs): (&[&dyn Rule], &[Input]),
-        documents: &[Document],
-        notices: &mut BTreeSet<String>,
-    ) -> BTreeMap<String, Value> {
-        let asked = selected
-            .iter()
-            .any(|rule| rule.reads_documents().iter().any(|field| field == FIELD));
-        if !asked {
-            return BTreeMap::new();
+impl Found<'_> {
+    /// What a run says of a search that could not be done in full or that
+    /// names decisions the catalog does not hold, for the language.
+    pub fn notices(&self, language: &str) -> Vec<String> {
+        let mut told = Vec::new();
+        if !self.lost.is_empty() {
+            told.push(format!(
+                "a contradiction among {language} decisions names decisions the catalog does not hold, and is not told: {}",
+                self.lost.join("; ")
+            ));
         }
-        let mut facts: BTreeMap<String, Value> = documents
-            .iter()
-            .filter(|d| d.kind == "Decision")
-            .map(|d| (Documents::key(d).to_owned(), json!({ FIELD: [] })))
-            .collect();
-        let Some(conflicts) = &self.conflicts else {
-            return facts;
-        };
-        let own = own_decisions(conflicts, documents);
-        if own.is_empty() {
-            return facts;
+        if !self.incomplete.is_empty() {
+            told.push(format!(
+                "the search for contradictions among {language} decisions is incomplete: {}",
+                self.incomplete.join("; ")
+            ));
         }
-        let catalog = &conflicts.catalog;
-        let mut entries: BTreeMap<String, Vec<Value>> = BTreeMap::new();
-        let mut guard = self.lock_graph();
-        let graph = self.graph_in(&mut guard, notices);
-        for cell in conflicts.cells(self, inputs, notices) {
-            let found = conflicts.nogoods(self, graph, &cell);
-            let mut told = |key: String, value: Value| {
-                let known = entries.entry(key).or_default();
-                if !known.contains(&value) {
-                    known.push(value);
-                }
-            };
-            for nogood in &found.nogoods {
-                for (key, value) in nogood.entries(catalog, &own) {
-                    told(key, value);
-                }
-            }
-            if !found.lost.is_empty() {
-                notices.insert(format!(
-                    "a contradiction among {} decisions names decisions the catalog does not hold, and is not told: {}",
-                    cell.0,
-                    found.lost.join("; ")
-                ));
-            }
-            if !found.incomplete.is_empty() {
-                notices.insert(format!(
-                    "the search for contradictions among {} decisions is incomplete: {}",
-                    cell.0,
-                    found.incomplete.join("; ")
-                ));
-                let members: Vec<&Decision> = cell
-                    .1
-                    .keys()
-                    .filter_map(|id| catalog.decision(id))
-                    .collect();
-                for (key, value) in incomplete_entries(&members, &own, &found.incomplete) {
-                    told(key, value);
-                }
-            }
-        }
-        for (key, list) in entries {
-            facts.insert(key, json!({ FIELD: list }));
-        }
-        facts
+        told
     }
 }
 
 impl Nogood<'_> {
+    /// Whether one of its decisions supersedes another, through any chain: the
+    /// order of the decisions settles it.
+    pub fn resolved(&self, catalog: &Catalog) -> bool {
+        resolved(catalog, &self.members)
+    }
+
+    /// The ids of its decisions, sorted.
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.members.iter().map(|d| d.id().to_owned()).collect();
+        names.sort_unstable();
+        names
+    }
+
     /// The entry of the nogood for each member that is a document of the
     /// project, by the key of its document. A nogood of pack decisions alone
     /// is gated where the packs are authored, not in a project that uses them.
@@ -250,39 +277,103 @@ impl Nogood<'_> {
     }
 }
 
-/// The entry of a cell whose search is incomplete, for each decision of the
-/// project in it: nothing is claimed, and the reasons are told.
-fn incomplete_entries(
-    members: &[&Decision],
-    own: &BTreeSet<&str>,
-    reasons: &[String],
-) -> Vec<(String, Value)> {
-    members
-        .iter()
-        .filter(|d| own.contains(d.key()))
-        .map(|d| {
-            let entry = json!({
-                "with": [],
-                "kind": "order",
-                "basis": "incomplete",
-                "witness": null,
-                "resolved": false,
-                "reasons": reasons,
-            });
-            (d.key().to_owned(), entry)
-        })
-        .collect()
-}
+impl Engine {
+    /// The facts of the decision documents that the engine works out, by
+    /// document, when a selected rule reads them: every decision document has
+    /// the fields that are read, empty unless it is a member of a
+    /// contradiction (`conflicts`) or an example of it declares a conflict
+    /// (`candidates`).
+    pub(super) fn document_facts(
+        &self,
+        (selected, inputs): (&[&dyn Rule], &[Input]),
+        documents: &[Document],
+        notices: &mut BTreeSet<String>,
+    ) -> BTreeMap<String, Value> {
+        let reads = |field: &str| {
+            selected
+                .iter()
+                .any(|rule| rule.reads_documents().iter().any(|f| f == field))
+        };
+        let (proving, declared) = (reads(FIELD), reads(CANDIDATES));
+        if !proving && !declared {
+            return BTreeMap::new();
+        }
+        let asked: Vec<&str> = [(FIELD, proving), (CANDIDATES, declared)]
+            .into_iter()
+            .filter_map(|(field, asked)| asked.then_some(field))
+            .collect();
+        let blank: Map<String, Value> = asked
+            .iter()
+            .map(|field| ((*field).to_owned(), json!([])))
+            .collect();
+        let mut facts: BTreeMap<String, Map<String, Value>> = documents
+            .iter()
+            .filter(|d| d.kind == "Decision")
+            .map(|d| (Documents::key(d).to_owned(), blank.clone()))
+            .collect();
+        if let Some(conflicts) = &self.conflicts {
+            let entries = proven::of(self, conflicts, (inputs, documents), notices);
+            if declared {
+                for (key, list) in declared::candidates(conflicts, documents, &entries) {
+                    facts
+                        .entry(key)
+                        .or_default()
+                        .insert(CANDIDATES.to_owned(), json!(list));
+                }
+            }
+            for (key, list) in entries.into_iter().filter(|_| proving) {
+                facts
+                    .entry(key)
+                    .or_default()
+                    .insert(FIELD.to_owned(), json!(list));
+            }
+        }
+        facts
+            .into_iter()
+            .map(|(key, fields)| (key, Value::Object(fields)))
+            .collect()
+    }
 
-/// The decisions of the catalog that the project's own documents are.
-fn own_decisions<'c>(conflicts: &'c Conflicts, documents: &[Document]) -> BTreeSet<&'c str> {
-    documents
-        .iter()
-        .filter(|d| d.kind == "Decision")
-        .filter_map(|d| conflicts.catalog.decision(&d.name))
-        .filter(|decision| (conflicts.orders)(decision))
-        .map(Decision::key)
-        .collect()
+    /// The contradictions among the order decisions in force for the files of
+    /// the project, under its configuration, packs, options and overrides:
+    /// the cells of the project, searched as a run reads them.
+    pub fn contradictions(&self) -> Result<Contradictions, Error> {
+        let mut found = Contradictions::default();
+        let Some(conflicts) = &self.conflicts else {
+            return Ok(found);
+        };
+        let overlays = super::Overlays::new();
+        let detected = self.detect(&overlays, |rel| self.claimed(rel))?;
+        let mut run = Run::default();
+        let inputs = self.read(&detected, &overlays, &mut run);
+        found.notices.extend(run.notices);
+        let mut guard = self.lock_graph();
+        let graph = self.graph_in(&mut guard, &mut found.notices);
+        for cell in conflicts.cells(self, &inputs, &mut found.notices) {
+            let (language, rules) = &cell;
+            let effective = conflicts.nogoods(self, graph, &cell);
+            let defaults = rules
+                .keys()
+                .filter_map(|id| Some((conflicts.catalog.decision(id)?, Options::new())))
+                .collect();
+            let baseline = conflicts.search(&self.registry, graph, language, defaults);
+            let at_defaults: BTreeSet<Vec<String>> =
+                baseline.nogoods.iter().map(|n| n.names()).collect();
+            found.notices.extend(effective.notices(language));
+            for nogood in &effective.nogoods {
+                let names = nogood.names();
+                found.found.push(Contradicted {
+                    language: language.clone(),
+                    kind: nogood.kind,
+                    witness: nogood.witness.clone(),
+                    resolved: resolved(&conflicts.catalog, &nogood.members),
+                    at_defaults: at_defaults.contains(&names),
+                    names,
+                });
+            }
+        }
+        Ok(found)
+    }
 }
 
 /// The nogoods a verdict holds, with the decisions they name.
@@ -371,6 +462,9 @@ fn supersedes(catalog: &Catalog, newer: &Decision, older: &Decision) -> bool {
     }
     false
 }
+
+mod declared;
+mod proven;
 
 #[cfg(test)]
 mod tests;

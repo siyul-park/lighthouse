@@ -33,6 +33,7 @@ spec:
       together; the engine looks for the smallest code that shows it.
     decisions:
     - no-contradictory-decisions
+    - no-conflicting-decisions
   - name: format
     title: Formatting
     intro: Source formatting is decided by the language standard, not by review.

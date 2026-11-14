@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_spec::Catalog;
 use lighthouse_test_support::{bundled, cel};
 
-use super::{Conflicts, Nogood, incomplete_entries, resolved};
+use super::{Conflicts, Found, Nogood, declared::candidates, proven::incomplete_entries, resolved};
 
 const FIRST: &str = "design/declaration-groups";
 const SECOND: &str = "design/top-down-order";
@@ -117,4 +117,167 @@ fn an_incomplete_search_tells_each_own_member_that_nothing_is_proven_and_why() {
     assert_eq!(entries[0].0, catalog.decision(FIRST).unwrap().key());
     assert_eq!(entries[0].1["basis"], "incomplete");
     assert_eq!(entries[0].1["reasons"], serde_json::json!(["the bound"]));
+}
+
+/// A local decision that declares, on its valid example, the conflicts given.
+fn declaring(name: &str, conflicts: &str, extra: &str) -> String {
+    format!(
+        "apiVersion: lighthouse/v1alpha1\nkind: Decision\nmetadata:\n  name: local/{name}\nspec:\n  title: T\n  context: C\n  scope: {{ subject: file }}\n  requirement: R MUST hold.\n  severity: warn\n{extra}  check:\n    type: cel\n    select: file\n    where: 'true'\n    message: m\n  examples:\n    - name: bad\n      language: text\n      kind: invalid\n      files: [{{ path: a.txt, body: x }}]\n    - name: good\n      language: text\n      kind: valid\n      files: [{{ path: a.txt, body: x }}]\n      conflicts: [{conflicts}]\n"
+    )
+}
+
+fn project(files: [(&str, String); 2]) -> (Conflicts, Vec<lighthouse_model::Document>) {
+    let documents = files
+        .iter()
+        .flat_map(|(name, text)| {
+            let path = std::path::Path::new(name);
+            let format = lighthouse_model::Format::of_path(path).unwrap();
+            lighthouse_model::Document::list(format, path, text).0
+        })
+        .collect();
+    let local = Catalog::from_local(
+        files.map(|(name, text)| (name.to_owned(), text)).into(),
+        &cel(),
+    )
+    .unwrap();
+    (
+        Conflicts::new(std::sync::Arc::new(local), std::sync::Arc::new(|_| true)),
+        documents,
+    )
+}
+
+#[test]
+fn a_conflict_an_example_declares_is_an_empirical_candidate_of_its_decision() {
+    let (conflicts, documents) = project([
+        ("a.yaml", declaring("a", "local/b", "")),
+        ("b.yaml", declaring("b", "", "")),
+    ]);
+
+    let found = candidates(&conflicts, &documents, &BTreeMap::new());
+
+    let key = lighthouse_plugin::Documents::key(&documents[0]);
+    assert_eq!(found[key].len(), 1);
+    assert_eq!(found[key][0]["with"], serde_json::json!(["local/b"]));
+    assert_eq!(found[key][0]["basis"], "empirical");
+    assert_eq!(found[key][0]["resolved"], false);
+    let other = lighthouse_plugin::Documents::key(&documents[1]);
+    assert!(found[other].is_empty());
+}
+
+#[test]
+fn a_candidate_that_a_search_proved_is_left_to_the_error_decision() {
+    let (conflicts, documents) = project([
+        ("a.yaml", declaring("a", "local/b", "")),
+        ("b.yaml", declaring("b", "", "")),
+    ]);
+    let key = lighthouse_plugin::Documents::key(&documents[0]).to_owned();
+    let proven = BTreeMap::from([(
+        key.clone(),
+        vec![serde_json::json!({ "with": ["local/b"], "basis": "proven" })],
+    )]);
+
+    let found = candidates(&conflicts, &documents, &proven);
+
+    assert!(found[&key].is_empty());
+}
+
+#[test]
+fn a_candidate_that_one_decision_settles_by_superseding_the_other_is_resolved() {
+    let (conflicts, documents) = project([
+        (
+            "a.yaml",
+            declaring("a", "local/b", "  supersedes: [local/b]\n"),
+        ),
+        ("b.yaml", declaring("b", "", "  status: superseded\n")),
+    ]);
+
+    let found = candidates(&conflicts, &documents, &BTreeMap::new());
+
+    let key = lighthouse_plugin::Documents::key(&documents[0]);
+    assert_eq!(found[key][0]["resolved"], true);
+}
+
+fn everything() -> Conflicts {
+    Conflicts::new(
+        std::sync::Arc::new(bundled().clone()),
+        std::sync::Arc::new(|_| true),
+    )
+}
+
+#[test]
+fn found() {
+    let found = Found {
+        nogoods: vec![nogood(bundled(), &[FIRST, SECOND], "order")],
+        lost: Vec::new(),
+        incomplete: Vec::new(),
+    };
+
+    assert_eq!(found.nogoods.len(), 1);
+    assert!(found.notices("go").is_empty());
+}
+
+#[test]
+fn conflicts_catalog() {
+    assert!(everything().catalog().decision(FIRST).is_some());
+}
+
+#[test]
+fn conflicts_orders() {
+    let only_first = |decision: &lighthouse_spec::Decision| decision.id() == FIRST;
+    let found = Conflicts::new(
+        std::sync::Arc::new(bundled().clone()),
+        std::sync::Arc::new(only_first),
+    );
+
+    assert!(found.orders(bundled().decision(FIRST).unwrap()));
+    assert!(!found.orders(bundled().decision(SECOND).unwrap()));
+}
+
+#[test]
+fn conflicts_search_once() {
+    let first = bundled().decision(FIRST).unwrap();
+    let registry = std::sync::Arc::new(lighthouse_plugin::Registry::default());
+
+    let conflicts = everything();
+    let found = conflicts.search_once(
+        &registry,
+        "text",
+        vec![(first, lighthouse_model::Options::new())],
+    );
+
+    assert!(found.nogoods.is_empty());
+    assert!(
+        found.incomplete[0].contains("no renderer"),
+        "{:?}",
+        found.incomplete
+    );
+}
+
+#[test]
+fn found_notices() {
+    let found = Found {
+        nogoods: Vec::new(),
+        lost: vec!["key".to_owned()],
+        incomplete: vec!["no renderer".to_owned()],
+    };
+
+    let told = found.notices("go");
+
+    assert_eq!(told.len(), 2);
+    assert!(told[0].contains("go decisions names decisions the catalog does not hold"));
+    assert!(told[1].contains("go decisions is incomplete: no renderer"));
+}
+
+#[test]
+fn nogood_resolved() {
+    let pair = nogood(bundled(), &[FIRST, SECOND], "order");
+
+    assert!(!pair.resolved(bundled()));
+}
+
+#[test]
+fn nogood_names() {
+    let pair = nogood(bundled(), &[SECOND, FIRST], "order");
+
+    assert_eq!(pair.names(), [FIRST, SECOND]);
 }

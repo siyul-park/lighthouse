@@ -22,8 +22,10 @@ use serde_json::{Value, json};
 const POS_LINE: u64 = 1 << 20;
 
 /// The fields of a document that no file states and the engine works out, for
-/// a run in which a check reads them: what a decision conflicts with.
-pub(crate) const COMPUTED_DOCUMENT_FACTS: [&str; 1] = ["conflicts"];
+/// a run in which a check reads them: what a decision is proven to
+/// contradict (`conflicts`) and the conflicts its examples declare
+/// (`candidates`).
+pub(crate) const COMPUTED_DOCUMENT_FACTS: [&str; 2] = ["conflicts", "candidates"];
 
 /// The span of a declaration whose place the model does not hold.
 const UNPLACED: Span = Span {

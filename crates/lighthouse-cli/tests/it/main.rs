@@ -9,6 +9,7 @@ mod cache_fixtures;
 mod checks;
 mod cli;
 mod command_sarif;
+mod contradictions;
 mod decision_portable;
 mod environment;
 mod explore;

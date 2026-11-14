@@ -245,6 +245,7 @@ fn commit(
             failures: Vec::new(),
             skipped: Vec::new(),
             conflicts: Vec::new(),
+            incomplete: Vec::new(),
             timings: crate::TestTimings::default(),
         }
     };

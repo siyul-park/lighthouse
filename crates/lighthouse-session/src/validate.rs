@@ -10,6 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use lighthouse_checks::Composition;
@@ -20,7 +21,7 @@ use lighthouse_spec::Catalog;
 use lighthouse_spec::{Config, ProjectSpec};
 use serde_json::Value;
 
-use crate::{Result, Session, decisions::test_catalog};
+use crate::{Result, Session, contradictions, decisions::test_catalog};
 
 /// The decision that asks decisions to be named well.
 const DECISION_NAMING: &str = "core/decision-naming";
@@ -31,6 +32,9 @@ pub struct Validated {
     pub files: usize,
     pub documents: usize,
     pub problems: Vec<Problem>,
+    /// What could not be checked in full, or was checked and is settled: not
+    /// a problem, but never left out.
+    pub notices: Vec<String>,
 }
 
 /// One thing wrong with one file.
@@ -96,7 +100,7 @@ impl Sets {
         session: &Session,
         registry: &Registry,
         examples: bool,
-        problems: &mut Vec<Problem>,
+        (problems, notices): (&mut Vec<Problem>, &mut Vec<String>),
     ) -> Result<()> {
         let cel = session.comp.cel();
         let bundled: &Catalog = &session.base;
@@ -111,6 +115,7 @@ impl Sets {
         for (path, config) in &self.projects {
             self.project(path, config, &known, (session, registry), problems);
         }
+        self.contradictions(session, (problems, notices));
         let mut roots = BTreeSet::new();
         let mut named = BTreeSet::new();
         let mut served: Option<Served> = None;
@@ -155,6 +160,52 @@ impl Sets {
             }
         }
         Ok(())
+    }
+
+    /// The contradictions the options and overrides of each project make among
+    /// the decisions in force for the files of the project, found by the
+    /// search a run makes. A project that does not load is reported already.
+    fn contradictions(
+        &self,
+        session: &Session,
+        (problems, notices): (&mut Vec<Problem>, &mut Vec<String>),
+    ) {
+        let mut started: Option<Option<Arc<Registry>>> = None;
+        for (path, project) in &self.projects {
+            let Ok(config) = Config::from_resource(project.clone()) else {
+                continue;
+            };
+            if problems.iter().any(|p| p.path == *path) {
+                continue;
+            }
+            let registry = started.get_or_insert_with(|| {
+                session
+                    .registry()
+                    .ok()
+                    .map(|(registry, _)| Arc::new(registry))
+            });
+            let Some(registry) = registry else {
+                notices.push(format!(
+                    "{path}: the search for contradictions was not done: the plugins did not start"
+                ));
+                continue;
+            };
+            let config = config.enabling(registry.manifests().iter().map(|m| m.id.as_str()));
+            let searched = contradictions::in_project(session, registry, config, path);
+            problems.extend(
+                searched
+                    .failures
+                    .into_iter()
+                    .map(|message| problem(path, message)),
+            );
+            notices.extend(
+                searched
+                    .settled
+                    .into_iter()
+                    .map(|line| format!("{path}: {line}")),
+            );
+            notices.extend(searched.unsearched);
+        }
     }
 
     /// The root of the catalog a directory belongs to: the parent of the
@@ -277,7 +328,12 @@ pub fn validate_paths(session: &Session, paths: &[PathBuf], examples: bool) -> R
             Err(e) => found.problems.push(problem(&label, e)),
         }
     }
-    sets.check(session, &registry, examples, &mut found.problems)?;
+    sets.check(
+        session,
+        &registry,
+        examples,
+        (&mut found.problems, &mut found.notices),
+    )?;
     Ok(found)
 }
 

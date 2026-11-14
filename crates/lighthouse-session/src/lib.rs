@@ -6,6 +6,7 @@
 
 mod authoring;
 mod check;
+mod contradictions;
 mod decisions;
 mod descriptor;
 mod examples;

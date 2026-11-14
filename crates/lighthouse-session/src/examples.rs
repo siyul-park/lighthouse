@@ -6,12 +6,13 @@
 use std::{collections::BTreeSet, sync::Mutex, time::Duration};
 
 use lighthouse_engine::{Plant, Planted, RuleTester, Spent, Tested};
+
 use lighthouse_plugin::Registry;
 use lighthouse_rpc::Started;
 use lighthouse_spec::{Catalog, Decision};
 use rayon::prelude::*;
 
-use crate::{Result, Session};
+use crate::{Result, Session, contradictions};
 
 /// Stack of a worker: the engine under an example recurses deeply.
 const WORKER_STACK: usize = 8 << 20;
@@ -25,6 +26,8 @@ pub(crate) struct Found {
     /// examples each keeps from running.
     pub(crate) lacking: Vec<(String, usize)>,
     pub(crate) conflicts: Vec<String>,
+    /// Searches for contradictions that were not done in full.
+    pub(crate) incomplete: Vec<String>,
     pub(crate) spent: Spent,
     /// The time of each unit: decision, language and total.
     pub(crate) per_unit: Vec<(String, String, Duration)>,
@@ -96,7 +99,10 @@ pub(crate) fn run(
     if let Some(e) = failed.lock().map_err(|e| e.to_string())?.take() {
         return Err(format!("plugins could not be started for every example: {e}").into());
     }
-    Ok(merge(done))
+    let mut found = merge(done);
+    contradictions::in_catalog(session, catalog, fresh(), (languages, decisions))
+        .report(&mut found);
+    Ok(found)
 }
 
 /// The examples of `decision` in `language`.
