@@ -34,13 +34,16 @@ spec:
     The search is on by default. It starts only when the project writes a
     decision of that kind, runs once per distinct configuration of a language
     and is kept in the project's graph (the cache), so a project without such
-    a decision never pays for it; a cold search of the order decisions of this repository costs about
-    a second and a half (Go and Rust), and a warm one a few milliseconds. The
-    bundled decisions have no contradiction up to two declarations. When the
-    search of a language cannot be done in full (a decision whose behaviour
-    needs more than two declarations to show, or a language without a
-    renderer), the run says so in a notice that names the language and why,
+    a decision never pays for it. When the search of a language cannot be done
+    in full, the run says so in one notice that names each language and why,
     and says nothing of what it did not search.
+
+
+    A search bounded at n claims only that no contradiction exists among shapes
+    of up to n declarations, never that the decisions agree. Only Go and Rust are rendered, so
+    the order decisions of other languages are not searched, and the notice
+    says so. `make decisions` reruns the search over the bundled catalog at
+    three declarations and fails on a contradiction.
   scope:
     subject: decision
   languages:
