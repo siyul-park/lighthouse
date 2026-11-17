@@ -7,7 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_logic::{Assumption, Env, Nogoods, hitting_sets, is_minimal_hitting};
 
 use super::{
-    Alphabet, Arrangement, Contradiction, Flagged, Forced, Language, Shape, Witness, text,
+    Alphabet, Arrangement, Contradiction, Flagged, Forced, Incomplete, Language, Shape, Witness,
+    text,
 };
 
 /// The rows of every shape of a search, smallest first.
@@ -29,7 +30,7 @@ pub(super) struct Search {
     /// The first shape that showed each nogood: the smallest, as the shapes
     /// come smallest first.
     pub(super) shapes: BTreeMap<Env, usize>,
-    pub(super) reasons: Vec<String>,
+    pub(super) reasons: Vec<Incomplete>,
 }
 
 impl Table {
@@ -123,11 +124,10 @@ impl Search {
             search.row(at, row);
         }
         for decision in decisions.filter(|decision| !sensitive.contains(decision)) {
-            search.reasons.push(format!(
-                "`{}` flags no arrangement differently on any shape of up to {bound} \
-                 declarations: the alphabet cannot show the order it asks",
-                decision.uid
-            ));
+            search.reasons.push(Incomplete::Insensitive {
+                decision: decision.uid.clone(),
+                bound,
+            });
         }
         search
     }
@@ -140,7 +140,10 @@ impl Search {
             return;
         }
         match hitting_sets(&row.flagged) {
-            Err(unsolved) => self.reasons.push(format!("shape {at}: {unsolved}")),
+            Err(unsolved) => self.reasons.push(Incomplete::Hitting {
+                shape: at,
+                reason: unsolved.to_string(),
+            }),
             Ok(label) => {
                 for env in label.iter() {
                     debug_assert!(is_minimal_hitting(env, &row.flagged));

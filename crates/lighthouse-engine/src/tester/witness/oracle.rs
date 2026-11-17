@@ -13,8 +13,8 @@ use lighthouse_spec::{Catalog, Decision};
 use serde_json::{Map, Value};
 
 use super::{
-    Alphabet, CellKey, FLAGS, Flags, FlagsKey, Language, Provenance, Scratch, Setting, VERDICT,
-    Verdict, enumerate, run,
+    Alphabet, CellKey, FLAGS, Flags, FlagsKey, Incomplete, Language, Provenance, Scratch, Setting,
+    VERDICT, Verdict, enumerate, run,
 };
 
 /// Runs the decisions of a cell over the shapes that can break their order.
@@ -81,8 +81,8 @@ impl<'a> Oracle<'a> {
         graph: &mut Graph,
         cell: &Cell<'_>,
         bound: usize,
-    ) -> Result<Searched, String> {
-        let language = Language::of(cell.language).map_err(|why| why.to_string())?;
+    ) -> Result<Searched, Incomplete> {
+        let language = Language::of(cell.language)?;
         let pairs: Vec<(&Decision, &Map<String, Value>)> =
             cell.decisions.iter().map(|(d, o)| (*d, o)).collect();
         let seen: Vec<_> = pairs
@@ -91,44 +91,48 @@ impl<'a> Oracle<'a> {
             .collect();
         let viewed: Vec<(&Decision, &Map<String, Value>)> =
             seen.iter().map(|(d, o)| (d, o)).collect();
-        let alphabet = Alphabet::of(language, &viewed).map_err(|why| why.to_string())?;
+        let alphabet = Alphabet::of(language, &viewed)?;
         let registry = (self.registry)();
-        let shapes = enumerate(language, alphabet, bound).map_err(|why| why.to_string())?;
+        let shapes = enumerate(language, alphabet, bound)?;
         let provenance = Provenance {
             renderer: Scratch::digest(language, alphabet, &shapes),
             provider: run::provider(&registry),
             tool: crate::cache::build_identity(),
-            injected: run::injected(self.catalog, language)?,
+            injected: run::injected(self.catalog, language).map_err(Incomplete::Failed)?,
         };
         let setting = Setting::new(language, alphabet, bound, provenance);
-        let members = members(language, &pairs, &viewed)?;
-        let missing = missing(graph, &setting, &members)?;
+        let members = members(language, &pairs, &viewed).map_err(Incomplete::Failed)?;
+        let missing = missing(graph, &setting, &members).map_err(Incomplete::Failed)?;
         let ran: Vec<String> = missing.iter().map(|m| m.assumption.uid.clone()).collect();
         if !missing.is_empty() {
             let rules: Vec<(&Decision, &Map<String, Value>)> =
                 missing.iter().map(|m| (m.decision, m.options)).collect();
-            let flags = run::flags(self.catalog, registry, (language, alphabet, bound), &rules)?;
+            let flags = run::flags(self.catalog, registry, (language, alphabet, bound), &rules)
+                .map_err(Incomplete::Failed)?;
             for member in &missing {
                 let key = key(&setting, member);
                 let found = flags.get(member.decision.id()).cloned().unwrap_or_default();
                 graph
                     .set_input(&FLAGS, &key, Flags(found), Durability::Stable)
-                    .map_err(|why| why.to_string())?;
+                    .map_err(failed)?;
             }
         }
         let cell = CellKey {
             setting,
             decisions: members.iter().map(|m| m.assumption.clone()).collect(),
         };
-        let verdict = graph
-            .query(&VERDICT, &cell)
-            .map_err(|why| why.to_string())?;
-        graph.commit().map_err(|why| why.to_string())?;
+        let verdict = graph.query(&VERDICT, &cell).map_err(failed)?;
+        graph.commit().map_err(failed)?;
         Ok(Searched {
             verdict: (*verdict).clone(),
             ran,
         })
     }
+}
+
+/// A reason the search could not run.
+fn failed(why: impl std::fmt::Display) -> Incomplete {
+    Incomplete::Failed(why.to_string())
 }
 
 /// The members of the cell, sorted by assumption.

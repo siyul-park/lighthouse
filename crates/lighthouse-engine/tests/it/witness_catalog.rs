@@ -7,9 +7,10 @@ use std::time::Instant;
 
 use lighthouse_engine::{Basis, Cell, Oracle};
 use lighthouse_graph::{Graph, Options};
-use lighthouse_spec::Config;
+use lighthouse_logic::Tier;
+use lighthouse_spec::{Config, Decision};
 use lighthouse_test_support::{bundled, lang_go, lang_rust, pooled, registry};
-use serde_json::Map;
+use serde_json::{Map, Value};
 
 /// The decisions whose fix is a move: the order decisions.
 const ORDER: [&str; 4] = [
@@ -82,6 +83,78 @@ fn types_that_hold_each_other_in_a_cycle_are_not_ordered_by_top_down_order() {
         "{:?}",
         found.verdict.basis
     );
+}
+
+/// The gate of the catalog: the order decisions of the bundled catalog, at
+/// their default options, hold together over every set of up to three
+/// declarations in Go and Rust, and the languages without a renderer say so.
+/// Run with `--nocapture` for the report.
+#[test]
+#[ignore = "slow: run by `make decisions` in release"]
+fn the_bundled_catalog_has_no_contradiction_up_to_three_declarations() {
+    let (oracle, go) = oracle();
+    let catalog = bundled();
+    let cel = lighthouse_test_support::cel();
+    let orders = |language: &str| -> Vec<(&Decision, Map<String, Value>)> {
+        catalog
+            .decisions()
+            .filter(|d| d.automated() && d.applies_to(language))
+            .filter(|d| lighthouse_logic::tier(&cel, d).tier == Tier::O)
+            .map(|d| (d, Map::new()))
+            .collect()
+    };
+    for language in ["rust", "go", "python", "typescript"] {
+        let rendered = matches!(language, "rust" | "go");
+        if language == "go" && !go {
+            continue;
+        }
+        let decisions = orders(language);
+        let mut names: Vec<&str> = decisions.iter().map(|(d, _)| d.id()).collect();
+        names.sort_unstable();
+        let expected: &[&str] = if rendered {
+            &ORDER
+        } else {
+            &["testing/file-layout"]
+        };
+        let mut expected = expected.to_vec();
+        expected.sort_unstable();
+        assert_eq!(names, expected, "{language}: the order decisions in force");
+        let cell = Cell {
+            language,
+            decisions,
+        };
+        let mut graph = Graph::in_memory(Options::default()).unwrap();
+
+        let found = oracle.search(&mut graph, &cell, 3).verdict;
+
+        println!(
+            "GATE {language} n=3 decisions={names:?} contradictions={} single={} basis={}",
+            found.contradictions.len(),
+            found.single.len(),
+            match &found.basis {
+                Basis::Bounded(b) => format!("bounded({})", b.declarations),
+                Basis::Incomplete(why) => format!(
+                    "incomplete({})",
+                    why.iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                ),
+            }
+        );
+        assert!(found.contradictions.is_empty(), "{language}: {found:?}");
+        assert!(found.single.is_empty(), "{language}: {found:?}");
+        match (&found.basis, rendered) {
+            (Basis::Bounded(b), true) => assert_eq!(b.declarations, 3),
+            (Basis::Incomplete(why), false) => {
+                assert!(
+                    why.iter().any(|w| w.to_string().contains("no renderer")),
+                    "{why:?}"
+                );
+            }
+            (basis, _) => panic!("{language}: unexpected basis {basis:?}"),
+        }
+    }
 }
 
 /// An oracle over the bundled catalog and the plugins of Rust and, when a Go

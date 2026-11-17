@@ -371,7 +371,10 @@ fn a_language_without_a_renderer_is_incomplete() {
     let Basis::Incomplete(why) = &found.verdict.basis else {
         panic!("{:?}", found.verdict);
     };
-    assert!(why[0].contains("no renderer for `python`"), "{why:?}");
+    assert!(
+        why[0].to_string().contains("no renderer for `python`"),
+        "{why:?}"
+    );
     assert!(found.verdict.contradictions.is_empty());
 }
 
@@ -456,12 +459,13 @@ fn a_decision_the_alphabet_cannot_tell_arrangements_by_makes_the_search_incomple
         panic!("{:?}", found.verdict);
     };
     assert!(
-        why.iter().any(|reason| reason.contains("`toy/never`")),
+        why.iter()
+            .any(|reason| reason.to_string().contains("`toy/never`")),
         "{why:?}"
     );
     assert!(
         !why.iter()
-            .any(|reason| reason.contains("`toy/pub-then-priv`")),
+            .any(|reason| reason.to_string().contains("`toy/pub-then-priv`")),
         "{why:?}"
     );
 }
@@ -505,7 +509,9 @@ fn a_finding_outside_the_shapes_makes_the_search_incomplete() {
         panic!("{:?}", found.verdict);
     };
     assert!(
-        why[0].contains("finding outside the shapes: toy/stray"),
+        why[0]
+            .to_string()
+            .contains("finding outside the shapes: toy/stray"),
         "{why:?}"
     );
     assert!(found.verdict.contradictions.is_empty());

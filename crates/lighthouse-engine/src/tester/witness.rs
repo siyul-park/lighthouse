@@ -137,7 +137,7 @@ pub struct Alphabet {
 
 /// Why no verdict can be given for a decision in a language: the caller
 /// reports `incomplete` with this reason, never silence.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Incomplete {
     /// No renderer exists for the language.
     NoRenderer(String),
@@ -152,24 +152,52 @@ pub enum Incomplete {
     Options { decision: String, reason: String },
     /// The bound is above [`MAX_BOUND`].
     Bound(usize),
+    /// The decision (by its key) flags no arrangement differently on any shape
+    /// of up to `bound` declarations: the alphabet cannot show the order it
+    /// asks.
+    Insensitive { decision: String, bound: usize },
+    /// The minimal sets of what an unsatisfiable shape flags could not be
+    /// worked out.
+    Hitting { shape: usize, reason: String },
+    /// The search could not be run: a plugin crashed, a file could not be
+    /// read, the graph failed.
+    Failed(String),
 }
 
 impl std::fmt::Display for Incomplete {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.told(&str::to_owned))
+    }
+}
+
+impl Incomplete {
+    /// The reason in words, with each decision named by `name`: the key the
+    /// search holds it by, told as the id its findings show.
+    pub fn told(&self, name: &dyn Fn(&str) -> String) -> String {
         match self {
-            Self::NoRenderer(language) => write!(f, "no renderer for `{language}`"),
+            Self::NoRenderer(language) => format!("no renderer for `{language}`"),
             Self::Alphabet {
                 decision,
                 language,
                 group,
-            } => write!(
-                f,
-                "`{decision}` orders `{group}`, which the {language} alphabet cannot produce"
+            } => format!(
+                "`{}` orders `{group}`, which the {language} alphabet cannot produce",
+                name(decision)
             ),
             Self::Options { decision, reason } => {
-                write!(f, "the options of `{decision}` do not resolve: {reason}")
+                format!(
+                    "the options of `{}` do not resolve: {reason}",
+                    name(decision)
+                )
             }
-            Self::Bound(bound) => write!(f, "a bound of {bound} is above {MAX_BOUND}"),
+            Self::Bound(bound) => format!("a bound of {bound} is above {MAX_BOUND}"),
+            Self::Insensitive { decision, bound } => format!(
+                "`{}` flags no arrangement differently on any shape of up to {bound} \
+                 declarations: the alphabet cannot show the order it asks",
+                name(decision)
+            ),
+            Self::Hitting { shape, reason } => format!("shape {shape}: {reason}"),
+            Self::Failed(reason) => reason.clone(),
         }
     }
 }

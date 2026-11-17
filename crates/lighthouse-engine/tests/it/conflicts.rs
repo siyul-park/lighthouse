@@ -95,8 +95,8 @@ fn a_search_that_cannot_be_done_in_full_is_a_notice_naming_the_language_and_why(
     let run = engine.check(&[], &[READING.to_owned()]).unwrap();
 
     let told = run.notices.iter().any(|n| {
-        n.starts_with("the search for contradictions among ")
-            && n.contains("decisions is incomplete: no renderer for")
+        n.starts_with("the search for contradictions is incomplete: ")
+            && n.contains("no renderer for")
     });
     assert!(told, "{:?}", run.notices);
 }

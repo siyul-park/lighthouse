@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use lighthouse_spec::Catalog;
 use lighthouse_test_support::{bundled, cel};
 
-use super::{Conflicts, Found, Nogood, declared::candidates, proven::incomplete_entries, resolved};
+use super::{
+    Conflicts, Found, Gaps, Nogood, declared::candidates, proven::incomplete_entries, resolved,
+};
 
 const FIRST: &str = "design/declaration-groups";
 const SECOND: &str = "design/top-down-order";
@@ -213,7 +215,7 @@ fn found() {
     };
 
     assert_eq!(found.nogoods.len(), 1);
-    assert!(found.notices("go").is_empty());
+    assert!(found.lost_notice("go").is_none());
 }
 
 #[test]
@@ -254,18 +256,55 @@ fn conflicts_search_once() {
 }
 
 #[test]
-fn found_notices() {
+fn found_lost_notice() {
     let found = Found {
         nogoods: Vec::new(),
         lost: vec!["key".to_owned()],
         incomplete: vec!["no renderer".to_owned()],
     };
 
-    let told = found.notices("go");
+    let told = found.lost_notice("go").unwrap();
 
-    assert_eq!(told.len(), 2);
-    assert!(told[0].contains("go decisions names decisions the catalog does not hold"));
-    assert!(told[1].contains("go decisions is incomplete: no renderer"));
+    assert!(told.contains("go decisions names decisions the catalog does not hold"));
+    assert!(
+        Found {
+            lost: Vec::new(),
+            ..found
+        }
+        .lost_notice("go")
+        .is_none()
+    );
+}
+
+#[test]
+fn gaps() {
+    assert!(Gaps::default().notice().is_none());
+}
+
+#[test]
+fn gaps_add() {
+    let mut gaps = Gaps::default();
+    let found = |why: &str| Found {
+        nogoods: Vec::new(),
+        lost: Vec::new(),
+        incomplete: vec![why.to_owned()],
+    };
+
+    gaps.add("go", &found("too small"));
+    gaps.add("go", &found("too small"));
+    gaps.add("python", &found("no renderer"));
+    gaps.add(
+        "rust",
+        &Found {
+            incomplete: Vec::new(),
+            ..found("")
+        },
+    );
+
+    assert_eq!(
+        gaps.notice().unwrap(),
+        "the search for contradictions is incomplete: go: too small | python: no renderer"
+    );
 }
 
 #[test]
@@ -280,4 +319,13 @@ fn nogood_names() {
     let pair = nogood(bundled(), &[SECOND, FIRST], "order");
 
     assert_eq!(pair.names(), [FIRST, SECOND]);
+}
+
+#[test]
+fn a_decision_is_told_by_its_id_and_by_its_key_only_when_it_has_no_id() {
+    let conflicts = everything();
+    let first = bundled().decision(FIRST).unwrap();
+
+    assert_eq!(conflicts.id_of(first.key()), FIRST);
+    assert_eq!(conflicts.id_of("unknown-key"), "unknown-key");
 }

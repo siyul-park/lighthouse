@@ -11,7 +11,7 @@ use lighthouse_logic::Assumption;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Alphabet, Arrangement, Language, Shape, enumerate,
+    Alphabet, Arrangement, Incomplete, Language, Shape, enumerate,
     search::{Search, Table},
 };
 
@@ -41,7 +41,7 @@ pub enum Basis {
     Bounded(Bounded),
     /// The search could not be completed; why. The contradictions it found,
     /// if any, stand, and nothing else is said.
-    Incomplete(Vec<String>),
+    Incomplete(Vec<Incomplete>),
 }
 
 /// The scope of a complete search.
@@ -176,7 +176,7 @@ impl Setting {
 
 impl Verdict {
     /// A verdict that says nothing: the search could not be done.
-    pub fn incomplete(reasons: Vec<String>) -> Self {
+    pub fn incomplete(reasons: Vec<Incomplete>) -> Self {
         Self {
             contradictions: Vec::new(),
             single: Vec::new(),
@@ -189,7 +189,7 @@ impl Verdict {
 /// each decision flags.
 pub(super) fn judge(setting: &Setting, flags: &BTreeMap<Assumption, BTreeSet<usize>>) -> Verdict {
     let Ok(language) = Language::of(&setting.language) else {
-        return Verdict::incomplete(vec![format!("no renderer for `{}`", setting.language)]);
+        return Verdict::incomplete(vec![Incomplete::NoRenderer(setting.language.clone())]);
     };
     let alphabet = Alphabet {
         tests: setting.tests,
@@ -197,7 +197,7 @@ pub(super) fn judge(setting: &Setting, flags: &BTreeMap<Assumption, BTreeSet<usi
     };
     let shapes = match enumerate(language, alphabet, setting.bound) {
         Ok(shapes) => shapes,
-        Err(why) => return Verdict::incomplete(vec![why.to_string()]),
+        Err(why) => return Verdict::incomplete(vec![why]),
     };
     let table = Table::of(&shapes, flags);
     let search = Search::over(&table, flags.keys(), setting.bound);
@@ -242,7 +242,7 @@ fn verdict(graph: &Graph, cell: &CellKey) -> Result<Verdict, Error> {
         };
         let Some(known) = graph.input(&FLAGS, &key)? else {
             let reason = format!("the flags of `{}` are not known", assumption.uid);
-            return Ok(Verdict::incomplete(vec![reason]));
+            return Ok(Verdict::incomplete(vec![Incomplete::Failed(reason)]));
         };
         flags.insert(assumption.clone(), known.0.iter().copied().collect());
     }

@@ -77,8 +77,9 @@ fn decision_test_says_what_its_search_could_not_do_in_full() {
         .args(["decision", "test", "local/types-first"])
         .assert()
         .stdout(predicate::str::contains(
-            "the search for contradictions among go decisions is incomplete",
-        ));
+            "the search for contradictions is incomplete: ",
+        ))
+        .stdout(predicate::str::contains("go: `"));
 }
 
 #[test]

@@ -245,10 +245,11 @@ fn setting_new() {
 
 #[test]
 fn verdict_incomplete() {
-    let verdict = Verdict::incomplete(vec!["why".to_owned()]);
+    let why = Incomplete::Failed("why".to_owned());
+    let verdict = Verdict::incomplete(vec![why.clone()]);
 
     assert!(verdict.contradictions.is_empty() && verdict.single.is_empty());
-    assert_eq!(verdict.basis, Basis::Incomplete(vec!["why".to_owned()]));
+    assert_eq!(verdict.basis, Basis::Incomplete(vec![why]));
 }
 
 #[test]
@@ -732,4 +733,17 @@ fn run(dir: &Path, program: &Path, args: &[&str]) {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn incomplete_told() {
+    let reason = Incomplete::Insensitive {
+        decision: "key".to_owned(),
+        bound: 2,
+    };
+
+    let told = reason.told(&|key| format!("id-of-{key}"));
+
+    assert!(told.starts_with("`id-of-key` flags no arrangement differently"));
+    assert!(reason.to_string().starts_with("`key` flags"));
 }

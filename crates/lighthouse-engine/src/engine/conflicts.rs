@@ -164,7 +164,10 @@ impl Conflicts {
         let oracle = Oracle::sharing(Arc::clone(registry), &self.catalog);
         let verdict = oracle.search(graph, &cell, BOUND).verdict;
         let incomplete = match &verdict.basis {
-            Basis::Incomplete(reasons) => reasons.clone(),
+            Basis::Incomplete(reasons) => reasons
+                .iter()
+                .map(|reason| reason.told(&|key| self.id_of(key)))
+                .collect(),
             Basis::Bounded(_) => Vec::new(),
         };
         let (nogoods, lost) = nogoods(&self.catalog, &verdict);
@@ -195,6 +198,12 @@ impl Conflicts {
         }
     }
 
+    /// The id of the decision the search holds by `key`, as its findings
+    /// show it; the key itself when the catalog has no such decision.
+    fn id_of(&self, key: &str) -> String {
+        find(&self.catalog, key).map_or_else(|| key.to_owned(), |d| d.id().to_owned())
+    }
+
     /// What the search finds among the decisions of a cell.
     fn nogoods(
         &self,
@@ -211,23 +220,51 @@ impl Conflicts {
 }
 
 impl Found<'_> {
-    /// What a run says of a search that could not be done in full or that
-    /// names decisions the catalog does not hold, for the language.
-    pub fn notices(&self, language: &str) -> Vec<String> {
-        let mut told = Vec::new();
-        if !self.lost.is_empty() {
-            told.push(format!(
+    /// What a run says of a search that names decisions the catalog does not
+    /// hold, for the language.
+    pub fn lost_notice(&self, language: &str) -> Option<String> {
+        (!self.lost.is_empty()).then(|| {
+            format!(
                 "a contradiction among {language} decisions names decisions the catalog does not hold, and is not told: {}",
                 self.lost.join("; ")
-            ));
+            )
+        })
+    }
+}
+
+/// The searches of a run that could not be done in full, by language, told
+/// once for all of them: a reason that several configurations of a language
+/// share is told once.
+#[derive(Debug, Default)]
+pub struct Gaps(BTreeMap<String, BTreeSet<String>>);
+
+impl Gaps {
+    /// Keeps why the search of `language` was not done in full, if it was not.
+    pub fn add(&mut self, language: &str, found: &Found<'_>) {
+        if !found.incomplete.is_empty() {
+            self.0
+                .entry(language.to_owned())
+                .or_default()
+                .extend(found.incomplete.iter().cloned());
         }
-        if !self.incomplete.is_empty() {
-            told.push(format!(
-                "the search for contradictions among {language} decisions is incomplete: {}",
-                self.incomplete.join("; ")
-            ));
-        }
-        told
+    }
+
+    /// The one notice of the run, naming each language and why.
+    pub fn notice(&self) -> Option<String> {
+        let told: Vec<String> = self
+            .0
+            .iter()
+            .map(|(language, reasons)| {
+                let reasons: Vec<&str> = reasons.iter().map(String::as_str).collect();
+                format!("{language}: {}", reasons.join("; "))
+            })
+            .collect();
+        (!told.is_empty()).then(|| {
+            format!(
+                "the search for contradictions is incomplete: {}",
+                told.join(" | ")
+            )
+        })
     }
 }
 
@@ -349,6 +386,7 @@ impl Engine {
         found.notices.extend(run.notices);
         let mut guard = self.lock_graph();
         let graph = self.graph_in(&mut guard, &mut found.notices);
+        let mut gaps = Gaps::default();
         for cell in conflicts.cells(self, &inputs, &mut found.notices) {
             let (language, rules) = &cell;
             let effective = conflicts.nogoods(self, graph, &cell);
@@ -359,7 +397,8 @@ impl Engine {
             let baseline = conflicts.search(&self.registry, graph, language, defaults);
             let at_defaults: BTreeSet<Vec<String>> =
                 baseline.nogoods.iter().map(|n| n.names()).collect();
-            found.notices.extend(effective.notices(language));
+            found.notices.extend(effective.lost_notice(language));
+            gaps.add(language, &effective);
             for nogood in &effective.nogoods {
                 let names = nogood.names();
                 found.found.push(Contradicted {
@@ -372,22 +411,27 @@ impl Engine {
                 });
             }
         }
+        found.notices.extend(gaps.notice());
         Ok(found)
     }
+}
+
+/// The decision of the catalog the search holds by `key`.
+fn find<'c>(catalog: &'c Catalog, key: &str) -> Option<&'c Decision> {
+    catalog.decisions().find(|d| d.key() == key)
 }
 
 /// The nogoods a verdict holds, with the decisions they name.
 /// The keys of decisions the catalog does not hold are told apart: a nogood
 /// that names one cannot be told to a document.
 fn nogoods<'c>(catalog: &'c Catalog, verdict: &Verdict) -> (Vec<Nogood<'c>>, Vec<String>) {
-    let find = |key: &str| catalog.decisions().find(|d| d.key() == key);
     let mut found = Vec::new();
     let mut lost = Vec::new();
     for contradiction in &verdict.contradictions {
         let members: Vec<&Decision> = contradiction
             .decisions
             .iter()
-            .filter_map(|key| find(key))
+            .filter_map(|key| find(catalog, key))
             .collect();
         if members.len() == contradiction.decisions.len() {
             found.push(Nogood {
@@ -400,7 +444,7 @@ fn nogoods<'c>(catalog: &'c Catalog, verdict: &Verdict) -> (Vec<Nogood<'c>>, Vec
         }
     }
     for single in &verdict.single {
-        match find(&single.decision) {
+        match find(catalog, &single.decision) {
             Some(decision) => found.push(Nogood {
                 members: vec![decision],
                 kind: "order",

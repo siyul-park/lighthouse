@@ -8,7 +8,7 @@ use lighthouse_model::Document;
 use lighthouse_spec::Decision;
 use serde_json::{Value, json};
 
-use super::{Conflicts, Engine, Input};
+use super::{Conflicts, Engine, Gaps, Input};
 
 /// What the search finds among the order decisions in force, told to the
 /// project's own decisions that are members of it, by document.
@@ -26,6 +26,7 @@ pub(super) fn of(
     let catalog = &conflicts.catalog;
     let mut guard = engine.lock_graph();
     let graph = engine.graph_in(&mut guard, notices);
+    let mut gaps = Gaps::default();
     for cell in conflicts.cells(engine, inputs, notices) {
         let found = conflicts.nogoods(engine, graph, &cell);
         let mut tell = |key: String, value: Value| {
@@ -39,7 +40,8 @@ pub(super) fn of(
                 tell(key, value);
             }
         }
-        notices.extend(found.notices(&cell.0));
+        notices.extend(found.lost_notice(&cell.0));
+        gaps.add(&cell.0, &found);
         if !found.incomplete.is_empty() {
             let members: Vec<&Decision> = cell
                 .1
@@ -51,6 +53,7 @@ pub(super) fn of(
             }
         }
     }
+    notices.extend(gaps.notice());
     entries
 }
 

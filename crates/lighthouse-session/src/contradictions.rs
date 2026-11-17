@@ -6,7 +6,7 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
-use lighthouse_engine::{Conflicts, Contradicted, Nogood};
+use lighthouse_engine::{Conflicts, Contradicted, Gaps, Nogood};
 use lighthouse_model::Options;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Config, Decision};
@@ -76,6 +76,7 @@ pub(crate) fn in_catalog(
     let mut searched = Searched::default();
     let conflicts = Conflicts::new(Arc::new(catalog.clone()), session.orders());
     let registry = Arc::new(registry);
+    let mut gaps = Gaps::default();
     for language in languages.iter().filter(|language| {
         under_test
             .iter()
@@ -90,7 +91,8 @@ pub(crate) fn in_catalog(
             continue;
         }
         let found = conflicts.search_once(&registry, language, decisions);
-        searched.unsearched.extend(found.notices(language));
+        searched.unsearched.extend(found.lost_notice(language));
+        gaps.add(language, &found);
         for nogood in &found.nogoods {
             let involved = nogood
                 .members
@@ -101,6 +103,7 @@ pub(crate) fn in_catalog(
             }
         }
     }
+    searched.unsearched.extend(gaps.notice());
     searched
 }
 
