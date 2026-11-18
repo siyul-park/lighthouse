@@ -14,7 +14,7 @@ use lighthouse_session::{
     Authored, CheckRequest, Checked, DecisionRow, DecisionTest, Fixing, Session, TestTimings,
     active_decisions,
     ask::{self, Answer, Delta, WhatIf},
-    consistency::{self, DecisionCheck, Target},
+    consistency::{self, DecisionCheck, Refused, Target},
     create_decision, decision_rows, explain,
     model::{self, EvalReport, EvalRequest, Side},
     replace_decision,
@@ -175,6 +175,15 @@ pub fn show(ctx: &Context, args: &DecisionShowArgs, format: Format) -> Result<Re
 /// `decision create`: `document` is YAML or JSON text.
 pub fn create(ctx: &Context, document: &str, format: Format) -> Result<Reply> {
     write(ctx, document, format, create_decision)
+}
+
+/// A document `create` or `update` refused for the contradictions it makes
+/// is a finding of the check, with its exit code: the reply of the command.
+/// Any other failure is as it was.
+pub fn refusal(error: Box<dyn std::error::Error + Send + Sync>, format: Format) -> Result<Reply> {
+    let refused = error.downcast::<Refused>()?;
+    let reply = Reply::data(format, &refused.check, || format!("{refused}\n"))?;
+    Ok(reply.with_code(FOUND))
 }
 
 /// `decision signals`.
@@ -372,17 +381,7 @@ fn checked_text(checked: &DecisionCheck) -> String {
         checked.decision, checked.verdict, checked.basis, checked.tier, checked.tier_reason
     );
     for c in &checked.contradicts {
-        let shape = c.witness["shape"].as_str().unwrap_or("some declarations");
-        let _ = write!(
-            out,
-            "contradicts [{}] with {}: on code shaped like {shape}, no order satisfies them",
-            c.language,
-            c.with.join(", ")
-        );
-        if let Some(by) = &c.resolved_by {
-            let _ = write!(out, "; settled, {by} supersedes another");
-        }
-        out.push('\n');
+        let _ = writeln!(out, "{}", c.told());
         for arrangement in c.witness["arrangements"].as_array().into_iter().flatten() {
             let _ = writeln!(out, "  {} <- {}", arrangement["order"], arrangement["by"]);
         }

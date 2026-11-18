@@ -216,6 +216,18 @@ catalog, pass its document (`decision_show` has it). The verdict is the worst of
 `independent` (exit 1, 3, 0, 0), with the weakest `basis` behind it. A document that does
 not load or whose examples fail is a usage error (exit 2).
 
+`decision_create` and `decision_update` run the same check on the document, after their own
+validation and tests, and refuse it when it makes order decisions contradict that did not: a
+contradiction that includes the decision, that no superseding decision settles and, for an
+update, that the old version did not have (the same decisions in the same language is the
+same contradiction, however its witness reads). The tool answers `isError: true` with the
+witness, the command exits 1 and prints it (with `--format json` the `DecisionCheck` in
+place of `Authored`), and nothing is written, recorded or changed;
+there is no flag to write it anyway. They do not run the project behind `likelyImpliedBy`, so
+the cost of authoring stays that of the examples; what the check says besides (a settled
+contradiction, conflicts the examples declare, what could not be searched) is added to the
+reply's `note`.
+
 ### Resources
 
 - `lighthouse://decisions/{id}`: one decision rendered as Markdown (the id keeps its

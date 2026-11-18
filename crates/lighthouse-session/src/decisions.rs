@@ -107,6 +107,9 @@ pub(crate) struct Analysis {
     pub(crate) declared: Vec<(String, Vec<Interference>)>,
     /// The contradictions found among the decisions, settled or not.
     pub(crate) contradicted: Vec<Contradicted>,
+    /// The failure lines among a decision test's that tell the contradictions
+    /// no decision settles, and not an example.
+    pub(crate) contradictions: Vec<String>,
     /// What the searches done in full covered, by language.
     pub(crate) bounded: Vec<(String, Bounded)>,
 }
@@ -345,11 +348,7 @@ pub(crate) fn test_catalog(
     skipped.extend(lacking.iter().map(|(plugin, examples)| {
         format!("plugin `{plugin}` is not available: {examples} example(s) not run")
     }));
-    let analysis = Analysis {
-        declared: found.declared,
-        contradicted: found.contradicted,
-        bounded: found.bounded,
-    };
+    let analysis = found.analysis;
     let test = DecisionTest {
         decisions: decisions.len(),
         languages: languages.len(),

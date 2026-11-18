@@ -3,7 +3,9 @@
 //! and what proof there is of an order contradiction is a CLI matter.
 
 use lighthouse_report::Detail;
-use lighthouse_session::consistency::{self, Basis, DecisionCheck, Scope, Target, Verdict};
+use lighthouse_session::consistency::{
+    self, Basis, Contradiction, DecisionCheck, Kind, Refused, Scope, Target, Verdict,
+};
 use serde_json::{Value, json};
 
 use crate::fixture::{LONG, project, session, trusted, write};
@@ -129,6 +131,139 @@ fn an_unknown_decision_or_a_document_that_is_not_one_is_an_error() {
         .is_err(),
         "only a local decision is a document"
     );
+}
+
+fn contradiction(with: &[&str], resolved_by: Option<&str>) -> Contradiction {
+    Contradiction {
+        language: "go".to_owned(),
+        with: with.iter().map(|w| (*w).to_owned()).collect(),
+        kind: Kind::Order,
+        basis: Basis::Proven,
+        witness: json!({ "shape": "a public type A, a public function B" }),
+        resolved_by: resolved_by.map(str::to_owned),
+    }
+}
+
+#[test]
+fn refused() {
+    let mut check = blank();
+    check.decision = "local/new".to_owned();
+    check.contradicts = vec![contradiction(&["local/a"], None)];
+    let found = check.introduced_since(None);
+
+    let refused = Refused::new(&check, &found, None);
+
+    assert_eq!(refused.found.len(), 1);
+    assert_eq!(
+        refused.to_string(),
+        format!(
+            "`local/new` was not written, it contradicts the decisions in force:\n{}",
+            contradiction(&["local/a"], None).told()
+        )
+    );
+}
+
+#[test]
+fn refused_old_incomplete() {
+    let mut check = blank();
+    check.decision = "local/new".to_owned();
+    check.contradicts = vec![contradiction(&["local/a"], None)];
+    let mut was = blank();
+    was.incomplete = vec!["go: the search was cut off".to_owned()];
+    let found = check.introduced_since(Some(&was));
+
+    let refused = Refused::new(&check, &found, Some(&was));
+
+    assert!(
+        refused
+            .to_string()
+            .contains("the old version could not be searched in full (go: the search was cut off)"),
+        "{refused}"
+    );
+    assert!(
+        refused
+            .check
+            .incomplete
+            .contains(&"the old version could not be searched in full".to_owned())
+    );
+}
+
+#[test]
+fn contradiction_told() {
+    let told = contradiction(&["local/a", "local/b"], None).told();
+
+    assert_eq!(
+        told,
+        "contradicts [go] with local/a, local/b: on code shaped like a public type A, a public function B, no order satisfies them"
+    );
+    assert!(
+        contradiction(&["local/a"], Some("local/a"))
+            .told()
+            .ends_with("; settled, local/a supersedes another")
+    );
+}
+
+#[test]
+fn decision_check_contradicted() {
+    let mut check = blank();
+    assert!(!check.contradicted());
+
+    check.contradicts = vec![contradiction(&["local/a"], Some("local/a"))];
+    assert!(!check.contradicted(), "a decision settles it");
+
+    check.contradicts = vec![contradiction(&["local/a"], None)];
+    assert!(check.contradicted());
+}
+
+#[test]
+fn decision_check_introduced_since() {
+    let mut now = blank();
+    now.contradicts = vec![
+        contradiction(&["local/a"], None),
+        contradiction(&["local/b"], None),
+        contradiction(&["local/c"], Some("local/c")),
+    ];
+    let mut was = blank();
+    was.contradicts = vec![contradiction(&["local/a"], None)];
+
+    let new = now.introduced_since(Some(&was));
+
+    assert_eq!(new.len(), 1, "{new:?}");
+    assert_eq!(new[0].with, ["local/b"]);
+    assert_eq!(
+        now.introduced_since(None).len(),
+        2,
+        "a created one has no past"
+    );
+}
+
+#[test]
+fn decision_check_introduced_since_reopened() {
+    let mut now = blank();
+    now.contradicts = vec![contradiction(&["local/a"], None)];
+    let mut was = blank();
+    was.contradicts = vec![contradiction(&["local/a"], Some("local/new"))];
+
+    let new = now.introduced_since(Some(&was));
+
+    assert_eq!(
+        new.len(),
+        1,
+        "a settled one that is reopened is new: {new:?}"
+    );
+}
+
+#[test]
+fn decision_check_notice() {
+    let mut check = blank();
+    assert_eq!(check.notice(), None);
+
+    check.interferes = vec![interference()];
+    check.incomplete = vec!["go: no renderer".to_owned()];
+    let told = check.notice().unwrap();
+
+    assert!(told.contains("interferes with local/short (ok)"), "{told}");
+    assert!(told.contains("not searched: go: no renderer"), "{told}");
 }
 
 #[test]
@@ -290,18 +425,9 @@ fn likely_implied() {
 fn blank() -> DecisionCheck {
     DecisionCheck {
         decision: "local/x".to_owned(),
-        verdict: Verdict::Independent,
         tier: "F".to_owned(),
         tier_reason: "translated".to_owned(),
-        contradicts: Vec::new(),
-        implied: Vec::new(),
-        likely_implied_by: Vec::new(),
-        interferes: Vec::new(),
-        independent_of: Vec::new(),
-        gaps: Vec::new(),
-        bounded: Vec::new(),
-        incomplete: Vec::new(),
-        basis: Basis::Empirical,
+        ..DecisionCheck::default()
     }
 }
 

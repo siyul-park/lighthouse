@@ -11,15 +11,17 @@ use std::{
 };
 
 use lighthouse_model::{API_VERSION, Attribution, STATE_DIR, new_uid};
+use lighthouse_report::Detail;
 use lighthouse_spec::{Catalog, local_dir, local_files};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-    AUTHORING, DecisionTest, Extended, Result, Session, ensure_extends,
+    AUTHORING, DecisionTest, Extended, Result, Session,
+    consistency::{Refused, Target, examine, overlay},
+    ensure_extends,
     signal::{DUPLICATE_THRESHOLD, Duplicate, candidates, record_proposal, settle_derived},
-    test_decisions,
 };
 
 /// Most possible duplicates a reply names.
@@ -234,24 +236,24 @@ fn commit(
     let duplicates = duplicates.unwrap_or_default();
     ensure_uid(&mut doc);
     let root = session.root.clone();
-    let local = layer(session, name, &doc)?;
-    let text = canonical(&local, id)?;
-    let candidate = session.with_local(Some(local))?;
-    let testable = candidate
-        .catalog
-        .decision(id)
-        .is_some_and(|d| d.automated());
-    let test = if testable {
-        test_decisions(&candidate, &[id.to_owned()], None, None)?
-    } else {
-        DecisionTest::default()
-    };
+    let text = canonical(&layer(session, name, &doc)?, id)?;
+    // The candidate is the one `decision check` makes of the same document.
+    let (candidate, _) = overlay(session, Target::Document(doc.clone()))?;
+    let (check, test) = examine(&candidate, id, Detail::Compact, false)?;
     if !test.failures.is_empty() {
         return Err(format!(
             "`{id}` was not written, its examples fail:\n{}",
             test.failures.join("\n")
         )
         .into());
+    }
+    let before = match (created, check.contradicted()) {
+        (false, true) => Some(examine(session, id, Detail::Compact, false)?.0),
+        _ => None,
+    };
+    let found = check.introduced_since(before.as_ref());
+    if !found.is_empty() {
+        return Err(Refused::new(&check, &found, before.as_ref()).into());
     }
     let dir = local_dir(&root);
     Catalog::write_local(&dir, name, &text)?;
@@ -264,6 +266,9 @@ fn commit(
     let settled = settle_derived(session, &doc, &uid, created, by)?;
     if created {
         record_proposal(session, &uid, id, &duplicates)?;
+    }
+    if let Some(told) = check.notice() {
+        note = format!("{told}; {note}");
     }
     if !duplicates.is_empty() {
         let names: Vec<&str> = duplicates.iter().map(|d| d.id.as_str()).collect();

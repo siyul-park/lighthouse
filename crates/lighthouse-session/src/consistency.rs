@@ -22,7 +22,7 @@ use crate::{
     authoring::{complete, layer, local_name},
     check::check_owning,
     cofiring::{Cofire, likely_implied_by, overlap, sort},
-    decisions::test_catalog,
+    decisions::{DecisionTest, test_catalog},
 };
 
 /// The exit code of a proven contradiction.
@@ -41,8 +41,66 @@ pub enum Target {
     Id(String),
 }
 
+/// A decision not written: it makes decisions contradict that did not, and no
+/// decision settles it. What the check found is in `check`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Refused {
+    pub check: DecisionCheck,
+    /// The contradictions the decision introduces.
+    pub found: Vec<Contradiction>,
+    /// What of the old version could not be searched in full, so that a
+    /// contradiction it had may be counted as new.
+    pub old_incomplete: Vec<String>,
+}
+
+impl Refused {
+    /// The refusal of `check` for the contradictions `found` in it, against
+    /// `before`, the check of the decision as it was.
+    pub fn new(
+        check: &DecisionCheck,
+        found: &[&Contradiction],
+        before: Option<&DecisionCheck>,
+    ) -> Self {
+        let old_incomplete = before.map(|b| b.incomplete.clone()).unwrap_or_default();
+        let mut check = check.clone();
+        if !old_incomplete.is_empty() {
+            check
+                .incomplete
+                .push("the old version could not be searched in full".to_owned());
+        }
+        Self {
+            check,
+            found: found.iter().map(|c| (*c).clone()).collect(),
+            old_incomplete,
+        }
+    }
+}
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "`{}` was not written, it contradicts the decisions in force:",
+            self.check.decision
+        )?;
+        self.found
+            .iter()
+            .try_for_each(|c| write!(f, "\n{}", c.told()))?;
+        match self.old_incomplete.is_empty() {
+            true => Ok(()),
+            false => write!(
+                f,
+                "\nthe old version could not be searched in full ({}): a contradiction it had may be counted as new",
+                self.old_incomplete.join("; ")
+            ),
+        }
+    }
+}
+
+impl std::error::Error for Refused {}
+
 /// The `DecisionCheck` kind: what the decisions in force say of one decision.
-#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DecisionCheck {
     pub decision: String,
@@ -89,7 +147,7 @@ pub struct DecisionCheck {
 }
 
 /// What the check found, worst first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Verdict {
     /// A set of decisions that includes this one cannot hold together.
@@ -101,11 +159,12 @@ pub enum Verdict {
     /// Its examples declare conflicts with other decisions.
     Interferes,
     /// Nothing was found.
+    #[default]
     Independent,
 }
 
 /// How an entry was reached, strongest first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Basis {
     /// Shown by a witness.
@@ -113,6 +172,7 @@ pub enum Basis {
     /// No other exists within a stated bound.
     Bounded,
     /// Seen on the code of the project, not shown.
+    #[default]
     Empirical,
     /// An analysis did not finish.
     Incomplete,
@@ -136,6 +196,23 @@ pub struct Contradiction {
     /// decisions settles the contradiction, and it does not fail the check.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolved_by: Option<String>,
+}
+
+impl Contradiction {
+    /// The contradiction in a line: the shape of code that shows it.
+    pub fn told(&self) -> String {
+        let shape = self.witness["shape"]
+            .as_str()
+            .unwrap_or("some declarations");
+        let settled = self.resolved_by.as_ref().map_or_else(String::new, |by| {
+            format!("; settled, {by} supersedes another")
+        });
+        format!(
+            "contradicts [{}] with {}: on code shaped like {shape}, no order satisfies them{settled}",
+            self.language,
+            self.with.join(", ")
+        )
+    }
 }
 
 /// What kind of contradiction it is.
@@ -250,18 +327,70 @@ impl DecisionCheck {
     /// The exit code: 1 a contradiction, 3 an analysis that did not finish,
     /// else 0.
     pub fn code(&self) -> u8 {
-        match self.verdict {
-            Verdict::Contradicts => CONTRADICTED,
-            Verdict::Incomplete => UNFINISHED,
+        match (self.contradicted(), self.verdict) {
+            (true, _) => CONTRADICTED,
+            (false, Verdict::Incomplete) => UNFINISHED,
             _ => 0,
         }
+    }
+
+    /// Whether a set of decisions that includes this one cannot hold
+    /// together and no decision settles it.
+    pub fn contradicted(&self) -> bool {
+        self.contradicts.iter().any(is_open)
+    }
+
+    /// The contradictions no decision settles that `before`, the check of
+    /// the decision as it was, did not have open (one it had settled and the
+    /// update reopens is new): the same decisions in the same
+    /// language is the same contradiction, however its witness reads.
+    pub fn introduced_since(&self, before: Option<&Self>) -> Vec<&Contradiction> {
+        let known: Vec<(&str, &[String])> = before
+            .iter()
+            .flat_map(|b| &b.contradicts)
+            .filter(|c| is_open(c))
+            .map(|c| (c.language.as_str(), c.with.as_slice()))
+            .collect();
+        self.contradicts
+            .iter()
+            .filter(|c| is_open(c) && !known.contains(&(c.language.as_str(), c.with.as_slice())))
+            .collect()
+    }
+
+    /// What a decision that is written anyway says of how it sits with the
+    /// others: what its examples declare, a contradiction a decision
+    /// settles, and what could not be searched.
+    pub fn notice(&self) -> Option<String> {
+        let mut told: Vec<String> = Vec::new();
+        told.extend(
+            self.contradicts
+                .iter()
+                .filter(|c| !is_open(c))
+                .map(Contradiction::told),
+        );
+        told.extend(
+            self.interferes
+                .iter()
+                .map(|i| format!("interferes with {} ({})", i.with, i.example)),
+        );
+        told.extend(
+            self.incomplete
+                .iter()
+                .map(|line| format!("not searched: {line}")),
+        );
+        (!told.is_empty()).then(|| {
+            format!(
+                "checked against the decisions in force: {}",
+                told.join("; ")
+            )
+        })
     }
 
     /// The worst of what was found: a contradiction no decision settles,
     /// then an analysis that did not finish, then proven implication, then
     /// interference, then nothing.
     pub fn worst_verdict(&self) -> Verdict {
-        if self.contradicts.iter().any(is_open) {
+        if self.contradicted() {
             Verdict::Contradicts
         } else if !self.incomplete.is_empty() {
             Verdict::Incomplete
@@ -294,61 +423,76 @@ impl DecisionCheck {
 /// `session`.
 pub fn check_decision(session: &Session, target: Target, detail: Detail) -> Result<DecisionCheck> {
     let (candidate, id) = overlay(session, target)?;
+    examine(&candidate, &id, detail, true).map(|(check, _)| check)
+}
+
+/// The check of the decision `id` of `candidate`, with the test of its
+/// examples that it rests on. `cofire` runs the project to find the
+/// decisions that likely imply it, which costs one check of the project;
+/// without it only the formal part is done. What a search covered is told
+/// only when it found nothing and finished.
+pub(crate) fn examine(
+    candidate: &Session,
+    id: &str,
+    detail: Detail,
+    cofire: bool,
+) -> Result<(DecisionCheck, DecisionTest)> {
     let decision = candidate
         .catalog
-        .decision(&id)
+        .decision(id)
         .ok_or_else(|| format!("unknown decision `{id}`"))?;
     let tier = lighthouse_logic::tier(candidate.comp.cel(), decision);
     let mut check = DecisionCheck {
-        decision: id.clone(),
-        verdict: Verdict::Independent,
+        decision: id.to_owned(),
         tier: tier.tier.as_str().to_owned(),
         tier_reason: tier.tier_reason,
-        contradicts: Vec::new(),
-        implied: Vec::new(),
-        likely_implied_by: Vec::new(),
-        interferes: Vec::new(),
-        independent_of: Vec::new(),
-        gaps: Vec::new(),
-        bounded: Vec::new(),
-        incomplete: Vec::new(),
-        basis: Basis::Empirical,
+        ..DecisionCheck::default()
     };
     if !decision.automated() {
-        return Ok(check);
+        return Ok((check, DecisionTest::default()));
     }
-    let ids = std::slice::from_ref(&id);
-    let (test, analysis) = test_catalog(&candidate, &candidate.catalog, ids, None, None)?;
+    let (mut test, analysis) =
+        test_catalog(candidate, &candidate.catalog, &[id.to_owned()], None, None)?;
+    // A contradiction is the check's to tell, and only a new one is refused.
+    test.failures
+        .retain(|line| !analysis.contradictions.contains(line));
     check.contradicts = analysis
         .contradicted
         .iter()
-        .map(|c| contradiction(c, &id, detail))
+        .map(|c| contradiction(c, id, detail))
         .collect();
     check.interferes = analysis
         .declared
         .into_iter()
         .flat_map(|(language, found)| found.into_iter().map(move |i| interference(&language, i)))
         .collect();
-    check.incomplete = test.incomplete.into_iter().chain(test.skipped).collect();
-    // What a search covered is told only when it found nothing and finished.
-    if check.incomplete.is_empty() && !check.contradicts.iter().any(is_open) {
+    check.incomplete = test
+        .incomplete
+        .iter()
+        .chain(&test.skipped)
+        .cloned()
+        .collect();
+    if check.incomplete.is_empty() && !check.contradicted() {
         let covered = analysis.bounded.iter();
         check.bounded = covered
             .map(|b| Scope::from((b, &*candidate.catalog)))
             .collect();
     }
     let searched: Vec<&str> = check.bounded.iter().map(|s| s.language.as_str()).collect();
-    check.independent_of = held_to(&candidate, decision, &searched);
+    check.independent_of = held_to(candidate, decision, &searched);
     check
         .independent_of
         .retain(|id| !check.contradicts.iter().any(|c| c.with.contains(id)));
-    check.gaps = gaps(&candidate, decision)?;
-    let (likely, unfinished) = likely_implied(&candidate, &id)?;
+    check.gaps = gaps(candidate, decision)?;
+    let (likely, unfinished) = match cofire {
+        true => likely_implied(candidate, id)?,
+        false => (Vec::new(), None),
+    };
     check.likely_implied_by = likely;
     check.verdict = check.worst_verdict();
     check.basis = check.weakest_basis();
     check.incomplete.extend(unfinished);
-    Ok(check)
+    Ok((check, test))
 }
 
 /// The session with `target` in it, in memory, enabled at the severity it

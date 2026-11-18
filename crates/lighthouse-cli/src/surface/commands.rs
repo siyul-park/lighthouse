@@ -146,8 +146,14 @@ pub enum DecisionCommand {
     /// Add a project-local decision from a Decision document.
     ///
     /// The document is YAML or JSON, from a file or stdin (`-`). Nothing is
-    /// written unless the candidate validates, compiles and every example
-    /// passes the whole engine; a rejection leaves the project untouched. A
+    /// written unless the candidate validates, compiles, every example
+    /// passes the whole engine and it makes no order decisions contradict that
+    /// did not (the formal part of `decision check`, without the run of the
+    /// project behind `likelyImpliedBy`; a contradiction a decision settles by
+    /// superseding is not one): exit 1 and the witness, or with `--format json`
+    /// the `DecisionCheck` in place of `Authored`; the tool answers `isError`
+    /// with the text. A rejection leaves the project untouched. There is no
+    /// flag to write it anyway. A
     /// document without `spec.status` is written as `proposed`: it produces no
     /// findings until a person accepts it. Decisions that may repeat it are named
     /// in the reply ("possible duplicate"), and the signals named in
@@ -163,7 +169,8 @@ pub enum DecisionCommand {
     /// Replace a project-local decision with a Decision document.
     ///
     /// The same gate as `decision create` applies, and nothing is written when
-    /// it fails. The signals the document names in `provenance.wasDerivedFrom`
+    /// it fails; only a contradiction the old version did not have open refuses
+    /// an update (exit 1 and the witness, as for `create`). The signals the document names in `provenance.wasDerivedFrom`
     /// become linked. A bundled decision is not changed in place: its level and
     /// options are the `rules` of lighthouse.toml, and different wording or
     /// examples are a local decision.
@@ -530,12 +537,14 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
                 ctx,
                 &decision::read_document(&args.document)?,
                 output.format,
-            ),
+            )
+            .or_else(|e| decision::refusal(e, output.format)),
             DecisionCommand::Update { args, output } => decision::update(
                 ctx,
                 &decision::read_document(&args.document)?,
                 output.format,
-            ),
+            )
+            .or_else(|e| decision::refusal(e, output.format)),
             DecisionCommand::Check { args, output } => decision::check(
                 ctx,
                 decision::target(ctx, &args.document.document)?,

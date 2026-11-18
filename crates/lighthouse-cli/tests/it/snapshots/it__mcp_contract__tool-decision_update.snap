@@ -9,7 +9,7 @@ expression: "serde_json::to_string_pretty(&tool).unwrap()"
     "openWorldHint": false,
     "readOnlyHint": false
   },
-  "description": "Replace a project-local decision with a Decision document.\n\nThe same gate as `decision create` applies, and nothing is written when it fails. The signals the document names in `provenance.wasDerivedFrom` become linked. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.",
+  "description": "Replace a project-local decision with a Decision document.\n\nThe same gate as `decision create` applies, and nothing is written when it fails; only a contradiction the old version did not have open refuses an update (exit 1 and the witness, as for `create`). The signals the document names in `provenance.wasDerivedFrom` become linked. A bundled decision is not changed in place: its level and options are the `rules` of lighthouse.toml, and different wording or examples are a local decision.",
   "inputSchema": {
     "additionalProperties": false,
     "description": "`decision create` and `decision update`.",

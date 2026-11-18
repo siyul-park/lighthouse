@@ -12,6 +12,7 @@ mod command_sarif;
 mod contradictions;
 mod decision_check;
 mod decision_portable;
+mod decision_refusal;
 mod environment;
 mod explore;
 mod fix;

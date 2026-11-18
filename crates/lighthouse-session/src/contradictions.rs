@@ -32,15 +32,16 @@ impl Searched {
     /// contradictions a decision settles as conflicts, and what it did not
     /// search as incomplete.
     pub(crate) fn report(self, found: &mut crate::examples::Found) {
-        found.failures.extend(
-            self.failures
-                .into_iter()
-                .map(|line| format!("contradiction in {line}")),
-        );
+        let told = self
+            .failures
+            .into_iter()
+            .map(|line| format!("contradiction in {line}"));
+        found.analysis.contradictions = told.clone().collect();
+        found.failures.extend(told);
         found.conflicts.extend(self.settled);
         found.incomplete.extend(self.unsearched);
-        found.contradicted = self.contradicted;
-        found.bounded = self.bounded;
+        found.analysis.contradicted = self.contradicted;
+        found.analysis.bounded = self.bounded;
     }
 
     fn add(&mut self, language: &str, nogood: &Nogood<'_>, catalog: &Catalog) {
