@@ -149,6 +149,16 @@ impl Engine {
         }))
     }
 
+    /// The id of the language that claims the project-relative file at
+    /// `rel`, as a run reads it; `None` when no provider does.
+    pub fn language_of(&self, rel: &Path) -> Option<&str> {
+        let &language = self
+            .providers
+            .iter()
+            .find(|&&i| self.languages[i].claims(rel))?;
+        Some(self.provider(language).manifest().id.as_str())
+    }
+
     pub(super) fn provider(&self, language: usize) -> &dyn LanguageProvider {
         self.registry.languages()[language].provider.as_ref()
     }

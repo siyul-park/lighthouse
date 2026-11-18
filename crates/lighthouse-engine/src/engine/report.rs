@@ -18,6 +18,7 @@ use crate::{cache, tools};
 /// What a run reports, as it is kept.
 #[derive(Serialize, Deserialize)]
 struct Body {
+    #[serde(with = "lighthouse_model::kept")]
     diagnostics: Vec<Diagnostic>,
     notices: BTreeSet<String>,
     incomplete: Vec<Incomplete>,
@@ -26,6 +27,7 @@ struct Body {
     facts: Vec<(Fingerprint, Value)>,
     options: Vec<(Fingerprint, Options)>,
     active: Vec<String>,
+    #[serde(with = "lighthouse_model::kept")]
     reviews: Vec<Diagnostic>,
     suppressed: Vec<Suppressed>,
 }

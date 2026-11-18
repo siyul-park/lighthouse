@@ -6,6 +6,7 @@
 
 mod authoring;
 mod check;
+mod cofiring;
 mod contradictions;
 mod decisions;
 mod descriptor;
@@ -34,6 +35,7 @@ pub mod signal;
 
 pub use authoring::{Authored, create_decision, replace_decision};
 pub use check::{CheckReport, CheckRequest, Checked, RunStatus, Summary, check};
+pub use cofiring::{Cofire, MIN_SHARE, MIN_SUBJECTS, cofiring, likely_implied_by};
 pub use decisions::{
     DecisionRow, DecisionTest, TestTimings, active_decisions, catalog_index, config_summary,
     decision_rows, decision_text, explain, test_decisions,

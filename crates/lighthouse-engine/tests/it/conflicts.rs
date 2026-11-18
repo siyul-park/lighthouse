@@ -3,6 +3,7 @@
 
 use std::{
     fs,
+    path::Path,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -109,4 +110,24 @@ fn engine_contradictions() {
 
     assert!(found.found.is_empty(), "{:?}", found.found);
     assert!(asked.load(Ordering::SeqCst) > 0 || found.notices.is_empty());
+}
+
+#[test]
+fn engine_language_of() {
+    let config = Config::parse_inline(&format!(
+        "plugins = [{{ id = \"lang-rust\", path = {:?} }}]\n",
+        lighthouse_test_support::lang_rust().display().to_string()
+    ))
+    .unwrap();
+    let registry = lighthouse_test_support::pooled(registry, &config)();
+    let config = config.enabling(registry.manifests().iter().map(|m| m.id.as_str()));
+    let dir = tempfile::tempdir().unwrap();
+    let engine = Engine::new(registry, config, bundled(), dir.path()).unwrap();
+
+    assert_eq!(engine.language_of(Path::new("src/lib.rs")), Some("rust"));
+    assert_eq!(
+        engine.language_of(Path::new("notes.txt")),
+        Some("text"),
+        "the fallback claims what no language does"
+    );
 }

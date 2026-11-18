@@ -4,6 +4,7 @@ mod ask;
 mod authoring;
 mod baseline;
 mod check;
+mod cofiring;
 mod decisions;
 mod descriptor;
 mod environment;

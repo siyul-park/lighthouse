@@ -291,20 +291,25 @@ impl Evaluation<'_> {
         };
         // Like the message, the place of a subject only suspected may name what
         // the subject does not have: it is then the default.
+        let selected = place.file.to_string_lossy().into_owned();
         let place = match self.place(&frame, place.clone()) {
             Err(error) if found => return Err(error),
             placed => placed.unwrap_or(place),
         };
-        let fingerprint = match &rule.identity {
+        let (subject, fingerprint) = match &rule.identity {
             Some(identity) => {
                 let subject = frame.string(&identity.subject, "identity.subject")?;
                 let snippet = match &identity.snippet {
                     Some(program) => frame.string(program, "identity.snippet")?,
                     None => String::new(),
                 };
-                self.meta.fingerprint(&subject, &snippet)
+                let fingerprint = self.meta.fingerprint(&subject, &snippet);
+                (subject, fingerprint)
             }
-            None => self.meta.fingerprint(&place.file.to_string_lossy(), key),
+            None => (
+                format!("{selected}\0{key}"),
+                self.meta.fingerprint(&place.file.to_string_lossy(), key),
+            ),
         };
         let mut diagnostic = Diagnostic::new(
             &self.meta.id,
@@ -315,6 +320,7 @@ impl Evaluation<'_> {
             fingerprint,
         );
         diagnostic.symbol = place.symbol.map(|id| id.as_str().to_owned());
+        diagnostic.subject = Some(subject);
         diagnostic.evidence = evidence;
         if let Some(abstain) = abstain {
             let fact = abstain.fact_of(&frame)?;

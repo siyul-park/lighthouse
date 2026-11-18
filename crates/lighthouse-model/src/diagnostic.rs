@@ -163,6 +163,16 @@ pub struct Diagnostic {
     /// as its own `//nolint`: the engine reports the finding as suppressed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suppression: Option<Suppression>,
+    /// What the finding is about, as the rule that found it identifies the
+    /// selected value (the `identity.subject` of its check, else the file and
+    /// the key of the value): the same for two decisions that report on the
+    /// same value, which the fingerprint, hashed with the rule, is not. Set by
+    /// the rules that select values; a finding of a command or a model has
+    /// none, and a plugin's findings are without it. No output (check JSON,
+    /// SARIF, a stored record) shows it; the engine keeps it with the finding
+    /// (see [`crate::kept`]), so a finding read back from the cache has it.
+    #[serde(skip)]
+    pub subject: Option<String>,
 }
 
 impl Diagnostic {
@@ -188,6 +198,7 @@ impl Diagnostic {
             fix: None,
             review: None,
             suppression: None,
+            subject: None,
         }
     }
 

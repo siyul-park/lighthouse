@@ -93,7 +93,8 @@ impl Judged {
 }
 
 /// What a rule found in one file, and what it said besides. The findings are
-/// kept as JSON: a finding carries free-form evidence.
+/// kept as JSON (with their subjects, see `lighthouse_model::kept`): a finding
+/// carries free-form evidence.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Findings {
     pub found: String,
@@ -103,7 +104,7 @@ pub struct Findings {
 impl Findings {
     /// The findings the JSON holds.
     pub fn diagnostics(&self) -> Result<Vec<Diagnostic>, serde_json::Error> {
-        serde_json::from_str(&self.found)
+        lighthouse_model::kept::from_str(&self.found)
     }
 }
 
@@ -247,7 +248,8 @@ pub fn judge(
         return Err(error);
     }
     Ok(Findings {
-        found: serde_json::to_string(&found).map_err(|e| Error::Encode(e.to_string()))?,
+        found: lighthouse_model::kept::to_string(&found)
+            .map_err(|e| Error::Encode(e.to_string()))?,
         notices: notices.take(),
     })
 }
