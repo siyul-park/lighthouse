@@ -457,6 +457,18 @@ impl Session {
         })
     }
 
+    /// The same project with `local` as its decisions, trusted as the user
+    /// trusts the project when the programs it would run are the same: a
+    /// decision that names a program of its own is never trusted unseen.
+    pub(crate) fn overlaid(&self, local: Catalog) -> Result<Self> {
+        let mut candidate = self.with_local(Some(local))?;
+        let own = commands(&self.config, self.local.as_ref(), &self.root);
+        if commands(&candidate.config, candidate.local.as_ref(), &candidate.root) == own {
+            candidate.basis = self.basis.clone();
+        }
+        Ok(candidate)
+    }
+
     /// Plugins that run in this process only: the bundled ones and the local
     /// decisions. Nothing is started, so it is cheap and cannot fail on a
     /// language plugin.
@@ -583,7 +595,7 @@ pub(crate) fn repository_catalog(
 /// plugins that come with the project, and the command fixes and command
 /// checks of its own decisions. The programs of a plugin's catalog are not
 /// among them: that catalog is trusted with its plugin.
-fn commands(config: &Config, local: Option<&Catalog>, root: &Path) -> Vec<Program> {
+pub(crate) fn commands(config: &Config, local: Option<&Catalog>, root: &Path) -> Vec<Program> {
     let mut found: Vec<Program> = config
         .fix()
         .verify

@@ -6,7 +6,7 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
-use lighthouse_engine::{Conflicts, Contradicted, Gaps, Nogood};
+use lighthouse_engine::{Bounded, Conflicts, Contradicted, Gaps, Nogood};
 use lighthouse_model::Options;
 use lighthouse_plugin::Registry;
 use lighthouse_spec::{Catalog, Config, Decision};
@@ -21,6 +21,10 @@ pub(crate) struct Searched {
     pub(crate) failures: Vec<String>,
     pub(crate) settled: Vec<String>,
     pub(crate) unsearched: Vec<String>,
+    /// The contradictions as found, settled or not.
+    pub(crate) contradicted: Vec<Contradicted>,
+    /// What the searches done in full covered, by language.
+    pub(crate) bounded: Vec<(String, Bounded)>,
 }
 
 impl Searched {
@@ -35,6 +39,8 @@ impl Searched {
         );
         found.conflicts.extend(self.settled);
         found.incomplete.extend(self.unsearched);
+        found.contradicted = self.contradicted;
+        found.bounded = self.bounded;
     }
 
     fn add(&mut self, language: &str, nogood: &Nogood<'_>, catalog: &Catalog) {
@@ -43,19 +49,20 @@ impl Searched {
             names: nogood.names(),
             kind: nogood.kind,
             witness: nogood.witness.clone(),
-            resolved: nogood.resolved(catalog),
+            resolved_by: nogood.resolver(catalog),
             at_defaults: true,
         });
     }
 
     fn add_contradicted(&mut self, c: &Contradicted) {
+        self.contradicted.push(c.clone());
         let shape = c.witness["shape"].as_str().unwrap_or("some declarations");
         let names = c.names.join(", ");
         let line = format!(
             "{}: on code shaped like {shape}, no order satisfies {names}",
             c.language
         );
-        if c.resolved {
+        if c.resolved_by.is_some() {
             self.settled.push(format!("{line}; one supersedes another"));
         } else {
             self.failures.push(line);
@@ -93,6 +100,9 @@ pub(crate) fn in_catalog(
         let found = conflicts.search_once(&registry, language, decisions);
         searched.unsearched.extend(found.lost_notice(language));
         gaps.add(language, &found);
+        if let Some(bounded) = &found.bounded {
+            searched.bounded.push((language.clone(), bounded.clone()));
+        }
         for nogood in &found.nogoods {
             let involved = nogood
                 .members

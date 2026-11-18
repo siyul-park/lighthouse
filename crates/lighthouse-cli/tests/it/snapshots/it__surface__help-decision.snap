@@ -13,6 +13,7 @@ Commands:
   update   Replace a project-local decision with a Decision document
   signals  List the session signals: what the hooks heard of design decisions
   signal   Settle the session signals
+  check    Check a decision against the decisions in force
   test     Run the examples of checked decisions through the whole engine
   eval     Measure a decision's check against its labels
   ask      Ask what a proposed edit would do: which decisions fire or clear

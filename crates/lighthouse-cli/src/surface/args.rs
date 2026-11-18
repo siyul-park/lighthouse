@@ -223,6 +223,22 @@ pub struct SignalDismissArgs {
     pub attributed: Attributed,
 }
 
+/// `decision check`.
+#[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionCheckArgs {
+    /// The decision to check. On the command line this is also the id of a
+    /// decision of the catalog; the tool takes a document only.
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub document: DocumentArgs,
+    /// Full adds the arrangements of an order contradiction's witness: each
+    /// order of the declarations and who flags it.
+    #[arg(long, value_enum, default_value_t)]
+    #[serde(default)]
+    pub detail: Detail,
+}
+
 /// `decision create` and `decision update`.
 #[derive(Debug, Default, Clone, Args, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

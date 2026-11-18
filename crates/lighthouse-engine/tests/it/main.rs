@@ -17,6 +17,7 @@ mod fix_safety;
 mod fix_write;
 mod generated;
 mod go_implements;
+mod interference;
 mod language_ignores;
 mod models;
 mod preview;

@@ -21,6 +21,7 @@ use crate::{Conflicts, Engine, FixPlan, FixRun, ModelOptions, Orders, Run, unifi
 mod cross;
 mod witness;
 
+pub use cross::Interference;
 use cross::{cross, hits_in, introduced, judge, model_only};
 pub use witness::{
     Alphabet, Arrangement, Basis, Bounded, Cell, Contradiction, Decl, Edge, Flagged, Forced,
@@ -184,11 +185,13 @@ impl<'a> RuleTester<'a> {
                 continue;
             }
             match self.run(decision, example, &mut tested.spent) {
-                Ok(known) => tested.conflicts.extend(
-                    known
-                        .into_iter()
-                        .map(|line| format!("{} {}: {line}", decision.id(), example.name)),
-                ),
+                Ok(known) => {
+                    for mut conflict in known {
+                        decision.id().clone_into(&mut conflict.decision);
+                        tested.conflicts.push(conflict.line());
+                        tested.interferences.push(conflict);
+                    }
+                }
                 Err(failure) => {
                     tested
                         .failures
@@ -310,7 +313,7 @@ impl<'a> RuleTester<'a> {
         decision: &Decision,
         example: &Example,
         spent: &mut Spent,
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<Vec<Interference>, String> {
         let fixing = decision.fix.as_ref().is_some_and(Fix::deterministic)
             && example.kind == ExampleKind::Invalid
             && !example.fixed.is_empty();
@@ -483,6 +486,8 @@ pub struct Tested {
     /// One line for each conflict with another decision that an example
     /// declares and still has.
     pub conflicts: Vec<String>,
+    /// The same conflicts, as the records the lines tell.
+    pub interferences: Vec<Interference>,
     /// Where the time of its examples went.
     pub spent: Spent,
 }

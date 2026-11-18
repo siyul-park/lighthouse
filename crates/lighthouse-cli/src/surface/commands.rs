@@ -9,10 +9,11 @@ use clap::{Args, Subcommand};
 use crate::surface::{
     Result,
     args::{
-        CheckArgs, ConfigShowArgs, DecisionAskArgs, DecisionEvalArgs, DecisionListArgs,
-        DecisionShowArgs, DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs,
-        FixOptions, ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelRebuildArgs,
-        ModelTrainArgs, ReviewListArgs, ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
+        CheckArgs, ConfigShowArgs, DecisionAskArgs, DecisionCheckArgs, DecisionEvalArgs,
+        DecisionListArgs, DecisionShowArgs, DecisionSignalsArgs, DecisionTestArgs, DocumentArgs,
+        FingerprintArgs, FixOptions, ModelAttachArgs, ModelDetachArgs, ModelListArgs,
+        ModelRebuildArgs, ModelTrainArgs, ReviewListArgs, ReviewResolveArgs, ReviewShowArgs,
+        SignalDismissArgs,
     },
     check, config, decision, model,
     reply::{CheckFormat, Context, FormatArg, Reply},
@@ -194,6 +195,36 @@ pub enum DecisionCommand {
     Signal {
         #[command(subcommand)]
         command: SignalCommand,
+    },
+    /// Check a decision against the decisions in force.
+    ///
+    /// FILE is a Decision document, `-` for stdin, or the id of a decision of
+    /// the catalog (a name that is both a file and an id is refused; the tool
+    /// takes the document only). A
+    /// document is laid over the project's decisions in memory and never
+    /// written. Order decisions are held to each other on every shape of up
+    /// to two declarations: a contradiction is shown with the code that
+    /// proves it (`contradicts`, basis `proven`); where the search finds none
+    /// it says what it covered (`bounded`), never that the decisions are
+    /// consistent. `likelyImpliedBy` lists the decisions that report on at
+    /// least 90% of the subjects this one reports on, when it has at least 20,
+    /// over a run of the project with it enabled: empirical, a lead and not a
+    /// finding. `implied` is always empty: proven implication is not computed
+    /// yet. The verdict is `contradicts`, `incomplete`, `interferes` or
+    /// `independent`, with the weakest basis behind it. Exits 0 independent
+    /// or interferes, 1 a contradiction no decision settles, 2 a usage
+    /// error, 3 an analysis involving this decision that did not finish.
+    ///
+    /// It costs one check of the whole project (the run behind
+    /// `likelyImpliedBy`, kept in the cache) and the decision's examples; a
+    /// run of the project that did not finish is told in `incomplete` and
+    /// does not change the exit code. The tool takes a document only: for a
+    /// decision of the catalog, pass its document (`decision_show` has it).
+    Check {
+        #[command(flatten)]
+        args: DecisionCheckArgs,
+        #[command(flatten)]
+        output: FormatArg,
     },
     /// Run the examples of checked decisions through the whole engine.
     ///
@@ -503,6 +534,12 @@ pub fn run(ctx: &Context, action: &Action) -> Result<Reply> {
             DecisionCommand::Update { args, output } => decision::update(
                 ctx,
                 &decision::read_document(&args.document)?,
+                output.format,
+            ),
+            DecisionCommand::Check { args, output } => decision::check(
+                ctx,
+                decision::target(ctx, &args.document.document)?,
+                args.detail,
                 output.format,
             ),
             DecisionCommand::Signals { args, output } => {

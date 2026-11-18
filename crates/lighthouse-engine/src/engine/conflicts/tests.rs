@@ -4,13 +4,14 @@ use lighthouse_spec::Catalog;
 use lighthouse_test_support::{bundled, cel};
 
 use super::{
-    Conflicts, Found, Gaps, Nogood, declared::candidates, proven::incomplete_entries, resolved,
+    Conflicts, Found, Gaps, Nogood, NogoodKind, declared::candidates, proven::incomplete_entries,
+    resolved,
 };
 
 const FIRST: &str = "design/declaration-groups";
 const SECOND: &str = "design/top-down-order";
 
-fn nogood<'c>(catalog: &'c Catalog, ids: &[&str], kind: &'static str) -> Nogood<'c> {
+fn nogood<'c>(catalog: &'c Catalog, ids: &[&str], kind: NogoodKind) -> Nogood<'c> {
     Nogood {
         members: ids.iter().map(|id| catalog.decision(id).unwrap()).collect(),
         kind,
@@ -27,7 +28,7 @@ fn own<'c>(catalog: &'c Catalog, ids: &[&str]) -> BTreeSet<&'c str> {
 #[test]
 fn a_pair_is_told_to_each_member_that_is_a_document_of_the_project() {
     let catalog = bundled();
-    let pair = nogood(catalog, &[FIRST, SECOND], "order");
+    let pair = nogood(catalog, &[FIRST, SECOND], NogoodKind::Order);
 
     let entries = pair.entries(catalog, &own(catalog, &[FIRST]));
 
@@ -44,7 +45,7 @@ fn a_pair_is_told_to_each_member_that_is_a_document_of_the_project() {
 #[test]
 fn a_nogood_of_pack_decisions_alone_is_told_to_no_document() {
     let catalog = bundled();
-    let pair = nogood(catalog, &[FIRST, SECOND], "order");
+    let pair = nogood(catalog, &[FIRST, SECOND], NogoodKind::Order);
 
     assert!(pair.entries(catalog, &BTreeSet::new()).is_empty());
 }
@@ -52,7 +53,7 @@ fn a_nogood_of_pack_decisions_alone_is_told_to_no_document() {
 #[test]
 fn a_decision_that_flags_every_order_alone_is_an_order_nogood_with_itself() {
     let catalog = bundled();
-    let single = nogood(catalog, &[FIRST], "order");
+    let single = nogood(catalog, &[FIRST], NogoodKind::Order);
 
     let entries = single.entries(catalog, &own(catalog, &[FIRST]));
 
@@ -209,9 +210,10 @@ fn everything() -> Conflicts {
 #[test]
 fn found() {
     let found = Found {
-        nogoods: vec![nogood(bundled(), &[FIRST, SECOND], "order")],
+        nogoods: vec![nogood(bundled(), &[FIRST, SECOND], NogoodKind::Order)],
         lost: Vec::new(),
         incomplete: Vec::new(),
+        bounded: None,
     };
 
     assert_eq!(found.nogoods.len(), 1);
@@ -261,6 +263,7 @@ fn found_lost_notice() {
         nogoods: Vec::new(),
         lost: vec!["key".to_owned()],
         incomplete: vec!["no renderer".to_owned()],
+        bounded: None,
     };
 
     let told = found.lost_notice("go").unwrap();
@@ -288,6 +291,7 @@ fn gaps_add() {
         nogoods: Vec::new(),
         lost: Vec::new(),
         incomplete: vec![why.to_owned()],
+        bounded: None,
     };
 
     gaps.add("go", &found("too small"));
@@ -309,14 +313,21 @@ fn gaps_add() {
 
 #[test]
 fn nogood_resolved() {
-    let pair = nogood(bundled(), &[FIRST, SECOND], "order");
+    let pair = nogood(bundled(), &[FIRST, SECOND], NogoodKind::Order);
 
     assert!(!pair.resolved(bundled()));
 }
 
 #[test]
+fn nogood_resolver() {
+    let pair = nogood(bundled(), &[FIRST, SECOND], NogoodKind::Order);
+
+    assert_eq!(pair.resolver(bundled()), None);
+}
+
+#[test]
 fn nogood_names() {
-    let pair = nogood(bundled(), &[SECOND, FIRST], "order");
+    let pair = nogood(bundled(), &[SECOND, FIRST], NogoodKind::Order);
 
     assert_eq!(pair.names(), [FIRST, SECOND]);
 }

@@ -217,6 +217,7 @@ fn the_server_lists_its_tools_and_resources() {
             "check",
             "config_show",
             "decision_ask",
+            "decision_check",
             "decision_create",
             "decision_eval",
             "decision_list",

@@ -10,6 +10,7 @@ use lighthouse_model::{SCHEMA_URL_BASE, schema_file};
 use lighthouse_session::{
     Authored, CheckReport, Session,
     ask::Answer,
+    consistency::DecisionCheck,
     fix::Fixed,
     model::{Attachment, Detachment, EvalReport, Rebuilt, Trained, remote_bound},
     review::{Recorded, Shown},
@@ -22,10 +23,10 @@ use serde_json::{Value, json};
 use crate::surface::{
     Result,
     args::{
-        CheckArgs, ConfigShowArgs, DecisionAskArgs, DecisionEvalArgs, DecisionListArgs,
-        DecisionShowArgs, DecisionSignalsArgs, DecisionTestArgs, DocumentArgs, FingerprintArgs,
-        FixArgs, ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelTrainArgs, ReviewListArgs,
-        ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
+        CheckArgs, ConfigShowArgs, DecisionAskArgs, DecisionCheckArgs, DecisionEvalArgs,
+        DecisionListArgs, DecisionShowArgs, DecisionSignalsArgs, DecisionTestArgs, DocumentArgs,
+        FingerprintArgs, FixArgs, ModelAttachArgs, ModelDetachArgs, ModelListArgs, ModelTrainArgs,
+        ReviewListArgs, ReviewResolveArgs, ReviewShowArgs, SignalDismissArgs,
     },
     check,
     commands::{self, CheckCommand},
@@ -45,7 +46,7 @@ const FIX_DESCRIPTION: &str = "Fix findings with the fixers the decisions name (
 const REBUILD_KIND: &str = "ModelRebuild";
 
 /// The tools, in the order they are listed.
-pub const TOOLS: [Tool; 20] = [
+pub const TOOLS: [Tool; 21] = [
     Tool::new::<CheckArgs, CheckReport>(
         "check",
         &["check"],
@@ -94,6 +95,17 @@ pub const TOOLS: [Tool; 20] = [
         "DecisionReport",
         Hints::WRITE,
         |ctx, args| decision::update(ctx, &parse::<DocumentArgs>(args)?.document, Format::Json),
+    ),
+    Tool::new::<DecisionCheckArgs, DecisionCheck>(
+        "decision_check",
+        &["decision", "check"],
+        "DecisionCheck",
+        Hints::READ,
+        |ctx, args| {
+            let args: DecisionCheckArgs = parse(args)?;
+            let target = decision::document(&args.document.document)?;
+            decision::check(ctx, target, args.detail, Format::Json)
+        },
     ),
     Tool::new::<DecisionSignalsArgs, SignalReport>(
         "decision_signals",

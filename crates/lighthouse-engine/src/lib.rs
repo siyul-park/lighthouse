@@ -18,7 +18,8 @@ pub mod cache;
 
 pub use engine::{
     Availability, CommandModels, Conflicts, Contradicted, Contradictions, EXIT_INCOMPLETE, Engine,
-    FailOn, Found, Gaps, ModelOptions, Needs, Nogood, Orders, Outcome, Overlays, Run, active,
+    FailOn, Found, Gaps, ModelOptions, Needs, Nogood, NogoodKind, Orders, Outcome, Overlays, Run,
+    active,
 };
 pub use error::Error;
 pub use fix::{
@@ -27,8 +28,8 @@ pub use fix::{
 };
 pub use tester::{
     Alphabet, Arrangement, Basis, Bounded, Cell, Contradiction, Decl, Edge, ExampleRun, Flagged,
-    Forced, Incomplete, Kind, Language, MAX_BOUND, Oracle, Plant, Planted, Relation, RuleTester,
-    Scratch, Searched, Shape, Single, Spent, Tested, Unit, Verdict, Visibility, Witness, enumerate,
-    local_decisions,
+    Forced, Incomplete, Interference, Kind, Language, MAX_BOUND, Oracle, Plant, Planted, Relation,
+    RuleTester, Scratch, Searched, Shape, Single, Spent, Tested, Unit, Verdict, Visibility,
+    Witness, enumerate, local_decisions,
 };
 pub use timings::{Detect, FixTimings, Timings};

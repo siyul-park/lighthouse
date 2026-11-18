@@ -27,6 +27,7 @@ mod why;
 
 pub mod ask;
 pub mod baseline;
+pub mod consistency;
 pub mod environment;
 pub mod fix;
 pub mod model;

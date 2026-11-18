@@ -5,7 +5,9 @@
 
 use std::{collections::BTreeSet, sync::Mutex, time::Duration};
 
-use lighthouse_engine::{Plant, Planted, RuleTester, Spent, Tested};
+use lighthouse_engine::{
+    Bounded, Contradicted, Interference, Plant, Planted, RuleTester, Spent, Tested,
+};
 
 use lighthouse_plugin::Registry;
 use lighthouse_rpc::Started;
@@ -28,6 +30,13 @@ pub(crate) struct Found {
     pub(crate) conflicts: Vec<String>,
     /// Searches for contradictions that were not done in full.
     pub(crate) incomplete: Vec<String>,
+    /// The conflicts the examples declare and still have, apart from the
+    /// contradictions among the decisions.
+    pub(crate) declared: Vec<(String, Vec<Interference>)>,
+    /// The contradictions the search found, settled or not.
+    pub(crate) contradicted: Vec<Contradicted>,
+    /// What the searches done in full covered, by language.
+    pub(crate) bounded: Vec<(String, Bounded)>,
     pub(crate) spent: Spent,
     /// The time of each unit: decision, language and total.
     pub(crate) per_unit: Vec<(String, String, Duration)>,
@@ -136,6 +145,9 @@ fn merge(units: Vec<Unit>) -> Found {
             unit.tested.spent.total(),
         ));
         found.failures.extend(prefixed(unit.tested.failures));
+        found
+            .declared
+            .push((language.clone(), unit.tested.interferences));
         found.conflicts.extend(prefixed(unit.tested.conflicts));
     }
     found

@@ -9,6 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use lighthouse_engine::{Bounded, Contradicted, Interference};
 use lighthouse_logic::Classified;
 use lighthouse_plugin::Registry;
 use lighthouse_report::docs::{Density, decision_markdown};
@@ -74,7 +75,7 @@ lighthouse_model::vocabulary!(Implementation, "implementation" {
 });
 
 /// The outcome of running examples.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Default, Serialize, JsonSchema)]
 pub struct DecisionTest {
     pub decisions: usize,
     pub languages: usize,
@@ -96,6 +97,18 @@ pub struct DecisionTest {
     /// Where the time went; reported on request.
     #[serde(skip)]
     pub timings: TestTimings,
+}
+
+/// What a decision test learned that its report does not carry: the
+/// structured form of what `decision check` tells.
+#[derive(Debug, Default)]
+pub(crate) struct Analysis {
+    /// The conflicts the examples declare and still have, by language.
+    pub(crate) declared: Vec<(String, Vec<Interference>)>,
+    /// The contradictions found among the decisions, settled or not.
+    pub(crate) contradicted: Vec<Contradicted>,
+    /// What the searches done in full covered, by language.
+    pub(crate) bounded: Vec<(String, Bounded)>,
 }
 
 /// Where the time of a decision test went, in seconds. The phases are summed
@@ -283,7 +296,7 @@ pub fn test_decisions(
     language: Option<&str>,
     jobs: Option<usize>,
 ) -> Result<DecisionTest> {
-    test_catalog(session, &session.catalog, ids, language, jobs)
+    test_catalog(session, &session.catalog, ids, language, jobs).map(|(test, _)| test)
 }
 
 /// Like [`test_decisions`], over `catalog` instead of the project's own.
@@ -293,7 +306,7 @@ pub(crate) fn test_catalog(
     ids: &[String],
     language: Option<&str>,
     jobs: Option<usize>,
-) -> Result<DecisionTest> {
+) -> Result<(DecisionTest, Analysis)> {
     let decisions = selected(catalog, ids)?;
     let jobs = jobs.unwrap_or_else(available).max(1);
     let started = Instant::now();
@@ -332,7 +345,12 @@ pub(crate) fn test_catalog(
     skipped.extend(lacking.iter().map(|(plugin, examples)| {
         format!("plugin `{plugin}` is not available: {examples} example(s) not run")
     }));
-    Ok(DecisionTest {
+    let analysis = Analysis {
+        declared: found.declared,
+        contradicted: found.contradicted,
+        bounded: found.bounded,
+    };
+    let test = DecisionTest {
         decisions: decisions.len(),
         languages: languages.len(),
         runs: found.per_unit.len(),
@@ -347,7 +365,8 @@ pub(crate) fn test_catalog(
             crossing: found.spent.crossing.as_secs_f64(),
             slowest: slowest(found.per_unit),
         },
-    })
+    };
+    Ok((test, analysis))
 }
 
 /// What the Go tool is told in every plugin process of a decision test, so

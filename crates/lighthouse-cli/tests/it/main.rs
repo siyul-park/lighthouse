@@ -10,6 +10,7 @@ mod checks;
 mod cli;
 mod command_sarif;
 mod contradictions;
+mod decision_check;
 mod decision_portable;
 mod environment;
 mod explore;

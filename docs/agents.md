@@ -63,6 +63,7 @@ output as `structuredContent` (validated by the tool's `outputSchema`, the schem
 | `decision_test` | `decision test` | `TestReport` |
 | `decision_eval` | `decision eval` | `EvalReport` |
 | `decision_ask` | `decision ask` | `Answer`: what a proposed edit would do, `fired` and `cleared` findings and a `verdict` |
+| `decision_check` | `decision check` | `DecisionCheck`: whether a decision holds together with the decisions in force |
 | `review_list` | `review list` | `ReviewList` |
 | `review_show` | `review show` | `Finding`: one finding in full; `detail: "full"` adds why it is as it is: `precedence` (the layers its severity went through), `suppressions` (the judgment that hides it or not) and `precedents` (judgments on other findings of its decision) |
 | `review_resolve` | `review resolve` | `ResolveReport` |
@@ -190,6 +191,30 @@ remembered and no model is asked; the answer is the one a `check` of a copy with
 applied would give, which a test checks. `basis` is always `evaluated`. A hunk that does not
 apply, or a refused edit, is a usage error (exit 2; `isError` for the tool) that names the
 file.
+
+### Checking a decision against the others
+
+`decision_check {document, detail?}` (CLI: `decision check <FILE|-> [--detail full]`, which
+also takes the id of a catalog decision) says whether a decision holds together with the
+decisions in force, before it is written: the document is laid over the project's decisions
+in memory, and nothing is written or remembered. `contradicts` lists the sets of order
+decisions that no arrangement of some declarations satisfies, each with the smallest code
+that shows it (`basis: proven`; `detail: "full"` adds every arrangement and who flags it);
+one a decision settles by superseding another is listed with `resolvedBy` and does not fail
+the check. Where the search finds none, `bounded` says what it covered (shapes of up to two
+declarations): never that the decisions are consistent. `likelyImpliedBy` lists decisions
+that report on at least 90% of the subjects this one reports on, when it has at least 20,
+over a run of the project with the decision enabled (`basis: empirical`): a lead for a
+person, never a finding. `implied` stays empty: proven implication is not computed yet, so
+the verdict is never `implied`. `interferes` holds the conflicts the decision's examples
+declare, each as a record (`with`, `example`, `introduced`, `places`), `independentOf` the order decisions it was held to and does not contradict, and
+`gaps` the enabled decisions on the same subject and language that no formal analysis
+decides. The check costs one check of the whole project (the run behind `likelyImpliedBy`)
+and the decision's examples; a run that did not finish is told in `incomplete` and does not
+change the verdict or the exit code. The tool takes a document only: for a decision of the
+catalog, pass its document (`decision_show` has it). The verdict is the worst of `contradicts`, `incomplete`, `interferes` and
+`independent` (exit 1, 3, 0, 0), with the weakest `basis` behind it. A document that does
+not load or whose examples fail is a usage error (exit 2).
 
 ### Resources
 

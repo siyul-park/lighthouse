@@ -123,6 +123,30 @@ pub fn likely_implied_by(
         .collect()
 }
 
+/// Whether two decisions both apply to `language`, or with none given, to a
+/// language in common.
+pub(crate) fn overlap(a: &Decision, b: &Decision, language: Option<&str>) -> bool {
+    match language {
+        Some(language) => a.applies_to(language) && b.applies_to(language),
+        None => {
+            a.languages.is_empty()
+                || b.languages.is_empty()
+                || a.languages.keys().any(|l| b.languages.contains_key(l))
+        }
+    }
+}
+
+/// What a decision selects: its check's `select`, else its scope's subject.
+pub(crate) fn sort(decision: &Decision) -> String {
+    match decision.check.as_ref().map(|c| &c.kind) {
+        Some(CheckKind::Cel(check)) => check.selects(decision.scope.subject).map_or_else(
+            || decision.scope.subject.to_string(),
+            |s| s.name().to_owned(),
+        ),
+        _ => decision.scope.subject.to_string(),
+    }
+}
+
 /// What a finding is about: the value its rule selected, as the rule
 /// identifies it; for a finding of a rule that selects none (a command or a
 /// model), the symbol it names, else its file.
@@ -138,16 +162,5 @@ fn subject(finding: &Diagnostic) -> String {
 /// Whether two decisions are about the same sort of subject and both apply to
 /// `language`.
 fn comparable(a: &Decision, b: &Decision, language: &str) -> bool {
-    sort(a) == sort(b) && a.applies_to(language) && b.applies_to(language)
-}
-
-/// What a decision selects: its check's `select`, else its scope's subject.
-fn sort(decision: &Decision) -> String {
-    match decision.check.as_ref().map(|c| &c.kind) {
-        Some(CheckKind::Cel(check)) => check.selects(decision.scope.subject).map_or_else(
-            || decision.scope.subject.to_string(),
-            |s| s.name().to_owned(),
-        ),
-        _ => decision.scope.subject.to_string(),
-    }
+    sort(a) == sort(b) && overlap(a, b, Some(language))
 }

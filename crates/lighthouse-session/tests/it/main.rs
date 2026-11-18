@@ -5,6 +5,7 @@ mod authoring;
 mod baseline;
 mod check;
 mod cofiring;
+mod consistency;
 mod decisions;
 mod descriptor;
 mod environment;

@@ -1,0 +1,449 @@
+---
+source: crates/lighthouse-cli/tests/it/mcp_contract.rs
+expression: "serde_json::to_string_pretty(&tool).unwrap()"
+---
+{
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false,
+    "readOnlyHint": true
+  },
+  "description": "Check a decision against the decisions in force.\n\nFILE is a Decision document, `-` for stdin, or the id of a decision of the catalog (a name that is both a file and an id is refused; the tool takes the document only). A document is laid over the project's decisions in memory and never written. Order decisions are held to each other on every shape of up to two declarations: a contradiction is shown with the code that proves it (`contradicts`, basis `proven`); where the search finds none it says what it covered (`bounded`), never that the decisions are consistent. `likelyImpliedBy` lists the decisions that report on at least 90% of the subjects this one reports on, when it has at least 20, over a run of the project with it enabled: empirical, a lead and not a finding. `implied` is always empty: proven implication is not computed yet. The verdict is `contradicts`, `incomplete`, `interferes` or `independent`, with the weakest basis behind it. Exits 0 independent or interferes, 1 a contradiction no decision settles, 2 a usage error, 3 an analysis involving this decision that did not finish.\n\nIt costs one check of the whole project (the run behind `likelyImpliedBy`, kept in the cache) and the decision's examples; a run of the project that did not finish is told in `incomplete` and does not change the exit code. The tool takes a document only: for a decision of the catalog, pass its document (`decision_show` has it).",
+  "inputSchema": {
+    "additionalProperties": false,
+    "description": "`decision check`.",
+    "properties": {
+      "detail": {
+        "default": "compact",
+        "description": "Full adds the arrangements of an order contradiction's witness: each\norder of the declarations and who flags it.",
+        "oneOf": [
+          {
+            "const": "compact",
+            "description": "Grouped by decision, a decision's text said once.",
+            "type": "string"
+          },
+          {
+            "const": "full",
+            "description": "One self-contained record per item.",
+            "type": "string"
+          }
+        ]
+      },
+      "document": {
+        "description": "A `Decision` document, as YAML or JSON. On the command line this is a\nfile, or `-` for stdin; the tool takes the text or the object.\n`metadata.name` is the id (`local/<name>`); `spec.examples` needs at\nleast one valid and one invalid example per language the project runs.",
+        "type": [
+          "string",
+          "object"
+        ]
+      }
+    },
+    "required": [
+      "document"
+    ],
+    "type": "object"
+  },
+  "name": "decision_check",
+  "outputSchema": {
+    "$id": "https://raw.githubusercontent.com/siyul-park/lighthouse/main/schema/decision-check.schema.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The `DecisionCheck` kind: what the decisions in force say of one decision.",
+    "properties": {
+      "basis": {
+        "description": "The weakest basis among the entries; `incomplete` when an analysis did\nnot finish.",
+        "oneOf": [
+          {
+            "const": "proven",
+            "description": "Shown by a witness.",
+            "type": "string"
+          },
+          {
+            "const": "bounded",
+            "description": "No other exists within a stated bound.",
+            "type": "string"
+          },
+          {
+            "const": "empirical",
+            "description": "Seen on the code of the project, not shown.",
+            "type": "string"
+          },
+          {
+            "const": "incomplete",
+            "description": "An analysis did not finish.",
+            "type": "string"
+          }
+        ]
+      },
+      "bounded": {
+        "description": "What the searches done in full covered: no other contradiction exists\nwithin it. Never \"proven consistent\". Told only when none was found.",
+        "items": {
+          "description": "What a search done in full covered, for one language.",
+          "properties": {
+            "alphabet": {
+              "type": "string"
+            },
+            "declarations": {
+              "description": "The most declarations of the shapes searched.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "language": {
+              "type": "string"
+            },
+            "options": {
+              "description": "The decisions with the options and digests the search saw.",
+              "items": {
+                "description": "A decision as a search saw it: what it asks, in a digest.",
+                "properties": {
+                  "decision": {
+                    "type": "string"
+                  },
+                  "digest": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "decision",
+                  "digest"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "renderer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "language",
+            "declarations",
+            "alphabet",
+            "renderer",
+            "options"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "contradicts": {
+        "description": "The sets of decisions that cannot hold together with this one, each\nwith the smallest code that shows it.",
+        "items": {
+          "description": "A set of decisions that cannot hold together.",
+          "properties": {
+            "basis": {
+              "description": "How an entry was reached, strongest first.",
+              "oneOf": [
+                {
+                  "const": "proven",
+                  "description": "Shown by a witness.",
+                  "type": "string"
+                },
+                {
+                  "const": "bounded",
+                  "description": "No other exists within a stated bound.",
+                  "type": "string"
+                },
+                {
+                  "const": "empirical",
+                  "description": "Seen on the code of the project, not shown.",
+                  "type": "string"
+                },
+                {
+                  "const": "incomplete",
+                  "description": "An analysis did not finish.",
+                  "type": "string"
+                }
+              ]
+            },
+            "kind": {
+              "description": "What kind of contradiction it is.",
+              "oneOf": [
+                {
+                  "const": "order",
+                  "description": "No order of some declarations satisfies the decisions.",
+                  "type": "string"
+                },
+                {
+                  "const": "covering",
+                  "description": "Together the decisions flag every subject.",
+                  "type": "string"
+                }
+              ]
+            },
+            "language": {
+              "description": "The language of the code the contradiction is on.",
+              "type": "string"
+            },
+            "resolvedBy": {
+              "description": "The decision that supersedes another of the set: the order of the\ndecisions settles the contradiction, and it does not fail the check.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "with": {
+              "description": "The other decisions; this one alone when it flags every order of\nsome declarations.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "witness": {
+              "description": "The shape of code, the order each decision forces and, at `--detail\nfull`, every arrangement and who flags it."
+            }
+          },
+          "required": [
+            "language",
+            "with",
+            "kind",
+            "basis",
+            "witness"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "decision": {
+        "type": "string"
+      },
+      "gaps": {
+        "description": "The enabled decisions on the same subject and a shared language that\nno formal analysis decides (tier `T`): they may bear on this one.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "implied": {
+        "description": "The decisions that provably imply this one or are equivalent to it.\nAlways empty: proven implication is not computed yet.",
+        "items": {
+          "description": "Decisions that provably cover this one.",
+          "properties": {
+            "basis": {
+              "description": "How an entry was reached, strongest first.",
+              "oneOf": [
+                {
+                  "const": "proven",
+                  "description": "Shown by a witness.",
+                  "type": "string"
+                },
+                {
+                  "const": "bounded",
+                  "description": "No other exists within a stated bound.",
+                  "type": "string"
+                },
+                {
+                  "const": "empirical",
+                  "description": "Seen on the code of the project, not shown.",
+                  "type": "string"
+                },
+                {
+                  "const": "incomplete",
+                  "description": "An analysis did not finish.",
+                  "type": "string"
+                }
+              ]
+            },
+            "by": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "equivalence": {
+              "description": "How a set of decisions covers one.",
+              "enum": [
+                "equivalent",
+                "implied"
+              ],
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "by",
+            "equivalence",
+            "basis",
+            "label"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "incomplete": {
+        "description": "Why an analysis involving this decision could not be done in full.\nA line about the run of the project behind `likelyImpliedBy` is told\nhere too, and does not change the verdict or the exit code.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "independentOf": {
+        "description": "The order decisions it was held to, in each language searched in full,\nthat it does not contradict.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "interferes": {
+        "description": "The conflicts the examples of the decision declare and still have with\nother decisions.",
+        "items": {
+          "description": "A conflict with another decision that an example of the decision declares\nand the code still has.",
+          "properties": {
+            "example": {
+              "description": "The example that shows it.",
+              "type": "string"
+            },
+            "introduced": {
+              "description": "Whether the fix of the decision introduces it, rather than the code\nhaving it anyway.",
+              "type": "boolean"
+            },
+            "language": {
+              "description": "The language of the example.",
+              "type": "string"
+            },
+            "message": {
+              "description": "What the other decision says there.",
+              "type": "string"
+            },
+            "places": {
+              "description": "Where the other decision reports, as `file:line`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "with": {
+              "description": "The other decision.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "language",
+            "with",
+            "example",
+            "introduced",
+            "places",
+            "message"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "likelyImpliedBy": {
+        "description": "The decisions that report on most of the subjects this one reports on,\nover the findings of the project's run with this decision enabled. A\nlead for a person, never a finding.",
+        "items": {
+          "description": "A decision that reports on most of the subjects of this one.",
+          "properties": {
+            "basis": {
+              "description": "How an entry was reached, strongest first.",
+              "oneOf": [
+                {
+                  "const": "proven",
+                  "description": "Shown by a witness.",
+                  "type": "string"
+                },
+                {
+                  "const": "bounded",
+                  "description": "No other exists within a stated bound.",
+                  "type": "string"
+                },
+                {
+                  "const": "empirical",
+                  "description": "Seen on the code of the project, not shown.",
+                  "type": "string"
+                },
+                {
+                  "const": "incomplete",
+                  "description": "An analysis did not finish.",
+                  "type": "string"
+                }
+              ]
+            },
+            "by": {
+              "type": "string"
+            },
+            "cofire": {
+              "description": "The share of this decision's subjects the other reports on too, in\npercent.",
+              "format": "double",
+              "type": "number"
+            },
+            "language": {
+              "type": "string"
+            },
+            "subjects": {
+              "description": "How many subjects this decision reports on in the language.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "by",
+            "language",
+            "cofire",
+            "subjects",
+            "basis"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "tier": {
+        "description": "How far the decision can be reasoned about without running it: `F`\nformal, `O` ordering, `T` the rest.",
+        "type": "string"
+      },
+      "tierReason": {
+        "description": "Why it is in that tier.",
+        "type": "string"
+      },
+      "verdict": {
+        "description": "The worst of what was found, in this order: `contradicts`,\n`incomplete`, `implied`, `interferes`, `independent`. `implied` is\nnever the verdict yet: proven implication is not computed.",
+        "oneOf": [
+          {
+            "const": "contradicts",
+            "description": "A set of decisions that includes this one cannot hold together.",
+            "type": "string"
+          },
+          {
+            "const": "incomplete",
+            "description": "An analysis involving this decision did not finish.",
+            "type": "string"
+          },
+          {
+            "const": "implied",
+            "description": "Other decisions provably cover it.",
+            "type": "string"
+          },
+          {
+            "const": "interferes",
+            "description": "Its examples declare conflicts with other decisions.",
+            "type": "string"
+          },
+          {
+            "const": "independent",
+            "description": "Nothing was found.",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "required": [
+      "decision",
+      "verdict",
+      "tier",
+      "tierReason",
+      "contradicts",
+      "implied",
+      "likelyImpliedBy",
+      "interferes",
+      "independentOf",
+      "gaps",
+      "basis"
+    ],
+    "title": "DecisionCheck",
+    "type": "object"
+  },
+  "title": "Check a decision against the decisions in force"
+}

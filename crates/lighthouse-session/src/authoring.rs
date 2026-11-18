@@ -130,6 +130,34 @@ pub fn replace_decision(
     commit(session, &id, &name, document, None, by)
 }
 
+/// The id of a document and the name of the file it is kept in.
+pub(crate) fn local_name(document: &Value) -> Result<(String, String)> {
+    let id = document_id(document)?;
+    let name = id
+        .strip_prefix("local/")
+        .ok_or_else(|| format!("id is `{id}`, a local decision is `local/<name>`"))?
+        .to_owned();
+    checked_name(&name)?;
+    Ok((id, name))
+}
+
+/// Fills in what a document may leave out: the API version and a uid.
+pub(crate) fn complete(document: &mut Value) {
+    if let Some(map) = document.as_object_mut() {
+        map.entry("apiVersion")
+            .or_insert_with(|| Value::String(API_VERSION.to_owned()));
+    }
+    ensure_uid(document);
+}
+
+/// The project's local layer with `doc` as the decision `name`, in memory:
+/// nothing is written.
+pub(crate) fn layer(session: &Session, name: &str, doc: &Value) -> Result<Catalog> {
+    let mut files: BTreeMap<String, String> = local_files(&session.root)?.unwrap_or_default();
+    files.insert(file_name(name), serde_norway::to_string(doc)?);
+    Ok(Catalog::from_local(files, session.comp.cel())?)
+}
+
 /// A project with decisions of its own extends `core/authoring`, which says
 /// where the CEL of those files is; a decision just written adds it when the
 /// project does not have it yet.
@@ -159,17 +187,6 @@ fn extend_authoring(session: &Session, authored: &mut Authored) -> Result<()> {
     Ok(())
 }
 
-/// The id of a document and the name of the file it is kept in.
-fn local_name(document: &Value) -> Result<(String, String)> {
-    let id = document_id(document)?;
-    let name = id
-        .strip_prefix("local/")
-        .ok_or_else(|| format!("id is `{id}`, a local decision is `local/<name>`"))?
-        .to_owned();
-    checked_name(&name)?;
-    Ok((id, name))
-}
-
 /// `metadata.name` of a `Decision` document.
 fn document_id(document: &Value) -> Result<String> {
     if document.get("kind").and_then(Value::as_str) != Some("Decision") {
@@ -180,15 +197,6 @@ fn document_id(document: &Value) -> Result<String> {
         .and_then(Value::as_str)
         .map(str::to_owned)
         .ok_or_else(|| "the document needs `metadata.name`, the decision id".into())
-}
-
-/// Fills in what a document may leave out: the API version and a uid.
-fn complete(document: &mut Value) {
-    if let Some(map) = document.as_object_mut() {
-        map.entry("apiVersion")
-            .or_insert_with(|| Value::String(API_VERSION.to_owned()));
-    }
-    ensure_uid(document);
 }
 
 /// Refuses a decision name that could name a file outside `.lighthouse/decisions`.
@@ -226,9 +234,7 @@ fn commit(
     let duplicates = duplicates.unwrap_or_default();
     ensure_uid(&mut doc);
     let root = session.root.clone();
-    let mut files: BTreeMap<String, String> = local_files(&root)?.unwrap_or_default();
-    files.insert(file_name(name), serde_norway::to_string(&doc)?);
-    let local = Catalog::from_local(files, session.comp.cel())?;
+    let local = layer(session, name, &doc)?;
     let text = canonical(&local, id)?;
     let candidate = session.with_local(Some(local))?;
     let testable = candidate
@@ -238,16 +244,7 @@ fn commit(
     let test = if testable {
         test_decisions(&candidate, &[id.to_owned()], None, None)?
     } else {
-        DecisionTest {
-            decisions: 0,
-            languages: 0,
-            runs: 0,
-            failures: Vec::new(),
-            skipped: Vec::new(),
-            conflicts: Vec::new(),
-            incomplete: Vec::new(),
-            timings: crate::TestTimings::default(),
-        }
+        DecisionTest::default()
     };
     if !test.failures.is_empty() {
         return Err(format!(

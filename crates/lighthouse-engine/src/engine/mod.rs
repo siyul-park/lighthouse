@@ -59,7 +59,9 @@ use config::{
     Inherited, constructors, inheritance, io_error, load_languages, options_at, test_naming,
     validate_config,
 };
-pub use conflicts::{Conflicts, Contradicted, Contradictions, Found, Gaps, Nogood, Orders};
+pub use conflicts::{
+    Conflicts, Contradicted, Contradictions, Found, Gaps, Nogood, NogoodKind, Orders,
+};
 use models::RunModels;
 pub(crate) use phases::in_pool;
 pub(crate) use route::{Member, Refusal, Route, Usage};

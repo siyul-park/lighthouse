@@ -63,6 +63,7 @@ pub struct Basis {
 }
 
 /// A program the project would run, with its arguments, for the digest and for the user.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Program {
     pub(crate) what: String,
     pub(crate) argv: Vec<String>,

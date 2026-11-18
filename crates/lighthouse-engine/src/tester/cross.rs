@@ -75,6 +75,41 @@ impl RuleTester<'_> {
     }
 }
 
+/// A conflict with another decision that an example declares and still has.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Interference {
+    /// The decision whose example it is; set by whoever ran the example.
+    pub decision: String,
+    pub example: String,
+    /// The decision it conflicts with.
+    pub with: String,
+    /// Whether the decision's fix introduces it, rather than the code
+    /// having it anyway.
+    pub introduced: bool,
+    /// Where the other decision reports, as `file:line`.
+    pub places: Vec<String>,
+    pub message: String,
+}
+
+impl Interference {
+    /// The conflict as a line.
+    pub fn line(&self) -> String {
+        let how = if self.introduced {
+            "its fix introduces"
+        } else {
+            "it also breaks"
+        };
+        format!(
+            "{} {}: {how} {} at {} ({})",
+            self.decision,
+            self.example,
+            self.with,
+            self.places.join(", "),
+            self.message
+        )
+    }
+}
+
 /// The findings of `others` in the files of `example`, as `engine` sees them.
 pub(super) fn cross(
     engine: &Engine,
@@ -138,9 +173,9 @@ pub(super) fn introduced(
 }
 
 /// Holds the `hits` to what `example` declares: a finding of a decision it does
-/// not list is a failure, and so is a listed decision that has none. The lines
-/// that report what is declared and still found.
-pub(super) fn judge(example: &Example, hits: &[Hit]) -> Result<Vec<String>, String> {
+/// not list is a failure, and so is a listed decision that has none. The
+/// conflicts that are declared and still found.
+pub(super) fn judge(example: &Example, hits: &[Hit]) -> Result<Vec<Interference>, String> {
     let mut found: BTreeMap<&str, Vec<&Hit>> = BTreeMap::new();
     for hit in hits {
         found.entry(&hit.rule).or_default().push(hit);
@@ -150,20 +185,30 @@ pub(super) fn judge(example: &Example, hits: &[Hit]) -> Result<Vec<String>, Stri
     let mut known = Vec::new();
     for (rule, group) in &found {
         let first = group[0];
-        let how = if group.iter().any(|h| h.introduced) {
-            "its fix introduces"
-        } else {
-            "it also breaks"
-        };
         let places: Vec<String> = group
             .iter()
             .map(|h| format!("{}:{}", h.file.display(), h.line))
             .collect();
-        let line = format!("{how} {rule} at {} ({})", places.join(", "), first.message);
         if declared.contains(rule) {
-            known.push(line);
+            known.push(Interference {
+                decision: String::new(),
+                example: example.name.clone(),
+                with: (*rule).to_owned(),
+                introduced: group.iter().any(|h| h.introduced),
+                places,
+                message: first.message.clone(),
+            });
         } else {
-            wrong.push(line);
+            let how = if group.iter().any(|h| h.introduced) {
+                "its fix introduces"
+            } else {
+                "it also breaks"
+            };
+            wrong.push(format!(
+                "{how} {rule} at {} ({})",
+                places.join(", "),
+                first.message
+            ));
         }
     }
     for rule in declared.iter().filter(|r| !found.contains_key(*r)) {

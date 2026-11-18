@@ -20,7 +20,7 @@ use lighthouse_spec::{Catalog, Decision, Rules};
 use serde_json::{Map, Value, json};
 
 use super::{Engine, Input};
-use crate::{Basis, Cell, Error, Oracle, Run, Verdict, Witness};
+use crate::{Basis, Bounded, Cell, Error, Oracle, Run, Verdict, Witness};
 
 /// The field of a document the search answers.
 const FIELD: &str = "conflicts";
@@ -52,13 +52,15 @@ pub struct Found<'a> {
     pub lost: Vec<String>,
     /// Why the search could not be done in full; empty when it was.
     pub incomplete: Vec<String>,
+    /// What a search done in full covered: the shapes it held the decisions to.
+    pub bounded: Option<Bounded>,
 }
 
 /// A set of decisions that cannot hold together, as one of its members sees
 /// it.
 pub struct Nogood<'a> {
     pub members: Vec<&'a Decision>,
-    pub kind: &'static str,
+    pub kind: NogoodKind,
     pub witness: Value,
 }
 
@@ -77,13 +79,33 @@ pub struct Contradicted {
     /// The decisions that cannot hold together, sorted; one for a decision
     /// that flags every order of some declarations alone.
     pub names: Vec<String>,
-    pub kind: &'static str,
+    pub kind: NogoodKind,
     pub witness: Value,
-    /// A member supersedes another: the order of the decisions settles it.
-    pub resolved: bool,
+    /// The member that supersedes another, when one does: the order of the
+    /// decisions settles the contradiction.
+    pub resolved_by: Option<String>,
     /// Whether the same decisions run with their default options contradict
     /// too: then the options and overrides of the project do not make it.
     pub at_defaults: bool,
+}
+
+/// What makes a set of decisions unable to hold together.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NogoodKind {
+    /// No order of some declarations satisfies them.
+    Order,
+    /// Together they flag every subject.
+    Covering,
+}
+
+impl NogoodKind {
+    /// The word the entries of a document and the output of a check use.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Order => "order",
+            Self::Covering => "covering",
+        }
+    }
 }
 
 impl Conflicts {
@@ -163,18 +185,22 @@ impl Conflicts {
         };
         let oracle = Oracle::sharing(Arc::clone(registry), &self.catalog);
         let verdict = oracle.search(graph, &cell, BOUND).verdict;
-        let incomplete = match &verdict.basis {
-            Basis::Incomplete(reasons) => reasons
-                .iter()
-                .map(|reason| reason.told(&|key| self.id_of(key)))
-                .collect(),
-            Basis::Bounded(_) => Vec::new(),
+        let (incomplete, bounded) = match &verdict.basis {
+            Basis::Incomplete(reasons) => (
+                reasons
+                    .iter()
+                    .map(|reason| reason.told(&|key| self.id_of(key)))
+                    .collect(),
+                None,
+            ),
+            Basis::Bounded(bounded) => (Vec::new(), Some(bounded.clone())),
         };
         let (nogoods, lost) = nogoods(&self.catalog, &verdict);
         Found {
             nogoods,
             lost,
             incomplete,
+            bounded,
         }
     }
 
@@ -194,6 +220,7 @@ impl Conflicts {
                 incomplete: vec![format!(
                     "the search has no graph to keep its flags in: {why}"
                 )],
+                bounded: None,
             },
         }
     }
@@ -275,6 +302,11 @@ impl Nogood<'_> {
         resolved(catalog, &self.members)
     }
 
+    /// The decision that supersedes another of the nogood, if one does.
+    pub fn resolver(&self, catalog: &Catalog) -> Option<String> {
+        resolver(catalog, &self.members).map(|d| d.id().to_owned())
+    }
+
     /// The ids of its decisions, sorted.
     pub fn names(&self) -> Vec<String> {
         let mut names: Vec<String> = self.members.iter().map(|d| d.id().to_owned()).collect();
@@ -301,7 +333,7 @@ impl Nogood<'_> {
                 };
                 let entry = json!({
                     "with": with,
-                    "kind": self.kind,
+                    "kind": self.kind.as_str(),
                     "basis": "proven",
                     "witness": self.witness,
                     "resolved": resolved,
@@ -405,7 +437,7 @@ impl Engine {
                     language: language.clone(),
                     kind: nogood.kind,
                     witness: nogood.witness.clone(),
-                    resolved: resolved(&conflicts.catalog, &nogood.members),
+                    resolved_by: nogood.resolver(&conflicts.catalog),
                     at_defaults: at_defaults.contains(&names),
                     names,
                 });
@@ -436,7 +468,7 @@ fn nogoods<'c>(catalog: &'c Catalog, verdict: &Verdict) -> (Vec<Nogood<'c>>, Vec
         if members.len() == contradiction.decisions.len() {
             found.push(Nogood {
                 members,
-                kind: "order",
+                kind: NogoodKind::Order,
                 witness: witness(catalog, &contradiction.witness),
             });
         } else {
@@ -447,7 +479,7 @@ fn nogoods<'c>(catalog: &'c Catalog, verdict: &Verdict) -> (Vec<Nogood<'c>>, Vec
         match find(catalog, &single.decision) {
             Some(decision) => found.push(Nogood {
                 members: vec![decision],
-                kind: "order",
+                kind: NogoodKind::Order,
                 witness: json!({ "shape": single.shape.describe(), "arrangements": [], "forced": [] }),
             }),
             None => lost.push(single.decision.clone()),
@@ -480,10 +512,15 @@ fn witness(catalog: &Catalog, witness: &Witness) -> Value {
     })
 }
 
-/// Whether a member supersedes another, through any chain: the contradiction
-/// is then settled by the order of the decisions.
+/// Whether a member supersedes another, through any chain.
 fn resolved(catalog: &Catalog, members: &[&Decision]) -> bool {
-    members.iter().any(|newer| {
+    resolver(catalog, members).is_some()
+}
+
+/// The member that supersedes another, through any chain: the contradiction
+/// is then settled by the order of the decisions.
+fn resolver<'c>(catalog: &Catalog, members: &[&'c Decision]) -> Option<&'c Decision> {
+    members.iter().copied().find(|newer| {
         members
             .iter()
             .any(|older| newer.key() != older.key() && supersedes(catalog, newer, older))

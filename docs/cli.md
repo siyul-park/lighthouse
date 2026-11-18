@@ -172,6 +172,7 @@ Commands:
   update   Replace a project-local decision with a Decision document
   signals  List the session signals: what the hooks heard of design decisions
   signal   Settle the session signals
+  check    Check a decision against the decisions in force
   test     Run the examples of checked decisions through the whole engine
   eval     Measure a decision's check against its labels
   ask      Ask what a proposed edit would do: which decisions fire or clear
@@ -376,6 +377,44 @@ Examples:
   lighthouse decision signals
   lighthouse decision signals --all --limit 50 --format json
   lighthouse decision signal dismiss 3fa9c1e --reason 'a request, not a rule'
+```
+
+## `lighthouse decision check`
+
+```text
+Check a decision against the decisions in force.
+
+FILE is a Decision document, `-` for stdin, or the id of a decision of the catalog (a name that is both a file and an id is refused; the tool takes the document only). A document is laid over the project's decisions in memory and never written. Order decisions are held to each other on every shape of up to two declarations: a contradiction is shown with the code that proves it (`contradicts`, basis `proven`); where the search finds none it says what it covered (`bounded`), never that the decisions are consistent. `likelyImpliedBy` lists the decisions that report on at least 90% of the subjects this one reports on, when it has at least 20, over a run of the project with it enabled: empirical, a lead and not a finding. `implied` is always empty: proven implication is not computed yet. The verdict is `contradicts`, `incomplete`, `interferes` or `independent`, with the weakest basis behind it. Exits 0 independent or interferes, 1 a contradiction no decision settles, 2 a usage error, 3 an analysis involving this decision that did not finish.
+
+It costs one check of the whole project (the run behind `likelyImpliedBy`, kept in the cache) and the decision's examples; a run of the project that did not finish is told in `incomplete` and does not change the exit code. The tool takes a document only: for a decision of the catalog, pass its document (`decision_show` has it).
+
+Usage: lighthouse decision check [OPTIONS] <FILE|->
+
+Arguments:
+  <FILE|->
+          A `Decision` document, as YAML or JSON. On the command line this is a file, or `-` for stdin; the tool takes the text or the object. `metadata.name` is the id (`local/<name>`); `spec.examples` needs at least one valid and one invalid example per language the project runs
+
+Options:
+      --detail <DETAIL>
+          Full adds the arrangements of an order contradiction's witness: each order of the declarations and who flags it
+
+          Possible values:
+          - compact: Grouped by decision, a decision's text said once
+          - full:    One self-contained record per item
+          
+          [default: compact]
+
+      --format <FORMAT>
+          `text` for people, `json` for programs (its schema: `lighthouse schema`)
+
+          Possible values:
+          - text: The human form
+          - json: One JSON document on one line
+          
+          [default: text]
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```
 
 ## `lighthouse decision test`

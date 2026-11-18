@@ -5,6 +5,7 @@ use std::{
     fmt::Write,
     fs,
     io::{Read, stdin},
+    path::Path,
 };
 
 use lighthouse_model::Attribution;
@@ -13,6 +14,7 @@ use lighthouse_session::{
     Authored, CheckRequest, Checked, DecisionRow, DecisionTest, Fixing, Session, TestTimings,
     active_decisions,
     ask::{self, Answer, Delta, WhatIf},
+    consistency::{self, DecisionCheck, Target},
     create_decision, decision_rows, explain,
     model::{self, EvalReport, EvalRequest, Side},
     replace_decision,
@@ -27,7 +29,7 @@ use crate::surface::{
     Result,
     args::{
         DecisionAskArgs, DecisionEvalArgs, DecisionListArgs, DecisionShowArgs, DecisionSignalsArgs,
-        DecisionTestArgs, SignalDismissArgs,
+        DecisionTestArgs, Detail, SignalDismissArgs,
     },
     list::{Page, omitted_line, page},
     reply::{Context, FOUND, Format, Reply},
@@ -266,6 +268,41 @@ pub fn ask(ctx: &Context, args: &DecisionAskArgs, format: Format) -> Result<Repl
     Ok(Reply::data(format, &answer, || answered(&answer))?.with_code(code))
 }
 
+/// What `decision check` checks: a document from a file or stdin (`-`), or a
+/// decision of the catalog by its id. A name that is both is refused.
+pub fn target(ctx: &Context, source: &str) -> Result<Target> {
+    if source == "-" {
+        return document(&read_document(source)?);
+    }
+    let file = Path::new(source).is_file();
+    let known = ctx.session()?.catalog.decision(source).is_some();
+    match (file, known) {
+        (true, true) => Err(format!(
+            "`{source}` is both a file and a decision of the catalog: rename the file, or write `./{source}`"
+        )
+        .into()),
+        (true, false) => document(&read_document(source)?),
+        (false, true) => Ok(Target::Id(source.to_owned())),
+        (false, false) => {
+            Err(format!("`{source}` is neither a file nor a decision of the catalog").into())
+        }
+    }
+}
+
+/// The document of `text`, YAML or JSON.
+pub fn document(text: &str) -> Result<Target> {
+    serde_norway::from_str(text)
+        .map(Target::Document)
+        .map_err(|e| format!("the document is not valid YAML or JSON: {e}").into())
+}
+
+/// `decision check`.
+pub fn check(ctx: &Context, target: Target, detail: Detail, format: Format) -> Result<Reply> {
+    let checked = consistency::check_decision(&ctx.session()?, target, detail.into())?;
+    let code = checked.code();
+    Ok(Reply::data(format, &checked, || checked_text(&checked))?.with_code(code))
+}
+
 /// `decision test`.
 pub fn test(ctx: &Context, args: &DecisionTestArgs, format: Format) -> Result<Reply> {
     let session = ctx.session()?;
@@ -324,6 +361,75 @@ pub fn eval(ctx: &Context, args: &DecisionEvalArgs, format: Format) -> Result<Re
         audit: args.audit,
     })?;
     Reply::data(format, &report, || eval_text(&report))
+}
+
+/// The lines of a check, worst first.
+fn checked_text(checked: &DecisionCheck) -> String {
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "{}: {:?} ({:?} basis); tier {} ({})",
+        checked.decision, checked.verdict, checked.basis, checked.tier, checked.tier_reason
+    );
+    for c in &checked.contradicts {
+        let shape = c.witness["shape"].as_str().unwrap_or("some declarations");
+        let _ = write!(
+            out,
+            "contradicts [{}] with {}: on code shaped like {shape}, no order satisfies them",
+            c.language,
+            c.with.join(", ")
+        );
+        if let Some(by) = &c.resolved_by {
+            let _ = write!(out, "; settled, {by} supersedes another");
+        }
+        out.push('\n');
+        for arrangement in c.witness["arrangements"].as_array().into_iter().flatten() {
+            let _ = writeln!(out, "  {} <- {}", arrangement["order"], arrangement["by"]);
+        }
+    }
+    for likely in &checked.likely_implied_by {
+        let _ = writeln!(
+            out,
+            "likely implied by {} [{}]: {}% of {} subjects (empirical)",
+            likely.by, likely.language, likely.cofire, likely.subjects
+        );
+    }
+    for i in &checked.interferes {
+        let how = if i.introduced {
+            "its fix introduces"
+        } else {
+            "it also breaks"
+        };
+        let _ = writeln!(
+            out,
+            "interferes [{}] example {}: {how} {} at {} ({})",
+            i.language,
+            i.example,
+            i.with,
+            i.places.join(", "),
+            i.message
+        );
+    }
+    for line in &checked.incomplete {
+        let _ = writeln!(out, "incomplete: {line}");
+    }
+    for scope in &checked.bounded {
+        let _ = writeln!(
+            out,
+            "bounded [{}]: no other contradiction among shapes of up to {} declarations (alphabet {}, renderer {})",
+            scope.language, scope.declarations, scope.alphabet, scope.renderer
+        );
+    }
+    if !checked.independent_of.is_empty() {
+        let _ = writeln!(out, "independent of: {}", checked.independent_of.join(", "));
+    }
+    for gap in &checked.gaps {
+        let _ = writeln!(
+            out,
+            "gap: {gap} bears on it and no formal analysis decides it"
+        );
+    }
+    out
 }
 
 /// How many of the listed decisions are in each tier.
