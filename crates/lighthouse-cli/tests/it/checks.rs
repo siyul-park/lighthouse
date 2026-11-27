@@ -345,3 +345,44 @@ fn a_fact_of_a_file_its_provider_does_not_state_is_an_error_naming_the_file_and_
     assert_eq!(code, 3, "{report}");
     assert!(report.contains("`a.txt` has no `edition` fact"), "{report}");
 }
+
+/// What a program prints on stderr (`printf`'s format) and the code it exits
+/// with, as a check that reads its findings from stderr.
+fn on_stderr(printed: &str, code: i32) -> (i32, String) {
+    let script = format!("printf '{printed}' >&2; exit {code}");
+    checked_at(
+        "project",
+        &format!("    command: [sh, -c, {script:?}]\n    stream: stderr\n    files: [\"a.txt\"]\n"),
+    )
+}
+
+#[test]
+fn a_program_on_stderr_has_the_lines_that_place_themselves_as_findings_and_the_rest_is_chatter() {
+    let (code, report) = on_stderr(
+        "# pkg\\na.txt:3:\\tx: call was not inlined\\nSee /tmp/x.log for full output.\\n",
+        1,
+    );
+
+    assert_eq!(code, 1, "{report}");
+    assert_eq!(report.matches("local/probe").count(), 1, "{report}");
+    assert!(
+        report.contains("a.txt:3:1: error local/probe: x: call was not inlined"),
+        "{report}"
+    );
+}
+
+#[test]
+fn a_program_on_stderr_that_places_nothing_and_fails_is_incomplete_not_a_finding() {
+    let (code, report) = on_stderr("Error: cannot load packages\\n", 1);
+
+    assert_eq!(code, 3, "{report}");
+    assert!(report.contains("printed no finding on stderr"), "{report}");
+    assert!(report.contains("cannot load packages"), "{report}");
+}
+
+#[test]
+fn a_program_on_stderr_that_prints_only_chatter_and_succeeds_is_clean() {
+    let (code, report) = on_stderr("# pkg\\n", 0);
+
+    assert_eq!(code, 0, "{report}");
+}

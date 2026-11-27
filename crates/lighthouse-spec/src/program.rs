@@ -28,7 +28,7 @@ const RETIRED: [&str; 3] = ["rule", "path", "root"];
 
 /// The keys a program table may have, for the loaders that read it beside
 /// others.
-pub(crate) const FIELDS: [&str; 12] = [
+pub(crate) const FIELDS: [&str; 13] = [
     "command",
     "batch",
     "env",
@@ -36,6 +36,7 @@ pub(crate) const FIELDS: [&str; 12] = [
     "stdin",
     "cwd",
     "output",
+    "stream",
     "success",
     "independent",
     "follows",
@@ -162,6 +163,12 @@ pub struct Program {
     /// check, `files` for a fix, `status` for a `[fix] verify` program.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<Output>,
+    /// Which stream holds the program's findings: `stdout`, or `stderr`, where
+    /// `go vet` and `gcassert` print theirs. Only with `output: lines` at a
+    /// check. Under `stderr`, a line that places itself in a file of the
+    /// project is a finding and any other line is the program's chatter.
+    #[serde(default, skip_serializing_if = "Stream::is_stdout")]
+    pub stream: Stream,
     /// The exit codes that mean the program ran; any other code, a signal or
     /// a timeout is an error. Default: `[0, 1]` for `lines` and `sarif`
     /// (linters exit 1 with findings), `[0]` otherwise.
@@ -205,6 +212,7 @@ impl Program {
             stdin: Stdin::None,
             cwd: Cwd::Root,
             output: None,
+            stream: Stream::Stdout,
             success: None,
             independent: false,
             follows: false,
@@ -356,6 +364,9 @@ impl Program {
         if self.independent && self.follows {
             return Some("`independent` and `follows` exclude each other".to_owned());
         }
+        if self.stream == Stream::Stderr && (point != Point::Check || output != Output::Lines) {
+            return Some("`stream: stderr` needs `output: lines` in a check".to_owned());
+        }
         if self.sarif.is_some() && output != Output::Sarif {
             return Some("`sarif` needs `output: sarif`".to_owned());
         }
@@ -454,6 +465,23 @@ pub enum Cwd {
 impl Cwd {
     fn is_root(&self) -> bool {
         *self == Self::Root
+    }
+}
+
+/// Which stream of a program holds its findings.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Stream {
+    /// Standard output.
+    #[default]
+    Stdout,
+    /// Standard error.
+    Stderr,
+}
+
+impl Stream {
+    fn is_stdout(&self) -> bool {
+        *self == Self::Stdout
     }
 }
 

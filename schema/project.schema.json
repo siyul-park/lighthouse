@@ -954,6 +954,21 @@
         }
       ]
     },
+    "Stream": {
+      "description": "Which stream of a program holds its findings.",
+      "oneOf": [
+        {
+          "const": "stdout",
+          "description": "Standard output.",
+          "type": "string"
+        },
+        {
+          "const": "stderr",
+          "description": "Standard error.",
+          "type": "string"
+        }
+      ]
+    },
     "Surface": {
       "description": "Whether the agent hears about the signals.",
       "oneOf": [
@@ -1077,6 +1092,10 @@
         "stdin": {
           "$ref": "#/$defs/Stdin",
           "description": "What it reads on stdin: nothing, or the text of `{file}`."
+        },
+        "stream": {
+          "$ref": "#/$defs/Stream",
+          "description": "Which stream holds the program's findings: `stdout`, or `stderr`, where\n`go vet` and `gcassert` print theirs. Only with `output: lines` at a\ncheck. Under `stderr`, a line that places itself in a file of the\nproject is a finding and any other line is the program's chatter."
         },
         "success": {
           "description": "The exit codes that mean the program ran; any other code, a signal or\na timeout is an error. Default: `[0, 1]` for `lines` and `sarif`\n(linters exit 1 with findings), `[0]` otherwise.",

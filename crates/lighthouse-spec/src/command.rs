@@ -11,7 +11,9 @@ use crate::{DecisionSpec, Point, Program, Programs, glob_set};
 /// exit `0` ran and found nothing and `1` ran and printed findings, one per
 /// line, anything else (a signal, a timeout, a code outside `success`) is an
 /// error that leaves the analysis incomplete, never clean. stderr is for
-/// people. It runs without a shell in the project root, read-only by
+/// people, unless `stream: stderr` says the findings are on it (`go vet`):
+/// only the lines that place themselves in a file of the project are findings
+/// then. It runs without a shell in the project root, read-only by
 /// contract. `{file}` runs it once per file, `{files}` over as many files as
 /// the argument list allows, neither once over the project.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

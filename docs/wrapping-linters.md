@@ -57,6 +57,13 @@ spec:
   different findings. The tool's `partialFingerprints` are not used: most hash the line text, which moves more
   often than a symbol does.
 
+## A tool without SARIF
+
+A tool that prints `path:line[:col]: message` on stderr, as `go vet` does, is wrapped with `output: lines` and
+`stream: stderr`: `command: [go, vet, ./...]`. A line that places itself in a project file is a finding; the
+rest (`# pkg` headers) is ignored, and an exit code other than `0` with no such line leaves the analysis
+incomplete.
+
 ## Verified against the tools' documentation
 
 - golangci-lint v2 writes SARIF with `--output.sarif.path=stdout` (or a file path), v1 with `--out-format sarif`

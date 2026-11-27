@@ -253,7 +253,7 @@
       "type": "object"
     },
     "CommandCheck": {
-      "description": "An external program that checks files, by the process contract. Its\n`output` says what it prints (`lines`, `sarif` or `status`); with `lines`,\nexit `0` ran and found nothing and `1` ran and printed findings, one per\nline, anything else (a signal, a timeout, a code outside `success`) is an\nerror that leaves the analysis incomplete, never clean. stderr is for\npeople. It runs without a shell in the project root, read-only by\ncontract. `{file}` runs it once per file, `{files}` over as many files as\nthe argument list allows, neither once over the project.",
+      "description": "An external program that checks files, by the process contract. Its\n`output` says what it prints (`lines`, `sarif` or `status`); with `lines`,\nexit `0` ran and found nothing and `1` ran and printed findings, one per\nline, anything else (a signal, a timeout, a code outside `success`) is an\nerror that leaves the analysis incomplete, never clean. stderr is for\npeople, unless `stream: stderr` says the findings are on it (`go vet`):\nonly the lines that place themselves in a file of the project are findings\nthen. It runs without a shell in the project root, read-only by\ncontract. `{file}` runs it once per file, `{files}` over as many files as\nthe argument list allows, neither once over the project.",
       "properties": {
         "batch": {
           "description": "The command that tells many files at once, for a check whose `command`\ntakes the text of one file on stdin (`stdin: file`): a run over `{files}`\nthat names the files it finds something in. A bundled check uses it\nfor the files of a run that have no stored findings, and `command` for\nthe one file an edit changed. Only bundled, and only with `independent`\nfindings. What it names outside the files it was given is left out, and a\nfile it names is run alone with `command`: only the files it does not\nname are answered from it.",
@@ -332,6 +332,10 @@
         "stdin": {
           "$ref": "#/$defs/Stdin",
           "description": "What it reads on stdin: nothing, or the text of `{file}`."
+        },
+        "stream": {
+          "$ref": "#/$defs/Stream",
+          "description": "Which stream holds the program's findings: `stdout`, or `stderr`, where\n`go vet` and `gcassert` print theirs. Only with `output: lines` at a\ncheck. Under `stderr`, a line that places itself in a file of the\nproject is a finding and any other line is the program's chatter."
         },
         "success": {
           "description": "The exit codes that mean the program ran; any other code, a signal or\na timeout is an error. Default: `[0, 1]` for `lines` and `sarif`\n(linters exit 1 with findings), `[0]` otherwise.",
@@ -438,6 +442,10 @@
         "stdin": {
           "$ref": "#/$defs/Stdin",
           "description": "What it reads on stdin: nothing, or the text of `{file}`."
+        },
+        "stream": {
+          "$ref": "#/$defs/Stream",
+          "description": "Which stream holds the program's findings: `stdout`, or `stderr`, where\n`go vet` and `gcassert` print theirs. Only with `output: lines` at a\ncheck. Under `stderr`, a line that places itself in a file of the\nproject is a finding and any other line is the program's chatter."
         },
         "success": {
           "description": "The exit codes that mean the program ran; any other code, a signal or\na timeout is an error. Default: `[0, 1]` for `lines` and `sarif`\n(linters exit 1 with findings), `[0]` otherwise.",
@@ -1304,6 +1312,21 @@
         }
       ]
     },
+    "Stream": {
+      "description": "Which stream of a program holds its findings.",
+      "oneOf": [
+        {
+          "const": "stdout",
+          "description": "Standard output.",
+          "type": "string"
+        },
+        {
+          "const": "stderr",
+          "description": "Standard error.",
+          "type": "string"
+        }
+      ]
+    },
     "Subject": {
       "description": "What a decision talks about. Mapping to the run scope of a rule is\n`Subject::run_scope`.",
       "oneOf": [
@@ -1489,6 +1512,10 @@
         "stdin": {
           "$ref": "#/$defs/Stdin",
           "description": "What it reads on stdin: nothing, or the text of `{file}`."
+        },
+        "stream": {
+          "$ref": "#/$defs/Stream",
+          "description": "Which stream holds the program's findings: `stdout`, or `stderr`, where\n`go vet` and `gcassert` print theirs. Only with `output: lines` at a\ncheck. Under `stderr`, a line that places itself in a file of the\nproject is a finding and any other line is the program's chatter."
         },
         "success": {
           "description": "The exit codes that mean the program ran; any other code, a signal or\na timeout is an error. Default: `[0, 1]` for `lines` and `sarif`\n(linters exit 1 with findings), `[0]` otherwise.",

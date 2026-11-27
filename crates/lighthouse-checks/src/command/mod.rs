@@ -4,8 +4,11 @@
 //! (one finding per line), `sarif` (a SARIF log) or `status` (one finding
 //! when the exit code is not in `success`). A code outside `success`, a
 //! signal, a timeout or a program that cannot start is an error that leaves
-//! the analysis incomplete, never clean; stderr is for people and only ever
-//! explains an error.
+//! the analysis incomplete, never clean. stderr is for people and only ever
+//! explains an error, unless the program says `stream: stderr` (`go vet`,
+//! `gcassert`): its `lines` are then read from stderr, where only a line that
+//! places itself in a file of the project is a finding and the rest is the
+//! program's chatter.
 
 mod batch;
 pub mod sarif;
@@ -22,7 +25,7 @@ use lighthouse_plugin::{Context, Error as PluginError, PATHS, RuleManifest};
 use lighthouse_process::{Environment, Home, Job, Ran, context, copy_project, expand};
 use lighthouse_protocol::hash::Hasher;
 use lighthouse_spec::{
-    Batching, Cwd, GlobSet, Output, Point, Program, Programs, Stdin, file_fact, glob_set,
+    Batching, Cwd, GlobSet, Output, Point, Program, Programs, Stdin, Stream, file_fact, glob_set,
 };
 use serde_json::{Map, Value, json};
 use tempfile::TempDir;
@@ -241,13 +244,18 @@ struct Printed {
     stdout: String,
     /// The start of stderr, which explains a failure.
     stderr: String,
+    /// All of stderr, for a program whose findings are on it.
+    errors: Option<String>,
     code: i32,
 }
 
 impl Printed {
-    /// The non-blank lines of stdout.
+    /// The non-blank lines of the stream that holds the findings: stdout, or
+    /// all of stderr.
     fn lines(&self) -> Vec<String> {
-        self.stdout
+        self.errors
+            .as_deref()
+            .unwrap_or(&self.stdout)
             .lines()
             .map(str::trim_end)
             .filter(|l| !l.trim().is_empty())
@@ -424,8 +432,11 @@ impl Invocation<'_> {
                 "printed more than the output cap, so its findings are not all here".to_owned(),
             ));
         }
+        let errors = (program.stream == Stream::Stderr)
+            .then(|| String::from_utf8_lossy(&ran.stderr).into_owned());
         Ok(Printed {
             code,
+            errors,
             stderr: stderr_of(&ran),
             stdout: String::from_utf8(ran.stdout)
                 .map_err(|_| incomplete("printed output that is not UTF-8".to_owned()))?,
@@ -441,15 +452,7 @@ impl Invocation<'_> {
         let program = &self.program;
         match program.output(Point::Check) {
             Output::Lines => {
-                let lines = printed.lines();
-                if lines.is_empty() && printed.code != 0 {
-                    return Err(PluginError::Incomplete(format!(
-                        "`{}` exited {} and reported nothing: {}",
-                        program.shown(),
-                        printed.code,
-                        printed.stderr
-                    )));
-                }
+                let lines = self.read_lines(printed, file)?;
                 Ok(self.findings(&lines, file))
             }
             Output::Status => Ok(self.failure(printed, file)),
@@ -472,6 +475,37 @@ impl Invocation<'_> {
         }
     }
 
+    /// The lines of what the program printed that are its findings: under
+    /// `stream: stderr` the ones that place themselves in a file; none, with
+    /// a code other than `0`, is an error.
+    fn read_lines(
+        &self,
+        printed: &Printed,
+        file: Option<&Path>,
+    ) -> Result<Vec<String>, PluginError> {
+        let mut lines = printed.lines();
+        if let Some(errors) = &printed.errors {
+            lines.retain(|line| self.places(line, file));
+            if lines.is_empty() && printed.code != 0 {
+                return Err(PluginError::Incomplete(format!(
+                    "`{}` exited {} and printed no finding on stderr: {}",
+                    self.program.shown(),
+                    printed.code,
+                    tail(errors)
+                )));
+            }
+        }
+        if lines.is_empty() && printed.code != 0 {
+            return Err(PluginError::Incomplete(format!(
+                "`{}` exited {} and reported nothing: {}",
+                self.program.shown(),
+                printed.code,
+                printed.stderr
+            )));
+        }
+        Ok(lines)
+    }
+
     /// The one finding of a `status` program whose code is not a success: the
     /// tail of what it printed is its message.
     fn failure(&self, printed: &Printed, file: Option<&Path>) -> Vec<Diagnostic> {
@@ -483,8 +517,7 @@ impl Invocation<'_> {
         } else {
             printed.stderr.trim()
         };
-        let skipped = said.chars().count().saturating_sub(STATUS_SHOWN);
-        let tail: String = said.chars().skip(skipped).collect();
+        let tail = tail(said);
         let message = format!(
             "`{}` exited {}{}{tail}",
             self.program.shown(),
@@ -499,6 +532,20 @@ impl Invocation<'_> {
         )
     }
 
+    /// Whether `line` places itself in a file of the project: by a leading
+    /// `path:line[:col]:`, or as only the path of one.
+    fn places(&self, line: &str, file: Option<&Path>) -> bool {
+        let from = self.relative_to(file);
+        self.located(line, from).is_some() || self.named(line, file, from).is_some()
+    }
+
+    /// The directory a relative path the program prints is relative to, when
+    /// it is not the root: under `cwd: file`, the file's.
+    fn relative_to<'f>(&self, file: Option<&'f Path>) -> Option<&'f Path> {
+        file.filter(|_| self.program.cwd == Cwd::File)
+            .and_then(Path::parent)
+    }
+
     /// One finding per line: a leading `path:line[:col]: ` of a file of the
     /// project places it; a line that is only the path of a file of the
     /// project places it at line 1 of that file, with the title of the
@@ -507,9 +554,7 @@ impl Invocation<'_> {
     fn findings(&self, lines: &[String], file: Option<&Path>) -> Vec<Diagnostic> {
         let mut named = BTreeSet::new();
         // Under `cwd: file` a relative path is the file's directory's.
-        let from = file
-            .filter(|_| self.program.cwd == Cwd::File)
-            .and_then(Path::parent);
+        let from = self.relative_to(file);
         lines
             .iter()
             .flat_map(|line| {
@@ -611,6 +656,12 @@ impl Invocation<'_> {
             });
         known(self.ctx.model, &relative).then_some(relative)
     }
+}
+
+/// The last `STATUS_SHOWN` characters of what a program said.
+fn tail(said: &str) -> String {
+    let skipped = said.chars().count().saturating_sub(STATUS_SHOWN);
+    said.chars().skip(skipped).collect()
 }
 
 /// The start of what the program said on stderr.

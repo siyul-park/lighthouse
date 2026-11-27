@@ -1,7 +1,9 @@
 //! The programs a decision binds per language: `core/format/formatted` gives
 //! one check and one fix for Go and another for Rust.
 
-use lighthouse_spec::{CheckKind, CommandCheck, CommandSpec, Decision, FixKind, Programs};
+use lighthouse_spec::{
+    CheckKind, CommandCheck, CommandSpec, Decision, FixKind, Point, Program, Programs, Stream,
+};
 
 fn formatted() -> &'static Decision {
     lighthouse_test_support::bundled()
@@ -61,4 +63,36 @@ fn all_lists_the_program_of_every_language() {
         .map(|program| program.command[0].clone())
         .collect();
     assert_eq!(names, ["gofmt", "ruff", "rustfmt", "prettier"]);
+}
+
+fn parsed(table: &str) -> Program {
+    let mut program: Program = serde_norway::from_str(table).unwrap();
+    program.command = vec!["go".to_owned()];
+    program
+}
+
+#[test]
+fn stream_stderr_is_refused_unless_a_check_reads_lines() {
+    let status = parsed("output: status\nstream: stderr\n");
+    let lines = parsed("output: lines\nstream: stderr\n");
+    let fix = parsed("output: files\nstream: stderr\n");
+
+    assert!(status.problem(Point::Check).unwrap().contains("stream"));
+    assert!(fix.problem(Point::Fix).unwrap().contains("stream"));
+    assert!(lines.problem(Point::Verify).unwrap().contains("stream"));
+    assert_eq!(lines.problem(Point::Check), None);
+}
+
+#[test]
+fn the_default_stream_is_stdout_and_is_not_written() {
+    let program = parsed("output: lines\n");
+
+    let written = serde_json::to_value(&program).unwrap();
+
+    assert_eq!(program.stream, Stream::Stdout);
+    assert!(written.get("stream").is_none(), "{written}");
+    assert_eq!(
+        serde_json::to_value(parsed("stream: stderr\n")).unwrap()["stream"],
+        "stderr"
+    );
 }

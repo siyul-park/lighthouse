@@ -59,7 +59,7 @@ pub use pack::{Pack, Section};
 pub(crate) use pack::{PackSpec, SectionSpec};
 pub use program::{
     Batching, Cwd, DEFAULT_TIMEOUT, LONG_TIMEOUT, Output, Point, Program, ProgramSpec, Programs,
-    Sandbox, Sarif, SarifColumns, Stdin, file_fact,
+    Sandbox, Sarif, SarifColumns, Stdin, Stream, file_fact,
 };
 pub use project::{
     BUNDLED, CommandProtocol, Config, Entry, EnvironmentRule, EnvironmentSpec, Evaluation,
