@@ -2,4 +2,143 @@
 
 # Go Language Guide
 
-Go-specific analysis is supplied by the Go language provider; shared formatting and design decisions live in the common packs.
+Go-specific analysis is supplied by the Go language provider; shared formatting and design decisions live in the common packs. The decisions that wrap Go tools need them on `PATH`; a project without them has an incomplete analysis, never a clean one.
+
+## Compiler
+
+What the compiler decides is stated where the code is and held.
+
+| id | title | check | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`go/compiler-assertions`](#compiler-assertions-in-comments-hold) | Compiler assertions in comments hold | error · command |  |  |
+
+### Compiler assertions in comments hold
+
+`go/compiler-assertions` · project · error · command · go
+
+*A small function that must inline, or an index whose bounds check must go, is a decision of the compiler. A change that pushes the function past the inliner's budget or hides the bound compiles and passes every test, and shows up only as a benchmark regression. A `//gcassert:` directive states the intent where the code is, and gcassert checks it against what the compiler decided. The program is gcassert, found on `PATH` like lychee. gcassert prints one `path:line:` line for each assertion that does not hold on stderr, and its stdout is only a pointer to a log; Lighthouse reads stderr and keeps the lines that place themselves in a project file. A `//gcassert:inline` on a function is reported at each call site that was not inlined, with the line of the call.*
+
+Every `//gcassert:inline` and `//gcassert:bce` directive MUST hold.
+
+Consequences: Without gcassert on `PATH` the analysis of the project is incomplete, never clean, and so is a run where gcassert exits non-zero without reporting a line of the project (a module that does not compile, or whose only package is `main`: `go build` then writes the binary into the project, which the sandbox forbids). The whole module is compiled on every run, not one file; a finding is kept for as long as the project's files are as they were. A node that spans several lines keeps only its first line in the message. `//gcassert:noescape` is accepted but never reported on Go 1.25 and later: gcassert 0.0.0-20260313214104 matches the compiler's `escapes to heap:` and Go 1.25 prints `escapes to heap in <function>:`, so a variable that escapes is not found; hence the requirement names `inline` and `bce` only.
+
+Derived from: gcassert: https://github.com/jordanlewis/gcassert (examples verified with v0.0.0-20260313214104-ad3fae17affe on Go 1.26.4; `//gcassert:inline`, `//gcassert:bce`); Go compiler optimizations, bounds check elimination: https://go.dev/src/cmd/compile/internal/ssa/README
+
+```go invalid example.go
+package example
+
+// Sum returns the sum of xs.
+//
+//gcassert:inline
+//go:noinline
+func Sum(xs []int) int {
+	n := 0
+	for _, x := range xs {
+		n += x
+	}
+	return n
+}
+
+// Total returns the sum of 1 and 2.
+func Total() int { return Sum([]int{1, 2}) }
+```
+
+```go valid example.go
+package example
+
+// Add returns a+b.
+//
+//gcassert:inline
+func Add(a, b int) int { return a + b }
+
+// Sum adds the elements of xs.
+func Sum(xs []int) int {
+	n := 0
+	for i := range xs {
+		//gcassert:bce
+		n += xs[i]
+	}
+	return n
+}
+
+// Total adds 1 and 2 to the elements of xs.
+func Total(xs []int) int { return Add(1, 2) + Sum(xs) }
+```
+
+## Modules
+
+The module files say what the code imports.
+
+| id | title | check | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`go/mod-tidy`](#gomod-and-gosum-are-tidy) | go.mod and go.sum are tidy | error · command | unsafe |  |
+
+### go.mod and go.sum are tidy
+
+`go/mod-tidy` · file · error · command · fix: unsafe
+
+*A requirement nobody imports, a missing one, or a go.sum that lacks a checksum builds on one machine and fails on the next. `go mod tidy` is the one tool that says what go.mod and go.sum hold for the packages the module imports, and `-diff` prints what it would change without writing. The check runs once for each go.mod, in its directory, so a repository with several modules is judged module by module. It changes nothing: with `-diff` the files stay as they are, and the exit status is non-zero when they differ.*
+
+go.mod and go.sum MUST equal what `go mod tidy` writes.
+
+Consequences: `-diff` needs Go 1.23 or later. The check reads the exit status alone (`output: status`), so every failure of the tool reads as a finding: an older Go, a missing module cache, no network for a module that is not cached. The fix adds the requirements the code imports at their latest versions, so it is `unsafe`; review its diff. Without Go on `PATH` the analysis is incomplete, never clean.
+
+Derived from: go mod tidy: https://go.dev/ref/mod#go-mod-tidy (`-diff` since Go 1.23; examples verified with Go 1.26.4); Go FAQ, keeping go.mod tidy: https://go.dev/doc/modules/managing-dependencies#tidy
+
+```diff
+--- a/go.mod
++++ b/go.mod
+@@ -4,2 +3,0 @@
+-
+-require example.com/unused v1.0.0
+```
+
+## Build
+
+Code builds on every platform the project supports.
+
+| id | title | check | fix | requirement |
+| --- | --- | --- | --- | --- |
+| [`go/cross-build`](#packages-and-tests-compile-on-every-listed-platform) | Packages and tests compile on every listed platform | error · command |  |  |
+
+### Packages and tests compile on every listed platform
+
+`go/cross-build` · project · error · command · go
+
+*A file named `_linux.go` or `_windows.go`, or a `//go:build` line, is compiled on some platforms only, so a change builds and tests on the developer's machine and breaks on another. Cross-compiling needs no other machine: the Go toolchain builds for a target from any host when the `GOOS` and `GOARCH` environment names it, so one run per listed platform finds what each platform's build would. The program is `go test` with `-exec=true` and `-run=^$`: it compiles each package and its test binary for the target, `-exec=true` runs nothing foreign, and `-run=^$` matches no test on the host. `go vet` is turned off (`-vet=off`) because its findings are those of the checks of the project, not of the platform. A package without tests is compiled too. The platforms are the option `platforms`; with none the decision has nothing to run and is clean.*
+
+Packages and their tests MUST compile for every platform the project lists.
+
+Consequences: The whole module is compiled once for each platform on every run. A finding starts with the platform (`GOARCH=arm64 GOOS=linux: `). Without Go on `PATH` the analysis is incomplete, never clean, and so is a run where `go test` fails without naming a line of the project (a module that cannot be loaded). Code that needs cgo for a target needs that target's C toolchain; set `CGO_ENABLED=0` in the platform's entry to leave it out.
+
+Derived from: Go, build constraints: https://pkg.go.dev/cmd/go#hdr-Build_constraints; go test: https://pkg.go.dev/cmd/go#hdr-Test_packages (`-exec`, `-vet=off`, `-run`; examples verified with Go 1.26.4); Go, environment variables `GOOS` and `GOARCH`: https://go.dev/doc/install/source#environment
+
+| option | default | meaning |
+| --- | --- | --- |
+| `platforms` | `[]` | The platforms to compile for, each an object of environment variables for `go` (`GOOS`, `GOARCH`, `CGO_ENABLED`), for example `{ GOOS: linux, GOARCH: arm64 }`. With none the decision runs nothing. |
+
+```go invalid lib_darwin.go
+package example
+
+func platform() string { return "darwin" }
+```
+
+```go invalid lib_linux.go
+package example
+
+func platform() string { return other() }
+```
+
+```go valid lib_unix.go
+//go:build !windows
+
+package example
+
+func platform() string { return "unix" }
+```
+
+```go valid lib_windows.go
+package example
+
+func platform() string { return "windows" }
+```

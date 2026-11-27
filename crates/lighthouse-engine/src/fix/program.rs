@@ -137,7 +137,8 @@ pub(super) fn run(
     )
     .map_err(fail)?;
     let policy = program.policy(&workspace.sandbox);
-    let mut profile = policy.profile(&workspace.root, dir);
+    // A fix that builds (`go mod tidy`) keeps what it builds where a check does.
+    let mut profile = policy.profile(&workspace.root, dir).caching();
     profile.writes.extend(writable.map(Path::to_owned));
     let stdin = match program.stdin {
         Stdin::None => &[][..],

@@ -2,7 +2,7 @@
 source: crates/lighthouse-checks/tests/it/tiers.rs
 expression: report
 ---
-95 decisions: F 12, O 4, T 79
+98 decisions: F 12, O 4, T 82
 
 core/allow-reason	T	outside-fragment:index
 core/decision-naming	T	outside-fragment:concatenation
@@ -73,6 +73,9 @@ design/stateless-layout	T	model
 design/task-shutdown	T	model
 design/top-down-order	O	fix:move
 design/vertical-distance	O	fix:move
+go/compiler-assertions	T	command
+go/cross-build	T	command
+go/mod-tidy	T	command
 markdown/gfm	T	command
 markdown/links	T	command
 testing/behavior-cases	T	model

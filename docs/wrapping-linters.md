@@ -1,9 +1,9 @@
 # Wrapping a linter
 
 A linter that writes SARIF 2.1.0 is wrapped, not rewritten: a `command` check names the program with
-`output: sarif`, and Lighthouse turns each result into a finding. No bundled decision wraps a tool, because the
-tools are installed by the user; the decision lives in the project (`.lighthouse/decisions`), and the project
-must trust commands (`lighthouse trust`; see [architecture](architecture.md#rules)). The command is a program like
+`output: sarif`, and Lighthouse turns each result into a finding. The bundled decisions that wrap a tool (`go/compiler-assertions`,
+`markdown/links`) do not install it: a missing tool leaves the analysis incomplete. A linter of your own is a
+decision of the project (`.lighthouse/decisions`), and the project must trust commands (`lighthouse trust`; see [architecture](architecture.md#rules)). The command is a program like
 every other ([programs](programs.md)): this page is only what is particular to SARIF.
 
 ```yaml

@@ -6,5 +6,22 @@ metadata:
 spec:
   title: Go Language Guide
   intro: Go-specific analysis is supplied by the Go language provider; shared formatting
-    and design decisions live in the common packs.
-  sections: []
+    and design decisions live in the common packs. The decisions that wrap Go tools
+    need them on `PATH`; a project without them has an incomplete analysis, never
+    a clean one.
+  sections:
+  - name: compiler
+    title: Compiler
+    intro: What the compiler decides is stated where the code is and held.
+    decisions:
+    - compiler-assertions
+  - name: modules
+    title: Modules
+    intro: The module files say what the code imports.
+    decisions:
+    - mod-tidy
+  - name: build
+    title: Build
+    intro: Code builds on every platform the project supports.
+    decisions:
+    - cross-build

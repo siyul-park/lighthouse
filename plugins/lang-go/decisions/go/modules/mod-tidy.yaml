@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: go/mod-tidy
+  uid: 3cad06ab-4999-4ce8-8882-05995ec33ac3
+spec:
+  title: go.mod and go.sum are tidy
+  context: >-
+    A requirement nobody imports, a missing one, or a go.sum that lacks a
+    checksum builds on one machine and fails on the next. `go mod tidy` is
+    the one tool that says what go.mod and go.sum hold for the packages the
+    module imports, and `-diff` prints what it would change without writing.
+
+    The check runs once for each go.mod, in its directory, so a repository
+    with several modules is judged module by module. It changes nothing: with
+    `-diff` the files stay as they are, and the exit status is non-zero when
+    they differ.
+  scope:
+    subject: file
+    generated: false
+    tests: include
+    examples: exclude
+  requirement: go.mod and go.sum MUST equal what `go mod tidy` writes.
+  consequences: >-
+    `-diff` needs Go 1.23 or later. The check reads the exit status alone
+    (`output: status`), so every failure of the tool reads as a finding: an
+    older Go, a missing module cache, no network for a module that is not
+    cached. The fix adds the requirements the code imports at their latest
+    versions, so it is `unsafe`; review its diff. Without Go on `PATH` the
+    analysis is incomplete, never clean.
+  severity: error
+  check:
+    type: command
+    files: ["**/go.mod"]
+    command: [go, mod, tidy, -diff, -modfile, "{file}"]
+    cwd: file
+    output: status
+    success: [0]
+  fix:
+    type: command
+    safety: unsafe
+    command: [go, mod, tidy, -modfile, "{file}"]
+    cwd: file
+    output: files
+  provenance:
+    wasDerivedFrom:
+      - 'go mod tidy: https://go.dev/ref/mod#go-mod-tidy (`-diff` since Go 1.23; examples verified with Go 1.26.4)'
+      - 'Go FAQ, keeping go.mod tidy: https://go.dev/doc/modules/managing-dependencies#tidy'
+  examples:
+    - name: unused requirement
+      language: go
+      kind: invalid
+      files:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+
+            require example.com/unused v1.0.0
+        - path: main.go
+          body: |
+            package main
+
+            func main() {}
+      expect:
+        - line: 1
+      fixed:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+    - name: tidy module
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: main.go
+          body: |
+            package main
+
+            func main() {}

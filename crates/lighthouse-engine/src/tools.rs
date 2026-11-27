@@ -246,7 +246,10 @@ fn identity_of(path: &Path) -> Option<String> {
 /// The version of the toolchain a program without a version flag belongs to.
 fn companion(tool: &str) -> Result<String, String> {
     match tool {
-        "gofmt" => which("go").map_or(Ok(String::new()), |go| probe(&go, &["version"])),
+        // gcassert reports what the compiler of `go` decides.
+        "go" | "gofmt" | "gcassert" => {
+            which("go").map_or(Ok(String::new()), |go| probe(&go, &["version"]))
+        }
         _ => Ok(String::new()),
     }
 }

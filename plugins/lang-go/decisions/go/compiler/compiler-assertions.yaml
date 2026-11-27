@@ -1,0 +1,132 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: go/compiler-assertions
+  uid: 20328c51-38cc-4b67-99b0-fc7b02c71f5c
+spec:
+  title: Compiler assertions in comments hold
+  context: >-
+    A small function that must inline, or an index whose bounds check must
+    go, is a decision of the compiler. A change that pushes the function past
+    the inliner's budget or hides the bound compiles and passes every test,
+    and shows up only as a benchmark regression. A `//gcassert:` directive
+    states the intent where the code is, and gcassert checks it against what
+    the compiler decided.
+
+    The program is gcassert, found on `PATH` like lychee. gcassert prints one
+    `path:line:` line for each assertion that does not hold on stderr, and
+    its stdout is only a pointer to a log; Lighthouse reads stderr and keeps
+    the lines that place themselves in a project file. A `//gcassert:inline`
+    on a function is reported at each call site that was not inlined, with
+    the line of the call.
+  scope:
+    subject: project
+  requirement: >-
+    Every `//gcassert:inline` and `//gcassert:bce` directive MUST hold.
+  consequences: >-
+    Without gcassert on `PATH` the analysis of the project is incomplete, never
+    clean, and so is a run where gcassert exits non-zero without reporting a
+    line of the project (a module that does not compile, or whose only package
+    is `main`: `go build` then writes the binary into the project, which the
+    sandbox forbids). The whole module is
+    compiled on every run, not one file; a finding is kept for as long as the
+    project's files are as they were. A node that spans several lines keeps
+    only its first line in the message. `//gcassert:noescape` is accepted but
+    never reported on Go 1.25 and later: gcassert 0.0.0-20260313214104 matches
+    the compiler's `escapes to heap:` and Go 1.25 prints `escapes to heap in
+    <function>:`, so a variable that escapes is not found; hence the
+    requirement names `inline` and `bce` only.
+  severity: error
+  languages:
+    go: {}
+  check:
+    type: command
+    command: [gcassert, "./..."]
+    output: lines
+    stream: stderr
+  provenance:
+    wasDerivedFrom:
+      - 'gcassert: https://github.com/jordanlewis/gcassert (examples verified with v0.0.0-20260313214104-ad3fae17affe on Go 1.26.4; `//gcassert:inline`, `//gcassert:bce`)'
+      - 'Go compiler optimizations, bounds check elimination: https://go.dev/src/cmd/compile/internal/ssa/README'
+  examples:
+    - name: directives hold
+      language: go
+      kind: valid
+      canonical: true
+      files:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: example.go
+          body: |
+            package example
+
+            // Add returns a+b.
+            //
+            //gcassert:inline
+            func Add(a, b int) int { return a + b }
+
+            // Sum adds the elements of xs.
+            func Sum(xs []int) int {
+            	n := 0
+            	for i := range xs {
+            		//gcassert:bce
+            		n += xs[i]
+            	}
+            	return n
+            }
+
+            // Total adds 1 and 2 to the elements of xs.
+            func Total(xs []int) int { return Add(1, 2) + Sum(xs) }
+    - name: marked function does not inline
+      language: go
+      kind: invalid
+      files:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: example.go
+          body: |
+            package example
+
+            // Sum returns the sum of xs.
+            //
+            //gcassert:inline
+            //go:noinline
+            func Sum(xs []int) int {
+            	n := 0
+            	for _, x := range xs {
+            		n += x
+            	}
+            	return n
+            }
+
+            // Total returns the sum of 1 and 2.
+            func Total() int { return Sum([]int{1, 2}) }
+      expect:
+        - line: 16
+    - name: bounds check stays
+      language: go
+      kind: invalid
+      files:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: example.go
+          body: |
+            package example
+
+            // At returns xs[i].
+            func At(xs []int, i int) int {
+            	//gcassert:bce
+            	return xs[i]
+            }
+      expect:
+        - line: 6

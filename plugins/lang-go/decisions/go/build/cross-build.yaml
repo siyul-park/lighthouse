@@ -1,0 +1,130 @@
+# yaml-language-server: $schema=../../../schema/decision.schema.json
+apiVersion: lighthouse/v1alpha1
+kind: Decision
+metadata:
+  name: go/cross-build
+  uid: ec427333-02a0-4000-99df-6c81e67b79e4
+spec:
+  title: Packages and tests compile on every listed platform
+  context: >-
+    A file named `_linux.go` or `_windows.go`, or a `//go:build` line, is
+    compiled on some platforms only, so a change builds and tests on the
+    developer's machine and breaks on another. Cross-compiling needs no other
+    machine: the Go toolchain builds for a target from any host when the
+    `GOOS` and `GOARCH` environment names it, so one run per listed platform
+    finds what each platform's build would.
+
+    The program is `go test` with `-exec=true` and `-run=^$`: it compiles each
+    package and its test binary for the target, `-exec=true` runs nothing
+    foreign, and `-run=^$` matches no test on the host. `go vet` is turned off
+    (`-vet=off`) because its findings are those of the checks of the project,
+    not of the platform. A package without tests is compiled too. The platforms are
+    the option `platforms`; with none the decision has nothing to run and is
+    clean.
+  scope:
+    subject: project
+  requirement: >-
+    Packages and their tests MUST compile for every platform the project lists.
+  consequences: >-
+    The whole module is compiled once for each platform on every run. A finding
+    starts with the platform (`GOARCH=arm64 GOOS=linux: `). Without Go on
+    `PATH` the analysis is incomplete, never clean, and so is a run where
+    `go test` fails without naming a line of the project (a module that
+    cannot be loaded). Code that needs cgo for a target needs that target's C
+    toolchain; set `CGO_ENABLED=0` in the platform's entry to leave it out.
+  severity: error
+  languages:
+    go: {}
+  options:
+    properties:
+      platforms:
+        type: array
+        default: []
+        description: >-
+          The platforms to compile for, each an object of environment variables
+          for `go` (`GOOS`, `GOARCH`, `CGO_ENABLED`), for example
+          `{ GOOS: linux, GOARCH: arm64 }`. With none the decision runs nothing.
+        items:
+          type: object
+          properties:
+            GOOS:
+              type: string
+            GOARCH:
+              type: string
+            CGO_ENABLED:
+              type: string
+  check:
+    type: command
+    command: [go, test, -exec=true, -vet=off, "-run=^$", ./...]
+    matrix: platforms
+    output: lines
+    stream: stderr
+  provenance:
+    wasDerivedFrom:
+      - 'Go, build constraints: https://pkg.go.dev/cmd/go#hdr-Build_constraints'
+      - 'go test: https://pkg.go.dev/cmd/go#hdr-Test_packages (`-exec`, `-vet=off`, `-run`; examples verified with Go 1.26.4)'
+      - 'Go, environment variables `GOOS` and `GOARCH`: https://go.dev/doc/install/source#environment'
+  examples:
+    - name: compiles for the platforms
+      language: go
+      kind: valid
+      canonical: true
+      options:
+        platforms:
+          - { GOOS: linux, GOARCH: arm64 }
+          - { GOOS: windows, GOARCH: amd64 }
+      files:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: lib.go
+          body: |
+            package example
+
+            // Name is the name of the platform.
+            func Name() string { return platform() }
+        - path: lib_unix.go
+          body: |
+            //go:build !windows
+
+            package example
+
+            func platform() string { return "unix" }
+        - path: lib_windows.go
+          body: |
+            package example
+
+            func platform() string { return "windows" }
+    - name: breaks on one platform
+      language: go
+      kind: invalid
+      options:
+        platforms:
+          - { GOOS: linux, GOARCH: arm64 }
+      files:
+        - path: go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: lib.go
+          body: |
+            package example
+
+            // Name is the name of the platform.
+            func Name() string { return platform() }
+        - path: lib_darwin.go
+          body: |
+            package example
+
+            func platform() string { return "darwin" }
+        - path: lib_linux.go
+          body: |
+            package example
+
+            func platform() string { return other() }
+      expect:
+        - line: 3
+          message: undefined

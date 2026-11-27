@@ -471,7 +471,7 @@ fn every_checked_decision_passes_its_catalog_examples() {
         return;
     }
     let config = listed(&go_plugin().expect("checked above"));
-    let registry = lighthouse_test_support::pooled(lighthouse_test_support::registry, &config);
+    let registry = lighthouse_test_support::pooled(lighthouse_test_support::full_registry, &config);
     let failures = crate::support::tester(registry, lighthouse_test_support::full())
         .language("go")
         .trusted(true)
