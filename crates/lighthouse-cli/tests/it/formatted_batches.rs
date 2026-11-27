@@ -1,5 +1,5 @@
 //! `core/formatted` starts one formatter for the files of a run, and none when
-//! nothing changed: a stand-in `gofmt` logs each run it is given.
+//! nothing changed: a stand-in `goimports` logs each run it is given.
 
 use std::{
     env, fs,
@@ -14,9 +14,9 @@ use crate::{
     checks::{home, trust},
 };
 
-/// Lists the files that hold the word UNFORMATTED, as `gofmt -l` lists those
+/// Lists the files that hold the word UNFORMATTED, as `goimports -l` lists those
 /// it would change, and logs the arguments of each run.
-const GOFMT: &str = "#!/bin/sh\necho \"$*\" >> \"LOG\"\nfor f in \"$@\"; do\n  case $f in -*) continue ;; esac\n  grep -q UNFORMATTED \"$f\" && echo \"$f\"\ndone\nexit 0\n";
+const GOIMPORTS: &str = "#!/bin/sh\necho \"$*\" >> \"LOG\"\nfor f in \"$@\"; do\n  case $f in -*) continue ;; esac\n  grep -q UNFORMATTED \"$f\" && echo \"$f\"\ndone\nexit 0\n";
 
 /// A project, and, beside it, the stand-in and its log: the project's files
 /// are what a run is keyed on, and the log is not one of them.
@@ -54,14 +54,14 @@ fn project() -> Option<Project> {
         "package demo\n\n// C is c. UNFORMATTED\nfunc C() {}\n",
     );
     let tools = tempfile::tempdir().unwrap();
-    let log = tools.path().join("gofmt.log");
+    let log = tools.path().join("goimports.log");
     write(
         tools.path(),
-        "gofmt",
-        &GOFMT.replace("LOG", log.to_str().unwrap()),
+        "goimports",
+        &GOIMPORTS.replace("LOG", log.to_str().unwrap()),
     );
     fs::set_permissions(
-        tools.path().join("gofmt"),
+        tools.path().join("goimports"),
         fs::Permissions::from_mode(0o755),
     )
     .unwrap();

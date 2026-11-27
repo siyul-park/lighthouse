@@ -32,14 +32,14 @@ fn fix_programs() -> Programs {
 #[test]
 fn a_check_takes_the_program_of_the_language() {
     let programs = check_programs();
-    assert_eq!(programs.of("go").unwrap().command[0], "gofmt");
+    assert_eq!(programs.of("go").unwrap().command[0], "goimports");
     assert_eq!(programs.of("rust").unwrap().command[0], "rustfmt");
 }
 
 #[test]
 fn a_fix_takes_the_program_of_the_language() {
     let programs = fix_programs();
-    assert_eq!(programs.of("go").unwrap().command[0], "gofmt");
+    assert_eq!(programs.of("go").unwrap().command[0], "goimports");
     assert_eq!(programs.of("rust").unwrap().command[0], "rustfmt");
 }
 
@@ -62,7 +62,7 @@ fn all_lists_the_program_of_every_language() {
         .all()
         .map(|program| program.command[0].clone())
         .collect();
-    assert_eq!(names, ["gofmt", "ruff", "rustfmt", "prettier"]);
+    assert_eq!(names, ["goimports", "ruff", "rustfmt", "prettier"]);
 }
 
 fn parsed(table: &str) -> Program {

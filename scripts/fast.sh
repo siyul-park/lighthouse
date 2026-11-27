@@ -46,7 +46,7 @@ if [ -n "$python" ]; then
     step sh -c 'cd plugins/lang-python && ruff format --check . && ruff check . && python3 -I scripts/wire.py --check && python3 -I -m unittest discover -s tests -t .'
 fi
 
-step make -s plugins cli
+step make -s plugins cli tools
 step "$lighthouse" check . --allow-incomplete
 if [ -n "$all_decisions" ]; then
     step "$lighthouse" decision test

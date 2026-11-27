@@ -7,7 +7,11 @@ metadata:
 spec:
   title: Source files use their standard formatter
   context: Formatting is a repository convention, not a review topic. Each language
-    states its formatter's programs under `languages.<id>`. Go uses gofmt. Rust uses
+    states its formatter's programs under `languages.<id>`. Go uses goimports with
+    `-format-only`, which is gofmt's layout and the sorted, grouped import blocks of Go
+    Code Review Comments, without adding or removing an import; goimports is
+    found on `PATH` like Prettier, and without it the analysis of Go files is
+    incomplete, never clean. Rust uses
     rustfmt with the edition of the crate that contains the file, supplied by the
     Rust provider as the `edition` fact.
     TypeScript and JavaScript use Prettier, found on `PATH` like markdownlint-cli2
@@ -35,13 +39,15 @@ spec:
     go:
       check:
         command:
-        - gofmt
+        - goimports
         - "-l"
+        - "-format-only"
         - "{files}"
         independent: true
       fix:
         command:
-        - gofmt
+        - goimports
+        - "-format-only"
         stdin: file
         output: stdout
     rust:
@@ -115,6 +121,8 @@ spec:
     wasDerivedFrom:
     - Martin, Clean Code (2008), G24 Follow Standard Conventions
     - 'gofmt: https://pkg.go.dev/cmd/gofmt'
+    - 'goimports: https://pkg.go.dev/golang.org/x/tools/cmd/goimports (examples verified with golang.org/x/tools v0.53.0; `-l`, `-format-only`)'
+    - 'Go Code Review Comments, Imports: https://go.dev/wiki/CodeReviewComments#imports'
     - 'rustfmt: https://rust-lang.github.io/rustfmt/'
     - 'Prettier: https://prettier.io/docs/cli (examples verified with 3.9.10; `--list-different`, `--stdin-filepath`)'
     - 'ruff format: https://docs.astral.sh/ruff/formatter/ (examples verified with 0.17.3; `--check`, `--output-format concise`, `--stdin-filename`)'
@@ -142,6 +150,35 @@ spec:
 
         // Run is part of the example.
         func Run() int { return 1 }
+  - name: go-imports-unsorted
+    language: go
+    kind: invalid
+    files:
+    - path: example.go
+      body: |
+        package sample
+
+        import (
+        	"os"
+        	"fmt"
+        )
+
+        // Run is part of the example.
+        func Run() { fmt.Println(os.Args) }
+    expect:
+    - line: 1
+    fixed:
+    - path: example.go
+      body: |
+        package sample
+
+        import (
+        	"fmt"
+        	"os"
+        )
+
+        // Run is part of the example.
+        func Run() { fmt.Println(os.Args) }
   - name: go-formatted
     language: go
     kind: valid

@@ -37,20 +37,6 @@ pub(crate) fn read(dir: &TempDir, name: &str) -> String {
 /// A Go project with the design and testing rules; `None` after a skip
 /// message when there is no Go toolchain.
 pub(crate) fn go_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
-    go_project_in(files, extra, "")
-}
-
-/// The same, with the pack `go` and its recommended decisions: `core/formatted`.
-pub(crate) fn go_formatted_project(files: &[(&str, &str)], extra: &str) -> Option<TempDir> {
-    go_project_in(files, extra, "go")
-}
-
-fn go_project_in(files: &[(&str, &str)], extra: &str, pack: &str) -> Option<TempDir> {
-    let extends_of = if pack.is_empty() {
-        String::new()
-    } else {
-        format!(", \"{pack}/recommended\"")
-    };
     let plugin = lighthouse_test_support::lang_go()?;
     let dir = tempfile::tempdir().unwrap();
     lighthouse_test_support::installed(&dir.path().join(".home"), &plugin);
@@ -58,7 +44,7 @@ fn go_project_in(files: &[(&str, &str)], extra: &str, pack: &str) -> Option<Temp
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(&format!(
-            "plugins = [\"lang-go\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"{extends_of}]\n{extra}"
+            "plugins = [\"lang-go\"]\nextends = [\"core/recommended\", \"design/recommended\", \"testing/recommended\"]\n{extra}"
         )),
     );
     write(dir.path(), "go.mod", "module example.com/demo\n\ngo 1.26\n");
@@ -215,7 +201,7 @@ fn paths_and_rules_select_what_is_fixed() {
 #[test]
 fn an_unformatted_go_file_is_a_finding_and_its_fix_makes_gofmt_clean() {
     let squashed = "package demo\n\nfunc  helper() int {return 1}\n";
-    let Some(dir) = go_formatted_project(&[("a.go", squashed)], "") else {
+    let Some(dir) = go_project(&[("a.go", squashed)], "") else {
         return;
     };
 
@@ -262,7 +248,7 @@ fn an_unformatted_go_file_is_a_finding_and_its_fix_makes_gofmt_clean() {
 #[test]
 fn a_reorder_whose_output_is_unformatted_is_applied_with_the_formatting_follow_up() {
     let squashed = "package demo\n\nfunc helper() int { return 1 }\n\ntype Service struct{}\n\nfunc (s *Service) Run() int {\n        return helper()\n}\n";
-    let Some(dir) = go_formatted_project(&[("a.go", squashed)], "") else {
+    let Some(dir) = go_project(&[("a.go", squashed)], "") else {
         return;
     };
 

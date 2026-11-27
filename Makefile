@@ -14,13 +14,22 @@ SOURCES := $(shell find crates plugins protocol Cargo.toml Cargo.lock -type f ! 
 # Command-check examples run from temporary directories, where goenv cannot
 # discover plugins/lang-go/.go-version. Keep this toolchain on PATH for checks.
 GO_TOOLCHAIN := $(shell cd plugins/lang-go && go env GOROOT 2>/dev/null)
-export PATH := $(GO_TOOLCHAIN)/bin:$(PATH)
+TOOLS := $(CURDIR)/target/tools
+export PATH := $(TOOLS):$(GO_TOOLCHAIN)/bin:$(PATH)
+
+# The Go tools the bundled decisions run (go/compiler-assertions, core/formatted),
+# installed at these versions into target/tools with the toolchain above, so
+# their examples run instead of being skipped. renovate.json tracks them.
+# renovate: datasource=go depName=github.com/jordanlewis/gcassert
+GCASSERT_VERSION := v0.0.0-20260313214104-ad3fae17affe
+# renovate: datasource=go depName=golang.org/x/tools
+GOIMPORTS_VERSION := v0.53.0
 
 # Test builds of the gates keep no incremental state: it grows the debug
 # target by tens of gigabytes. Plain `cargo` outside make keeps its default.
 export CARGO_INCREMENTAL := 0
 
-.PHONY: plugins cli test lint decisions docs ci fast
+.PHONY: plugins tools cli test lint decisions docs ci fast
 
 # `decision test` of the decisions $(1) (all when empty), which fails when it
 # fails and also when it skipped an example: the gate lists every plugin and
@@ -76,6 +85,16 @@ $(BUILT): $(SOURCES) Makefile
 	done
 	touch $(BUILT)
 
+# `go install` is a no-op when the pinned version is built already, so the
+# stamp is the Makefile: a new pin installs again.
+tools: $(TOOLS)/.installed
+
+$(TOOLS)/.installed: Makefile
+	mkdir -p $(TOOLS)
+	GOBIN=$(TOOLS) go install github.com/jordanlewis/gcassert/cmd/gcassert@$(GCASSERT_VERSION)
+	GOBIN=$(TOOLS) go install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
+	touch $@
+
 # The release binary every check below runs; cargo knows when it is fresh.
 cli:
 	cargo build --release -p lighthouse-cli
@@ -88,7 +107,7 @@ test: plugins
 
 # Formatters, compilers' linters, then the dogfood gate: Lighthouse checks its
 # own sources with the rules this repository enforces (lighthouse.toml).
-lint: plugins cli
+lint: plugins cli tools
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets -- -D warnings
 	cd plugins/lang-go && test -z "$$(gofmt -l .)" && go vet ./... && cd sdk && go run ./gen -check
@@ -99,7 +118,7 @@ lint: plugins cli
 
 # Every example of every checked decision, and the queries of the translated
 # decisions held to the decisions on the subjects of the whole repository.
-decisions: plugins cli
+decisions: plugins cli tools
 	$(call test-examples,)
 	cargo test --release -p lighthouse-checks --test it -- --ignored the_query_holds_of_the_subjects_the_decision_reports_on_this_repository
 	cargo test --release -p lighthouse-engine --lib -- --ignored every_rendered

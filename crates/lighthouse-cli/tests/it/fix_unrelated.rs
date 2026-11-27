@@ -28,7 +28,7 @@ fn project(extra: &[(&str, &str)]) -> Option<TempDir> {
         dir.path(),
         "lighthouse.toml",
         &lighthouse_test_support::project(
-            "plugins = [\"lang-go\", \"lang-python\"]\nextends = [\"core/recommended\", \"go/recommended\"]\n",
+            "plugins = [\"lang-go\", \"lang-python\"]\nextends = [\"core/recommended\"]\n",
         ),
     );
     write(dir.path(), "go.mod", "module example.com/demo\n\ngo 1.26\n");
