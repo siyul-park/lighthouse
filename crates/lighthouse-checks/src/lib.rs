@@ -38,7 +38,7 @@ pub mod metrics;
 pub mod probe;
 
 pub use builder::level;
-pub use bundled::{ids, registry, registry_of};
+pub use bundled::{core_pack::version_files as core_version_files, ids, registry, registry_of};
 pub use checks::Checks;
 pub use compose::{Composition, Entry, compose, compose_from};
 pub use error::Error;

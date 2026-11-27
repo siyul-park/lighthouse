@@ -8,6 +8,9 @@ name = "lang-typescript"
 version = "0.1.0"
 # Where npm and every Node package manager install dependencies.
 ignores = ["node_modules/"]
+# nodenv selects the Node version of the directory from `.node-version`
+# (https://github.com/nodenv/nodenv#choosing-the-node-version).
+versionFiles = [".node-version"]
 
 [spec.runtime]
 command = "./lang-typescript"

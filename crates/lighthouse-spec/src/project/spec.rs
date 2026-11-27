@@ -67,6 +67,17 @@ pub struct ProjectSpec {
     /// `.gitignore`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ignores: Vec<String>,
+    /// Files, relative to the project root, that a version manager reads to
+    /// choose a toolchain (`.go-version`, `.tool-versions`), beyond what the
+    /// listed plugins name. `decision test` copies those that exist into
+    /// every example, so that a shim finds the toolchain there as in the
+    /// project. Those of the projects `extends` names come first.
+    #[serde(
+        default,
+        rename = "versionFiles",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub version_files: Vec<String>,
     /// Which files are generated code, beyond what `.gitattributes` and the
     /// listed plugins say.
     #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]

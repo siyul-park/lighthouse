@@ -12,6 +12,9 @@ version = "0.1.0"
 # the provider declares: `__tests__/` or `.github/` stay files of the project
 # for the other languages.
 ignores = ["testdata/", "vendor/"]
+# goenv selects the Go version of the directory from `.go-version`
+# (https://github.com/go-nv/goenv/blob/master/docs/COMMANDS.md#goenv-local).
+versionFiles = [".go-version"]
 catalog = "decisions"
 
 [spec.runtime]

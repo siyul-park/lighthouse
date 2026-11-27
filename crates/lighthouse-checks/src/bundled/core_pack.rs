@@ -1,5 +1,5 @@
 //! What only code provides for the `core` pack: the fallback text language,
-//! and the generated-code markers its manifest declares.
+//! and the generated-code markers and version files its manifest declares.
 
 use lighthouse_model::{
     GeneratedSpec,
@@ -64,15 +64,27 @@ pub(crate) fn languages() -> Vec<Box<dyn LanguageProvider>> {
 
 /// The `[spec.generated]` of the manifest of the `core` plugin.
 pub(crate) fn generated() -> GeneratedSpec {
+    spec("generated")
+}
+
+/// The `[spec] versionFiles` of the manifest of the `core` plugin: the files
+/// of the version managers that work on any language (asdf, mise).
+pub fn version_files() -> Vec<String> {
+    spec("versionFiles")
+}
+
+/// The key `key` of the `[spec]` of the manifest of the `core` plugin, or its
+/// default.
+fn spec<T: serde::de::DeserializeOwned + Default>(key: &str) -> T {
     let manifest: toml::Table = toml::from_str(MANIFEST).expect("the core manifest is TOML");
     manifest
         .get("spec")
-        .and_then(|spec| spec.get("generated"))
+        .and_then(|spec| spec.get(key))
         .cloned()
-        .map(|generated| {
-            generated
+        .map(|value| {
+            value
                 .try_into()
-                .expect("the core markers are a `generated`")
+                .unwrap_or_else(|e| panic!("the core `{key}` is malformed: {e}"))
         })
         .unwrap_or_default()
 }

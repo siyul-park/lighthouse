@@ -5,7 +5,7 @@
 use std::{
     collections::BTreeMap,
     env, fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -242,6 +242,34 @@ impl Session {
         let mut ignores = lighthouse_rpc::plugin_ignores(&self.config, &self.root, &search)?;
         ignores.extend(self.config.ignores().iter().cloned());
         Ok(ProjectFiles::new(root, &ignores)?)
+    }
+
+    /// The version files that exist at the project root, by name, with their
+    /// text: the files a version manager's shim reads to choose a toolchain,
+    /// as `core`, the listed plugins and the project name them. Only the root
+    /// is read: a shim that finds none there would look above the project.
+    pub fn version_files(&self) -> Result<BTreeMap<String, String>> {
+        let search = lighthouse_rpc::search_dirs(&self.root);
+        let mut names = lighthouse_checks::core_version_files();
+        names.extend(lighthouse_rpc::plugin_version_files(
+            &self.config,
+            &self.root,
+            &search,
+        )?);
+        names.extend(self.config.version_files().iter().cloned());
+        let mut found = BTreeMap::new();
+        for name in names {
+            if !Path::new(&name)
+                .components()
+                .all(|c| matches!(c, Component::Normal(_)))
+            {
+                return Err(format!("`versionFiles` `{name}` is not relative to the root").into());
+            }
+            if let Ok(text) = fs::read_to_string(self.root.join(&name)) {
+                found.insert(name, text);
+            }
+        }
+        Ok(found)
     }
 
     /// The bundled and local plugins, the packs of the listed plugins, and the

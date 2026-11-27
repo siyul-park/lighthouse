@@ -700,8 +700,8 @@ pub fn fragment(idx: &Index, file: usize) -> (Fragment, MacroStats) {
         seen: HashSet::new(),
         stats: MacroStats::default(),
     };
-    for m in 0..idx.tree.mods.len() {
-        if idx.tree.mods[m].file == file {
+    for (m, module) in idx.tree.mods.iter().enumerate() {
+        if module.file == file {
             out.module(m);
         }
     }

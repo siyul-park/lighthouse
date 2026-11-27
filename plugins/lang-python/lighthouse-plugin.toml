@@ -9,6 +9,9 @@ version = "0.1.0"
 # Bytecode caches (PEP 3147) and installed packages (`site-packages`, the
 # PEP 405 virtual environment directory `.venv`).
 ignores = ["__pycache__/", "site-packages/", ".venv/"]
+# pyenv selects the Python version of the directory from `.python-version`
+# (https://github.com/pyenv/pyenv/blob/master/COMMANDS.md#pyenv-local).
+versionFiles = [".python-version"]
 
 [spec.runtime]
 command = "./lang-python"

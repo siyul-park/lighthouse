@@ -100,3 +100,31 @@ fn the_check_validation_the_baseline_and_the_copy_list_the_same_files() {
             .unwrap();
     assert_eq!(placed, listed);
 }
+
+#[test]
+fn session_version_files() {
+    let dir = project("error");
+    let root = canonical(dir.path());
+    write(&root, ".tool-versions", "golang 1.22\n");
+    write(&root, ".python-version", "3.12\n");
+    write(&root, "sub/.tool-versions", "nested\n");
+    write(
+        &root,
+        "lighthouse.toml",
+        &lighthouse_test_support::project(
+            "versionFiles = [\".python-version\", \".missing\"]\n[rules]\n\"local/short\" = \"error\"\n",
+        ),
+    );
+
+    let found = session(&root).version_files().unwrap();
+
+    // `core` names `.tool-versions` and the project `.python-version`; only
+    // the files at the root that exist are read.
+    assert_eq!(
+        found.into_iter().collect::<Vec<_>>(),
+        [
+            (".python-version".to_owned(), "3.12\n".to_owned()),
+            (".tool-versions".to_owned(), "golang 1.22\n".to_owned()),
+        ]
+    );
+}

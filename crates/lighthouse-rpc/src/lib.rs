@@ -295,19 +295,23 @@ pub fn plugin_ignores(
     root: &Path,
     search: &[PathBuf],
 ) -> Result<Vec<String>, Error> {
-    let discovered = discover(search)?;
-    note_broken(discovered.broken, config, &mut Registered::default())?;
-    let root = canonical(root);
-    let mut ignores = Vec::new();
-    for listed in config.plugins() {
-        if let Some(one) = choose(listed, false, &discovered.found, &root)?
-            .into_iter()
-            .next()
-        {
-            ignores.extend(one.resource.spec.ignores.iter().cloned());
-        }
-    }
-    Ok(ignores)
+    Ok(listed_specs(config, root, search)?
+        .into_iter()
+        .flat_map(|spec| spec.ignores)
+        .collect())
+}
+
+/// The `versionFiles` of the listed plugins, in listing order, found as
+/// [`plugin_ignores`] finds them.
+pub fn plugin_version_files(
+    config: &Config,
+    root: &Path,
+    search: &[PathBuf],
+) -> Result<Vec<String>, Error> {
+    Ok(listed_specs(config, root, search)?
+        .into_iter()
+        .flat_map(|spec| spec.version_files)
+        .collect())
 }
 
 /// The plugin that provides the pack `pack`, for the message of a config that
@@ -324,6 +328,27 @@ pub fn plugin_of_pack(pack: &str, listed: &[PluginCatalog], search: &[PathBuf]) 
         .iter()
         .find(|one| one.catalog_dir().is_some_and(|dir| holds(&dir)))
         .map_or_else(|| format!("lang-{pack}"), |one| one.id().to_owned())
+}
+
+/// The specs of the manifests of the listed plugins, in listing order.
+fn listed_specs(
+    config: &Config,
+    root: &Path,
+    search: &[PathBuf],
+) -> Result<Vec<PluginSpec>, Error> {
+    let discovered = discover(search)?;
+    note_broken(discovered.broken, config, &mut Registered::default())?;
+    let root = canonical(root);
+    let mut specs = Vec::new();
+    for listed in config.plugins() {
+        if let Some(one) = choose(listed, false, &discovered.found, &root)?
+            .into_iter()
+            .next()
+        {
+            specs.push(one.resource.spec.clone());
+        }
+    }
+    Ok(specs)
 }
 
 /// Whether the listed plugin `one` is part of the project: it has a `path`, or

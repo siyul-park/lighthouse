@@ -354,6 +354,29 @@ fn engine_errors_in_an_example_are_failures_not_panics() {
 }
 
 #[test]
+fn rule_tester_version_files() {
+    let catalog = catalog(HOLDING);
+    let decision = catalog.decision("fake/marker").unwrap();
+    // The rule flags the file the example is given, which only a version file
+    // the tester copies in can be.
+    let files = std::collections::BTreeMap::from([("v.txt".to_owned(), "TODO\n".to_owned())]);
+
+    let given = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
+        .version_files(files)
+        .tested(decision)
+        .failures;
+    let bare = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
+        .tested(decision)
+        .failures;
+
+    assert!(
+        given.iter().any(|f| f.starts_with("fake/marker clean")),
+        "{given:?}"
+    );
+    assert!(bare.is_empty(), "{bare:?}");
+}
+
+#[test]
 fn rule_tester_tested() {
     let catalog = catalog(HOLDING);
     let decision = catalog.decision("fake/marker").unwrap();
@@ -590,6 +613,7 @@ fn example_run_checks_an_example_with_the_given_configuration() {
         catalog: &catalog,
         trusted: false,
         models: ModelOptions::default(),
+        version_files: Default::default(),
         conflicts: None,
     };
 

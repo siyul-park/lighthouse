@@ -52,6 +52,7 @@ pub struct RuleTester<'a> {
     language: Option<String>,
     trusted: bool,
     planting: Option<Planting<'a>>,
+    version_files: BTreeMap<String, String>,
 }
 
 /// How an example plants decisions of its own, and which of them order
@@ -89,6 +90,7 @@ impl<'a> RuleTester<'a> {
             language: None,
             trusted: false,
             planting: None,
+            version_files: BTreeMap::new(),
         }
     }
 
@@ -103,6 +105,14 @@ impl<'a> RuleTester<'a> {
     /// Lets fix examples run commands, as a trusted project does.
     pub fn trusted(mut self, trusted: bool) -> Self {
         self.trusted = trusted;
+        self
+    }
+
+    /// Gives every example the project's version files, by root-relative
+    /// name, that a version manager's shim reads to choose its toolchain; an
+    /// example's own file of the same name wins.
+    pub fn version_files(mut self, files: BTreeMap<String, String>) -> Self {
+        self.version_files = files;
         self
     }
 
@@ -355,6 +365,7 @@ impl<'a> RuleTester<'a> {
             catalog,
             trusted: self.trusted,
             models: ModelOptions::default(),
+            version_files: self.version_files.clone(),
             conflicts: self
                 .planting
                 .as_ref()
@@ -536,6 +547,10 @@ pub struct ExampleRun<'a> {
     pub catalog: &'a Catalog,
     pub trusted: bool,
     pub models: ModelOptions,
+    /// The files, by root-relative name, a version manager reads to choose its
+    /// toolchain, which every example directory holds unless the example has
+    /// a file of that name.
+    pub version_files: BTreeMap<String, String>,
     /// The search for contradictions between decisions, when the example is
     /// about them.
     pub conflicts: Option<Conflicts>,
@@ -560,7 +575,7 @@ impl ExampleRun<'_> {
         rules: &[String],
         example: &Example,
     ) -> Result<(Run, Engine, TempDir), String> {
-        let dir = materialize(example)?;
+        let dir = materialize(example, &self.version_files)?;
         let mut engine = Engine::new(self.registry, self.config, self.catalog, dir.path())
             .map_err(|e| e.to_string())?
             .with_trust(self.trusted)
@@ -591,15 +606,24 @@ pub fn local_decisions(example: &Example) -> Files {
         .collect()
 }
 
-/// A directory holding the files of `example`.
-fn materialize(example: &Example) -> Result<TempDir, String> {
+/// A directory holding the files of `example` and, for each of the
+/// `version_files` it has none of, that one.
+fn materialize(
+    example: &Example,
+    version_files: &BTreeMap<String, String>,
+) -> Result<TempDir, String> {
     let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-    for file in &example.files {
-        let path = dir.path().join(&file.path);
+    let own = example.files.iter().map(|f| (f.path.as_str(), f.text()));
+    let inherited = version_files
+        .iter()
+        .filter(|(name, _)| example.files.iter().all(|f| f.path != **name))
+        .map(|(name, text)| (name.as_str(), text.as_str()));
+    for (name, text) in own.chain(inherited) {
+        let path = dir.path().join(name);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        fs::write(&path, file.text()).map_err(|e| e.to_string())?;
+        fs::write(&path, text).map_err(|e| e.to_string())?;
     }
     Ok(dir)
 }
@@ -760,4 +784,52 @@ fn on_path(program: &str) -> bool {
         std::env::split_paths(&path)
             .any(|dir| fs::metadata(dir.join(program)).is_ok_and(|meta| meta.is_file()))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use lighthouse_spec::ExampleFile;
+
+    use super::*;
+
+    const VERSION_FILE: &str = ".go-version";
+
+    fn example(files: Vec<ExampleFile>) -> Example {
+        Example {
+            name: "e".to_owned(),
+            language: NEUTRAL.to_owned(),
+            kind: ExampleKind::Valid,
+            files,
+            canonical: false,
+            expect: Vec::new(),
+            options: Map::new(),
+            fixed: Vec::new(),
+            conflicts: Vec::new(),
+        }
+    }
+
+    fn version_files() -> BTreeMap<String, String> {
+        BTreeMap::from([(VERSION_FILE.to_owned(), "1.22\n".to_owned())])
+    }
+
+    #[test]
+    fn an_example_without_the_version_file_gets_it() {
+        let own = example(vec![ExampleFile::inline("a.txt", "x")]);
+
+        let dir = materialize(&own, &version_files()).unwrap();
+
+        let read = |name: &str| fs::read_to_string(dir.path().join(name)).unwrap();
+        assert_eq!(read(VERSION_FILE), "1.22\n");
+        assert_eq!(read("a.txt"), "x");
+    }
+
+    #[test]
+    fn an_example_keeps_the_version_file_it_writes() {
+        let own = example(vec![ExampleFile::inline(VERSION_FILE, "3.9\n")]);
+
+        let dir = materialize(&own, &version_files()).unwrap();
+
+        let text = fs::read_to_string(dir.path().join(VERSION_FILE)).unwrap();
+        assert_eq!(text, "3.9\n");
+    }
 }

@@ -7,6 +7,10 @@ name = "core"
 [spec]
 version = "0.1.0"
 catalog = "decisions"
+# The files of the version managers that serve any language: asdf and mise read
+# `.tool-versions` (https://asdf-vm.com/manage/configuration.html), mise also its
+# own `mise.toml` (https://mise.jdx.dev/configuration.html).
+versionFiles = [".tool-versions", "mise.toml", ".mise.toml"]
 
 # What generators leave at the head of what they write, for any language; a
 # language plugin adds one only for a convention these miss.

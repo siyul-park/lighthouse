@@ -172,6 +172,30 @@ fn nested_gitattributes_are_relative_to_their_directory_and_deeper_files_win_per
 }
 
 #[test]
+fn config_version_files() {
+    let base = Resource::new(
+        Metadata::named("base"),
+        ProjectSpec {
+            version_files: vec![".tool-versions".to_owned(), ".go-version".to_owned()],
+            ..ProjectSpec::default()
+        },
+    );
+    let projects = Projects::new([base]).unwrap();
+    let own = Config::parse_inline(
+        "extends = [\"base\"]\nversionFiles = [\".go-version\", \".python-version\"]\n",
+    )
+    .unwrap();
+
+    let merged = own.inheriting(&projects).unwrap();
+
+    assert_eq!(own.version_files(), [".go-version", ".python-version"]);
+    assert_eq!(
+        merged.version_files(),
+        [".tool-versions", ".go-version", ".python-version"]
+    );
+}
+
+#[test]
 fn extends_inherits_ignores_generated_files_and_markers_extended_first() {
     let base = Resource::new(
         Metadata::named("base"),

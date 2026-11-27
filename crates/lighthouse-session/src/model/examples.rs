@@ -35,6 +35,7 @@ pub(super) fn labels(
             catalog: &session.catalog,
             trusted: session.trusted(),
             models: models.clone(),
+            version_files: Default::default(),
             conflicts: None,
         }
         .run(rule, example)

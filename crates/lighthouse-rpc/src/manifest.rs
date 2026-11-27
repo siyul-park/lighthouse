@@ -121,6 +121,15 @@ pub struct PluginSpec {
     /// project's own.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ignores: Vec<String>,
+    /// The files, relative to the project root, that a version manager of the
+    /// plugin's ecosystem reads to choose a toolchain: the same key and
+    /// meaning as the project's `versionFiles`, merged the same way.
+    #[serde(
+        default,
+        rename = "versionFiles",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub version_files: Vec<String>,
     /// How the plugin's ecosystem marks its generated code: the same key,
     /// shape and merge as the project's `generated`.
     #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]

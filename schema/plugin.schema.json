@@ -94,6 +94,13 @@
         },
         "version": {
           "type": "string"
+        },
+        "versionFiles": {
+          "description": "The files, relative to the project root, that a version manager of the\nplugin's ecosystem reads to choose a toolchain: the same key and\nmeaning as the project's `versionFiles`, merged the same way.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [

@@ -62,6 +62,7 @@ pub(crate) fn run(
 ) -> Result<Found> {
     let failed = Mutex::new(None);
     let bundled = session.comp.bundled().map_err(|e| e.to_string())?;
+    let version_files = session.version_files()?;
     let fresh = || registry(session, plugins, &failed, true);
     let testers: Vec<(&String, RuleTester<'_>)> = languages
         .iter()
@@ -74,7 +75,10 @@ pub(crate) fn run(
                 );
             (
                 language,
-                tester.language(language).trusted(session.trusted()),
+                tester
+                    .language(language)
+                    .trusted(session.trusted())
+                    .version_files(version_files.clone()),
             )
         })
         .collect();

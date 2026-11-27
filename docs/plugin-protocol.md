@@ -612,6 +612,11 @@ project), merged the same way and before the project's own. It applies when the 
 to every file. The same key in a language's declaration (`ignores` of the `LanguageManifest` that
 `initialize` returns, next to its `globs`) applies to the files that language claims only: the
 host does not send them to that provider, and other languages still see them.
+`spec.versionFiles` (optional) names the files, relative to the project root, that a version
+manager of the plugin's ecosystem reads to choose a toolchain (`.go-version` of goenv,
+`rust-toolchain.toml` of rustup). It has the key and meaning of the project's `versionFiles`, which
+is merged with it: `decision test` copies those that exist at the project root into each example's
+directory, so that a manager's shim finds the toolchain there as it does in the project.
 `[spec.generated]` (optional) has the shape of the project's `[generated]`: `files` patterns and
 `markers` (regular expressions searched in the head comments of any file), for the generated code of
 the plugin's ecosystem.

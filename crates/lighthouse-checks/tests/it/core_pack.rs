@@ -379,3 +379,11 @@ fn bundled_plugins_provide_cel_and_fallback_text_languages() {
         Some(Severity::Error)
     );
 }
+
+#[test]
+fn core_names_the_files_of_the_version_managers_that_serve_any_language() {
+    assert_eq!(
+        lighthouse_checks::core_version_files(),
+        [".tool-versions", "mise.toml", ".mise.toml"]
+    );
+}

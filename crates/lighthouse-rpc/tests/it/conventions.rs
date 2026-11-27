@@ -110,3 +110,43 @@ fn python_leaves_out_caches_installed_packages_and_the_virtual_environment() {
     );
     assert_eq!(found, ["pkg/a.py", "testdata/z.py"]);
 }
+
+#[test]
+fn the_plugins_name_the_files_their_version_manager_reads() {
+    let named = |name: &str| {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../plugins")
+            .join(name);
+        lighthouse_rpc::load(&dir)
+            .unwrap()
+            .resource
+            .spec
+            .version_files
+    };
+
+    assert_eq!(named("lang-go"), [".go-version"]);
+    assert_eq!(
+        named("lang-rust"),
+        ["rust-toolchain", "rust-toolchain.toml"]
+    );
+    assert_eq!(named("lang-python"), [".python-version"]);
+    assert_eq!(named("lang-typescript"), [".node-version"]);
+}
+
+#[test]
+fn plugin_version_files() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join(".lighthouse/plugins/p");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("lighthouse-plugin.toml"),
+        "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Plugin\"\n[metadata]\nname = \"p\"\n[spec]\nversion = \"0\"\nversionFiles = [\".p-version\"]\n[spec.runtime]\ncommand = \"./does-not-exist\"\n",
+    )
+    .unwrap();
+    let config = lighthouse_spec::Config::parse_inline("plugins = [\"p\", \"unknown\"]\n").unwrap();
+    let search = lighthouse_rpc::search_dirs(root.path());
+
+    let found = lighthouse_rpc::plugin_version_files(&config, root.path(), &search).unwrap();
+
+    assert_eq!(found, [".p-version"]);
+}

@@ -572,6 +572,13 @@
         "signals": {
           "$ref": "#/$defs/SignalsSpec",
           "description": "How long session signals are kept, and whether the agent hears about\nthem."
+        },
+        "versionFiles": {
+          "description": "Files, relative to the project root, that a version manager reads to\nchoose a toolchain (`.go-version`, `.tool-versions`), beyond what the\nlisted plugins name. `decision test` copies those that exist into\nevery example, so that a shim finds the toolchain there as in the\nproject. Those of the projects `extends` names come first.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"

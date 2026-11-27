@@ -8,6 +8,9 @@ name = "lang-rust"
 version = "0.1.0"
 # Cargo's build output directory (`target`, `build.target-dir`).
 ignores = ["target/"]
+# rustup selects the toolchain of the directory from these files
+# (https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file).
+versionFiles = ["rust-toolchain", "rust-toolchain.toml"]
 catalog = "decisions"
 
 [spec.runtime]

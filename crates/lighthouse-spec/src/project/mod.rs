@@ -171,6 +171,7 @@ pub struct Config {
     /// does: set by [`Config::inheriting`].
     required: BTreeMap<String, String>,
     ignores: Vec<String>,
+    version_files: Vec<String>,
     generated_files: Vec<String>,
     generated_markers: Vec<String>,
     models: Models,
@@ -277,6 +278,7 @@ impl Config {
             injections: spec.injections,
             required: BTreeMap::new(),
             ignores: spec.ignores,
+            version_files: spec.version_files,
             generated_files: spec.generated.files,
             generated_markers: spec.generated.markers,
             models: Models::new(&spec.models),
@@ -385,6 +387,12 @@ impl Config {
     /// it, those of the projects it extends, extended first.
     pub fn ignores(&self) -> &[String] {
         &self.ignores
+    }
+
+    /// The project's `versionFiles` and, once [`Config::inheriting`] has
+    /// resolved it, those of the projects it extends, extended first.
+    pub fn version_files(&self) -> &[String] {
+        &self.version_files
     }
 
     /// The project's `generated.files` and, once [`Config::inheriting`] has

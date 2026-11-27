@@ -422,7 +422,7 @@ Options:
 ```text
 Run the examples of checked decisions through the whole engine.
 
-The bundled catalog and the project's `.lighthouse/decisions`. Examples run in each language whose plugin the config lists (or only in --language); a decision needs an example for every language run. Each example runs in a project of its own, so it does not depend on the project that runs it. One that cannot run here (a plugin that is not available, a command that is not installed or, in a project that is not trusted, not run) is reported as SKIP with the reason and counted in `skipped`; it is not a failure. Exits 1 when any example fails.
+The bundled catalog and the project's `.lighthouse/decisions`. Examples run in each language whose plugin the config lists (or only in --language); a decision needs an example for every language run. Each example runs in a project of its own, so it does not depend on the project that runs it, but for the `versionFiles` that exist at the project root, which each example gets so that a version manager's shim finds its toolchain. One that cannot run here (a plugin that is not available, a command that is not installed or, in a project that is not trusted, not run) is reported as SKIP with the reason and counted in `skipped`; it is not a failure. Exits 1 when any example fails.
 
 Usage: lighthouse decision test [OPTIONS] [IDS]...
 

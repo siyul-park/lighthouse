@@ -22,13 +22,14 @@ use crate::Error;
 
 /// The tables of the project file that decide findings or what may change the
 /// shared repository.
-const MEANING: [&str; 6] = [
+const MEANING: [&str; 7] = [
     "plugins",
     "extends",
     "languages",
     "overrides",
     "generated",
     "ignores",
+    "versionFiles",
 ];
 
 /// The keys of a rule that are meaning; its model bindings are environment.
