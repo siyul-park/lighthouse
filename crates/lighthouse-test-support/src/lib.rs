@@ -102,6 +102,7 @@ fn shared() -> &'static Composition {
 }
 
 use std::{
+    collections::BTreeMap,
     env, fs,
     path::{Path, PathBuf},
     process::Command,
@@ -164,6 +165,29 @@ pub fn listing(config: &str, plugin: &str) -> String {
         .expect("plugins is a list")
         .push(entry);
     project(&toml::to_string(spec).expect("a spec is TOML"))
+}
+
+/// The version files that exist at the root of this repository, by name, with
+/// their text: the files a version manager's shim reads to choose a toolchain,
+/// as `core` and the plugins of the repository name them. A tester of the
+/// bundled examples is given them, as `lighthouse decision test` gives a
+/// project's, so that a shimmed tool runs the toolchain the repository pins.
+pub fn version_files() -> BTreeMap<String, String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut names = lighthouse_checks::core_version_files();
+    let plugins = fs::read_dir(root.join("plugins")).expect("the repository has plugins");
+    for dir in plugins.flatten() {
+        if let Ok(found) = lighthouse_rpc::load(&dir.path()) {
+            names.extend(found.resource.spec.version_files);
+        }
+    }
+    names
+        .into_iter()
+        .filter_map(|name| {
+            let text = fs::read_to_string(root.join(&name)).ok()?;
+            Some((name, text))
+        })
+        .collect()
 }
 
 /// The `GOROOT` of the Go toolchain that runs in `plugins/lang-go` (the one of

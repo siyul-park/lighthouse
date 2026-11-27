@@ -607,5 +607,7 @@ pub fn tester<'a>(
     let orders = Arc::new(move |decision: &lighthouse_spec::Decision| {
         lighthouse_logic::tier(&cel, decision).tier == lighthouse_logic::Tier::O
     });
-    RuleTester::new(move || own(), catalog, catalog).planting(plant, orders)
+    RuleTester::new(move || own(), catalog, catalog)
+        .version_files(lighthouse_test_support::version_files())
+        .planting(plant, orders)
 }
