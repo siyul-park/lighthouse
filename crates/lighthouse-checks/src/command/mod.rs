@@ -81,7 +81,7 @@ impl CommandRule {
         let root = held
             .as_ref()
             .map_or_else(|| ctx.workspace.root.clone(), |dir| dir.path().to_owned());
-        let run = |program| self.invocation(program, (meta, ctx, options), &root);
+        let runs = |program| self.invocations(program, (meta, ctx, options), &root);
         if meta.scope == RunScope::File {
             let Some((file, text)) = ctx.file else {
                 return Ok(Vec::new());
@@ -99,26 +99,43 @@ impl CommandRule {
             if let Some(found) = self.answered((meta, ctx, options), &file.path)? {
                 return Ok(found);
             }
-            return run(program)?.one(&file.path, Some(text.get()));
+            let mut found = Vec::new();
+            for run in runs(program)? {
+                found.extend(run.in_item(run.one(&file.path, Some(text.get())))?);
+            }
+            return Ok(found);
         }
         let mut found = Vec::new();
         for (program, files) in self.assigned(ctx) {
-            let run = run(program)?;
-            match program.batching() {
-                Batching::Files => found.extend(run.all(files)?),
-                Batching::File => {
-                    for file in files {
-                        let text = program.stdin == Stdin::File;
-                        let content = text.then(|| ctx.workspace.read(&file)).transpose()?;
-                        found.extend(run.one(&file, content.as_deref())?);
-                    }
-                }
-                Batching::Once => {
-                    found.extend(run.collect(&run.invoke(&run.arguments(&[])?, &[], None)?, None)?);
-                }
+            for run in runs(program)? {
+                found.extend(run.in_item(self.over(&run, program, &files, ctx))?);
             }
         }
         Ok(found)
+    }
+
+    /// The findings of one run of `program` over `files`, as many files per
+    /// command as it takes.
+    fn over(
+        &self,
+        run: &Invocation,
+        program: &Program,
+        files: &[PathBuf],
+        ctx: &Context,
+    ) -> Result<Vec<Diagnostic>, PluginError> {
+        match program.batching() {
+            Batching::Files => run.all(files.to_vec()),
+            Batching::File => {
+                let mut found = Vec::new();
+                for file in files {
+                    let text = program.stdin == Stdin::File;
+                    let content = text.then(|| ctx.workspace.read(file)).transpose()?;
+                    found.extend(run.one(file, content.as_deref())?);
+                }
+                Ok(found)
+            }
+            Batching::Once => run.collect(&run.invoke(&run.arguments(&[])?, &[], None)?, None),
+        }
     }
 
     /// The findings in each of `files` that one run of the program over the
@@ -133,12 +150,51 @@ impl CommandRule {
         self.answers((meta, ctx, options), files)
     }
 
-    /// The run of `program` for the rule `meta` over `ctx`, in `root`.
+    /// The runs of `program` for the rule `meta` over `ctx`, in `root`: one,
+    /// or one for each item of its `matrix`, which may be none.
+    fn invocations<'a>(
+        &'a self,
+        program: &'a Program,
+        check: (&'a RuleManifest, &'a Context<'a>, &Map<String, Value>),
+        root: &Path,
+    ) -> Result<Vec<Invocation<'a>>, PluginError> {
+        let Some(name) = &program.matrix else {
+            return Ok(vec![self.invocation(program, check, root, None)?]);
+        };
+        let (meta, _, options) = check;
+        let incomplete = |reason: String| PluginError::Incomplete(format!("{}: {reason}", meta.id));
+        let items = match options.get(name) {
+            None | Some(Value::Null) => Vec::new(),
+            Some(Value::Array(items)) => items.clone(),
+            Some(_) => return Err(incomplete(format!("option `{name}` is not a list"))),
+        };
+        items
+            .iter()
+            .map(|item| {
+                let item = item
+                    .as_object()
+                    .and_then(|pairs| {
+                        pairs
+                            .iter()
+                            .map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                            .collect::<Option<BTreeMap<String, String>>>()
+                    })
+                    .ok_or_else(|| {
+                        incomplete(format!("an item of `{name}` is not an object of strings"))
+                    })?;
+                self.invocation(program, check, root, Some(item))
+            })
+            .collect()
+    }
+
+    /// The run of `program` for the rule `meta` over `ctx`, in `root`, for
+    /// one `item` of its matrix.
     fn invocation<'a>(
         &'a self,
         program: &'a Program,
         (meta, ctx, options): (&'a RuleManifest, &'a Context<'a>, &Map<String, Value>),
         root: &Path,
+        item: Option<BTreeMap<String, String>>,
     ) -> Result<Invocation<'a>, PluginError> {
         let incomplete = |reason: String| PluginError::Incomplete(format!("{}: {reason}", meta.id));
         if !ctx.trusted && !self.bundled {
@@ -147,8 +203,21 @@ impl CommandRule {
                 program.shown()
             )));
         }
+        let mut declared = program.env.clone();
+        let mut label = String::new();
+        if let Some(item) = item {
+            if let Some(why) = program.item_problem(&item) {
+                return Err(incomplete(why));
+            }
+            label = item
+                .iter()
+                .map(|(key, value)| format!("{key}={value}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            declared.extend(item);
+        }
         let environment = Environment::new(
-            &program.env,
+            &declared,
             context(
                 &json!({ "id": meta.id }).to_string(),
                 &Value::Object(options.clone()).to_string(),
@@ -162,6 +231,7 @@ impl CommandRule {
             meta,
             ctx,
             environment,
+            label,
             root: root.to_owned(),
         })
     }
@@ -271,11 +341,24 @@ struct Invocation<'a> {
     meta: &'a RuleManifest,
     ctx: &'a Context<'a>,
     environment: Environment,
+    /// The `KEY=value` pairs of the item of the matrix this run is for, or
+    /// nothing.
+    label: String,
     /// Where the program runs: the project, or its copy with overlays.
     root: PathBuf,
 }
 
 impl Invocation<'_> {
+    /// `result` with an error saying which item of the matrix it was for.
+    fn in_item<T>(&self, result: Result<T, PluginError>) -> Result<T, PluginError> {
+        match result {
+            Err(PluginError::Incomplete(why)) if !self.label.is_empty() => {
+                Err(PluginError::Incomplete(format!("{}: {why}", self.label)))
+            }
+            other => other,
+        }
+    }
+
     /// One invocation for one file.
     fn one(&self, file: &Path, text: Option<&str>) -> Result<Vec<Diagnostic>, PluginError> {
         let command = self.arguments(std::slice::from_ref(&file.to_path_buf()))?;
@@ -580,6 +663,13 @@ impl Invocation<'_> {
 
     fn finding(&self, message: &str, path: PathBuf, line: u32, col: u32) -> Vec<Diagnostic> {
         let at = Position { line, col };
+        let prefixed;
+        let message = if self.label.is_empty() {
+            message
+        } else {
+            prefixed = format!("{}: {message}", self.label);
+            &prefixed
+        };
         let snippet = squash(message);
         // Where the line is does not identify the finding: moving code must
         // not make it a new one. The engine tells repeats of the same text

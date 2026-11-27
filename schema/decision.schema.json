@@ -296,6 +296,13 @@
           "description": "What the program finds in a file depends on that file and the\nprogram's configuration alone, as `gofmt -l` and `markdownlint-cli2`\ndo; not so for a program that follows what a file names, as `rustfmt`\nfollows `mod` and `lychee` follows links. A run over several files\n(`{files}`) then finds in each what a run over it alone finds, which\nlets a check run one program for the files of a batch and tell each\nfile its findings. A bundled check that is `independent` keeps the\nfindings of a file for as long as the file, the program and its\nconfiguration are as they were.",
           "type": "boolean"
         },
+        "matrix": {
+          "description": "The name of an option of the decision, a list of objects that map\nvariable names to strings, as `strategy.matrix.include` of GitHub\nActions does. The program runs once for each item, with the item added\nto its `env` (a name `env` has is refused), and each finding's message\nstarts with the item's `KEY=value` pairs. An empty list runs nothing,\nand finds nothing. Only for a check.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "output": {
           "anyOf": [
             {
@@ -394,6 +401,13 @@
         "independent": {
           "description": "What the program finds in a file depends on that file and the\nprogram's configuration alone, as `gofmt -l` and `markdownlint-cli2`\ndo; not so for a program that follows what a file names, as `rustfmt`\nfollows `mod` and `lychee` follows links. A run over several files\n(`{files}`) then finds in each what a run over it alone finds, which\nlets a check run one program for the files of a batch and tell each\nfile its findings. A bundled check that is `independent` keeps the\nfindings of a file for as long as the file, the program and its\nconfiguration are as they were.",
           "type": "boolean"
+        },
+        "matrix": {
+          "description": "The name of an option of the decision, a list of objects that map\nvariable names to strings, as `strategy.matrix.include` of GitHub\nActions does. The program runs once for each item, with the item added\nto its `env` (a name `env` has is refused), and each finding's message\nstarts with the item's `KEY=value` pairs. An empty list runs nothing,\nand finds nothing. Only for a check.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "output": {
           "anyOf": [
@@ -1475,6 +1489,13 @@
         "independent": {
           "description": "What the program finds in a file depends on that file and the\nprogram's configuration alone, as `gofmt -l` and `markdownlint-cli2`\ndo; not so for a program that follows what a file names, as `rustfmt`\nfollows `mod` and `lychee` follows links. A run over several files\n(`{files}`) then finds in each what a run over it alone finds, which\nlets a check run one program for the files of a batch and tell each\nfile its findings. A bundled check that is `independent` keeps the\nfindings of a file for as long as the file, the program and its\nconfiguration are as they were.",
           "type": "boolean"
+        },
+        "matrix": {
+          "description": "The name of an option of the decision, a list of objects that map\nvariable names to strings, as `strategy.matrix.include` of GitHub\nActions does. The program runs once for each item, with the item added\nto its `env` (a name `env` has is refused), and each finding's message\nstarts with the item's `KEY=value` pairs. An empty list runs nothing,\nand finds nothing. Only for a check.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "output": {
           "anyOf": [

@@ -459,7 +459,12 @@ fn programs(decision: &Decision) -> Result<(), Error> {
         _ => None,
     };
     let owned = [("check", check, Point::Check), ("fix", fix, Point::Fix)];
+    let empty = crate::OptionsSchema::default();
+    let options = decision.options.as_ref().unwrap_or(&empty);
     for (what, program, point) in owned {
+        if let Some(why) = program.and_then(|p| p.matrix_option_problem(options)) {
+            return Err(Error::invalid(id, format!("{what}: {why}")));
+        }
         let given = decision.languages.values().any(|l| match point {
             Point::Check => l.check.is_some(),
             _ => l.fix.is_some(),
@@ -488,6 +493,15 @@ fn programs(decision: &Decision) -> Result<(), Error> {
             ("fix", &spec.fix, Point::Fix),
         ];
         for (what, program, point) in given {
+            let matrix = program
+                .as_ref()
+                .and_then(|p| p.matrix_option_problem(options));
+            if let Some(why) = matrix {
+                return Err(Error::invalid(
+                    id,
+                    format!("`languages.{language}.{what}`: {why}"),
+                ));
+            }
             if let Some(why) = program.as_ref().and_then(|p| p.problem(point)) {
                 return Err(Error::invalid(
                     id,

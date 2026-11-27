@@ -51,6 +51,7 @@ impl CommandRule {
             && self.programs.all().next().is_some()
             && self.programs.all().all(|p| {
                 p.env.is_empty()
+                    && p.matrix.is_none()
                     && (!p.batch.is_empty()
                         || (p.stdin == Stdin::None && p.batching() == Batching::Files))
             })
@@ -156,7 +157,10 @@ impl CommandRule {
             else {
                 continue;
             };
-            let Ok(run) = self.invocation(program, check, &root) else {
+            let Ok(mut runs) = self.invocations(program, check, &root) else {
+                continue;
+            };
+            let (Some(run), None) = (runs.pop(), runs.first()) else {
                 continue;
             };
             let Ok(groups) = run.grouped(files) else {

@@ -386,3 +386,84 @@ fn a_program_on_stderr_that_prints_only_chatter_and_succeeds_is_clean() {
 
     assert_eq!(code, 0, "{report}");
 }
+
+/// A decision whose command prints `a.txt:1: $GOOS` and exits 1, run once for
+/// each item of its option `platforms` (`matrix`), with `extra` besides.
+fn matrixed(extra: &str) -> String {
+    let rule = decision(&format!(
+        "  options:\n    properties:\n      platforms:\n        type: array\n        items: {{ type: object, properties: {{ GOOS: {{ type: string }}, GOARCH: {{ type: string }} }} }}\n        default: []\n        description: The platforms to run for.\n    additionalProperties: false\n  check:\n    type: command\n    command: [sh, -c, 'echo \"a.txt:1: $GOOS\"; exit 1']\n    files: [\"a.txt\"]\n    matrix: platforms\n{extra}"
+    ));
+    rule.replace(
+        "      expect: [{ line: 1 }]",
+        "      options: { platforms: [{ GOOS: linux }] }\n      expect: [{ line: 1 }]",
+    )
+}
+
+/// The outcome of `lighthouse check` over a project that sets `platforms` of
+/// `matrixed` to `platforms` (TOML), as the exit code and the report.
+fn matrix_checked(platforms: &str, extra: &str) -> (i32, String) {
+    let dir = project(&matrixed(extra));
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_test_support::project(&format!(
+            "plugins = []\n[rules]\n\"local/probe\" = {{ level = \"error\", options = {{ platforms = {platforms} }} }}\n"
+        )),
+    );
+    trust(dir.path());
+    let out = lighthouse(dir.path()).arg("check").output().unwrap();
+    (
+        out.status.code().unwrap(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+    )
+}
+
+#[test]
+fn a_matrix_runs_the_program_once_per_item_and_prefixes_each_finding_with_the_item() {
+    let (code, report) = matrix_checked(
+        "[{ GOOS = \"linux\", GOARCH = \"arm64\" }, { GOOS = \"darwin\", GOARCH = \"amd64\" }]",
+        "",
+    );
+
+    assert_eq!(code, 1, "{report}");
+    assert!(
+        report.contains("GOARCH=arm64 GOOS=linux: linux"),
+        "{report}"
+    );
+    assert!(
+        report.contains("GOARCH=amd64 GOOS=darwin: darwin"),
+        "{report}"
+    );
+    assert_eq!(report.matches("local/probe").count(), 2, "{report}");
+}
+
+#[test]
+fn an_empty_matrix_runs_nothing_and_is_clean_not_incomplete() {
+    let (code, report) = matrix_checked("[]", "");
+
+    assert_eq!(code, 0, "{report}");
+}
+
+#[test]
+fn a_matrix_item_that_sets_a_variable_env_has_is_refused() {
+    let (code, report) = matrix_checked("[{ GOOS = \"linux\" }]", "    env: { GOOS: darwin }\n");
+
+    assert_eq!(code, 3, "{report}");
+    assert!(report.contains("`matrix` item sets `GOOS`"), "{report}");
+}
+
+#[test]
+fn a_matrix_naming_a_missing_option_is_refused_when_the_decision_loads() {
+    let rule = decision(
+        "  check:\n    type: command\n    command: [sh, -c, \"exit 0\"]\n    matrix: platforms\n",
+    );
+    let dir = project(&rule);
+
+    lighthouse(dir.path())
+        .arg("check")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "`matrix` names `platforms`, which is not an option",
+        ));
+}

@@ -96,3 +96,65 @@ fn the_default_stream_is_stdout_and_is_not_written() {
         "stderr"
     );
 }
+
+fn options(properties: &str) -> lighthouse_spec::OptionsSchema {
+    serde_norway::from_str(&format!(
+        "properties: {{{properties}}}\nadditionalProperties: false\n"
+    ))
+    .unwrap()
+}
+
+const PLATFORMS: &str = "platforms: { type: array, items: { type: object, properties: { GOOS: { type: string } } }, default: [], description: Platforms. }";
+
+#[test]
+fn a_matrix_names_an_option_that_is_a_list_of_objects_of_strings() {
+    let program = parsed("matrix: platforms\n");
+
+    assert_eq!(program.matrix_option_problem(&options(PLATFORMS)), None);
+    assert!(
+        program
+            .matrix_option_problem(&options(""))
+            .unwrap()
+            .contains("not an option")
+    );
+    let flag = "platforms: { type: boolean, default: false, description: Flag. }";
+    assert!(
+        program
+            .matrix_option_problem(&options(flag))
+            .unwrap()
+            .contains("list of objects")
+    );
+    let numbers = "platforms: { type: array, items: { type: object, properties: { n: { type: integer } } }, default: [], description: Numbers. }";
+    assert!(
+        program
+            .matrix_option_problem(&options(numbers))
+            .unwrap()
+            .contains("string values")
+    );
+}
+
+#[test]
+fn a_matrix_is_refused_outside_a_check() {
+    let program = parsed("matrix: platforms\n");
+
+    assert_eq!(program.problem(Point::Check), None);
+    for point in [Point::Fix, Point::Verify] {
+        assert!(program.problem(point).unwrap().contains("matrix"));
+    }
+}
+
+#[test]
+fn a_matrix_item_follows_the_rules_of_env_and_adds_no_name_env_has() {
+    let program = parsed("matrix: platforms\nenv: { CGO_ENABLED: '0' }\n");
+    let item = |key: &str| std::collections::BTreeMap::from([(key.to_owned(), "x".to_owned())]);
+
+    assert_eq!(program.item_problem(&item("GOOS")), None);
+    assert!(program.item_problem(&item("LIGHTHOUSE_X")).is_some());
+    assert!(program.item_problem(&item("A=B")).is_some());
+    assert!(
+        program
+            .item_problem(&item("CGO_ENABLED"))
+            .unwrap()
+            .contains("`env` has")
+    );
+}

@@ -14,6 +14,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;
 
+use crate::{OptionType, OptionsSchema};
+
 /// How long a program may run when it names no `timeout`.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
 /// How long an agent and a verification command may run when they name none.
@@ -28,10 +30,11 @@ const RETIRED: [&str; 3] = ["rule", "path", "root"];
 
 /// The keys a program table may have, for the loaders that read it beside
 /// others.
-pub(crate) const FIELDS: [&str; 13] = [
+pub(crate) const FIELDS: [&str; 14] = [
     "command",
     "batch",
     "env",
+    "matrix",
     "timeout",
     "stdin",
     "cwd",
@@ -145,6 +148,14 @@ pub struct Program {
     /// not set fails the run, naming it.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
+    /// The name of an option of the decision, a list of objects that map
+    /// variable names to strings, as `strategy.matrix.include` of GitHub
+    /// Actions does. The program runs once for each item, with the item added
+    /// to its `env` (a name `env` has is refused), and each finding's message
+    /// starts with the item's `KEY=value` pairs. An empty list runs nothing,
+    /// and finds nothing. Only for a check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matrix: Option<String>,
     /// How long it may run, such as `30s` or `2m`. Default: `2m`; `10m` for
     /// an agent and for a `[fix] verify` program.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -208,6 +219,7 @@ impl Program {
             command,
             batch: Vec::new(),
             env: BTreeMap::new(),
+            matrix: None,
             timeout: None,
             stdin: Stdin::None,
             cwd: Cwd::Root,
@@ -296,6 +308,7 @@ impl Program {
             .or_else(|| self.fact_problem(point))
             .or_else(|| self.output_problem(point))
             .or_else(|| self.env_problem())
+            .or_else(|| self.matrix_problem(point))
             .or_else(|| self.sandbox_problem())
     }
 
@@ -395,17 +408,55 @@ impl Program {
 
     fn env_problem(&self) -> Option<String> {
         self.env.iter().find_map(|(key, value)| {
-            if key.is_empty() || key.contains('=') {
-                return Some(format!(
-                    "`env` has the name `{key}`, which is not a variable"
-                ));
-            }
-            if key.starts_with("LIGHTHOUSE_") {
-                return Some(format!("`env` cannot set `{key}`: Lighthouse sets it"));
-            }
-            variables(value)
-                .err()
-                .map(|why| format!("`env.{key}`: {why}"))
+            env_name_problem("env", key).or_else(|| {
+                variables(value)
+                    .err()
+                    .map(|why| format!("`env.{key}`: {why}"))
+            })
+        })
+    }
+
+    /// `matrix` is a check's.
+    fn matrix_problem(&self, point: Point) -> Option<String> {
+        self.matrix.as_ref()?;
+        if point != Point::Check {
+            return Some("`matrix` is for a check".to_owned());
+        }
+        (self.output(point) == Output::Sarif)
+            .then(|| "`matrix` needs `output: lines` or `status`".to_owned())
+    }
+
+    /// What is wrong with `matrix` against the options the decision declares:
+    /// it names a list of objects whose values are strings.
+    pub fn matrix_option_problem(&self, options: &OptionsSchema) -> Option<String> {
+        let name = self.matrix.as_deref()?;
+        let Some(option) = options.properties.get(name) else {
+            return Some(format!("`matrix` names `{name}`, which is not an option"));
+        };
+        let items = option.items.as_deref().filter(|items| {
+            option.kind == Some(OptionType::Array) && items.kind == Some(OptionType::Object)
+        });
+        let Some(items) = items else {
+            return Some(format!(
+                "`matrix` names `{name}`, which must be a list of objects"
+            ));
+        };
+        items
+            .properties
+            .iter()
+            .any(|(_, value)| value.kind != Some(OptionType::String))
+            .then(|| format!("`matrix` names `{name}`, whose items must have string values"))
+    }
+
+    /// What is wrong with one item of `matrix`: its names follow the rules of
+    /// `env`'s, and none is a name `env` has.
+    pub fn item_problem(&self, item: &BTreeMap<String, String>) -> Option<String> {
+        item.keys().find_map(|key| {
+            env_name_problem("matrix", key).or_else(|| {
+                self.env
+                    .contains_key(key)
+                    .then(|| format!("`matrix` item sets `{key}`, which `env` has"))
+            })
         })
     }
 
@@ -430,7 +481,7 @@ impl From<ProgramSpec> for Program {
     fn from(spec: ProgramSpec) -> Self {
         match spec {
             ProgramSpec::Command(command) => Self::of(command),
-            ProgramSpec::Program(program) => program,
+            ProgramSpec::Program(program) => *program,
         }
     }
 }
@@ -618,7 +669,7 @@ impl fmt::Display for Point {
 #[serde(untagged)]
 pub enum ProgramSpec {
     Command(Vec<String>),
-    Program(Program),
+    Program(Box<Program>),
 }
 
 impl<'de> Deserialize<'de> for ProgramSpec {
@@ -647,7 +698,7 @@ impl<'de> Deserialize<'de> for ProgramSpec {
 
 impl From<&Program> for ProgramSpec {
     fn from(program: &Program) -> Self {
-        ProgramSpec::Program(program.clone())
+        ProgramSpec::Program(Box::new(program.clone()))
     }
 }
 
@@ -658,6 +709,17 @@ pub fn file_fact(arg: &str) -> Option<&str> {
     let name = arg.strip_prefix("{file.")?.strip_suffix('}')?;
     let mut chars = name.chars();
     (chars.next()?.is_ascii_lowercase() && chars.all(|c| c.is_ascii_alphanumeric())).then_some(name)
+}
+
+/// What is wrong with `key` as the name of a variable `field` sets.
+fn env_name_problem(field: &str, key: &str) -> Option<String> {
+    if key.is_empty() || key.contains('=') {
+        return Some(format!(
+            "`{field}` has the name `{key}`, which is not a variable"
+        ));
+    }
+    key.starts_with("LIGHTHOUSE_")
+        .then(|| format!("`{field}` cannot set `{key}`: Lighthouse sets it"))
 }
 
 /// `arg` as a placeholder, when it is one of its own: `{file}` and not
