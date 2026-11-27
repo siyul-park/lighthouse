@@ -464,4 +464,14 @@ fn a_batch_tells_many_files_what_the_command_tells_one_and_cwd_file_needs_the_te
     assert!(fix.problem(Point::Fix).is_some());
     let cwd = one(&[], Stdin::None, Cwd::File);
     assert!(cwd.problem(Point::Check).unwrap().contains("`cwd: file`"));
+    let many = Program {
+        command: vec!["tidy".to_owned(), "{files}".to_owned()],
+        ..one(&[], Stdin::None, Cwd::File)
+    };
+    assert!(many.problem(Point::Check).unwrap().contains("`cwd: file`"));
+    let named = Program {
+        command: vec!["tidy".to_owned(), "{file}".to_owned()],
+        ..one(&[], Stdin::None, Cwd::File)
+    };
+    assert_eq!(named.problem(Point::Check), None);
 }

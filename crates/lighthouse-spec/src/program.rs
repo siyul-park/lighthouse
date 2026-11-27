@@ -165,7 +165,8 @@ pub struct Program {
     pub stdin: Stdin,
     /// Where it runs: the project's root, or the directory of `{file}`, which
     /// a tool that looks for its configuration from where it runs needs
-    /// (`rustfmt` on stdin). `file` needs `stdin: file`. `{file}` is then the
+    /// (`rustfmt` on stdin). `file` needs `stdin: file` or `{file}` in `command`:
+    /// a run has one file. `{file}` is then the
     /// file's name from that directory, and a relative path the program prints
     /// is relative to it. A directory not on disk runs at the root.
     #[serde(default, skip_serializing_if = "Cwd::is_root")]
@@ -313,7 +314,8 @@ impl Program {
     }
 
     /// `batch` is a check's, tells files from `{files}`, and goes with a
-    /// `command` that reads one file; `cwd: file` too.
+    /// `command` that reads one file; `cwd: file` too, which a run of one file
+    /// has: `stdin: file` or `{file}`.
     fn batch_problem(&self, point: Point) -> Option<String> {
         if !self.batch.is_empty() {
             if point != Point::Check {
@@ -332,8 +334,9 @@ impl Program {
                 return Some("`batch` needs `{files}`".to_owned());
             }
         }
-        (self.cwd == Cwd::File && self.stdin != Stdin::File)
-            .then(|| "`cwd: file` needs `stdin: file`".to_owned())
+        let one_file = self.stdin == Stdin::File || self.command.iter().any(|arg| arg == "{file}");
+        (self.cwd == Cwd::File && !one_file)
+            .then(|| "`cwd: file` needs `stdin: file` or `{file}`: a run has one file".to_owned())
     }
 
     /// A check reads a fact of a file for the files of a run, so the run must
