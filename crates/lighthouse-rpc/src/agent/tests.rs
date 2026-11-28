@@ -3,7 +3,7 @@ use serde_json::json;
 use super::*;
 
 fn read_in(dir: &Path, sent: Value, cut: bool) -> Edited {
-    let environment = Environment::new(&BTreeMap::new(), Vec::new(), Home::User).unwrap();
+    let environment = Environment::new(&[], &BTreeMap::new(), Vec::new(), Home::User).unwrap();
     let sent: Sent = serde_json::from_value(sent).unwrap();
     read_sent(sent, cut, dir, &environment)
 }

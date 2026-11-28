@@ -195,6 +195,8 @@ impl Session {
             config = next;
         };
         lap("plugin catalogs");
+        let plugin_env = lighthouse_rpc::plugin_env(&config, &root, &search)?;
+        let config = config.with_plugin_env(plugin_env);
         if withheld.is_empty() {
             environment::check_local(&root, &personal, &catalog)?;
         }

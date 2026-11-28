@@ -78,6 +78,7 @@ pub(crate) fn run(
                 tester
                     .language(language)
                     .trusted(session.trusted())
+                    .plugin_env(session.config.sandbox().plugin_env.clone())
                     .version_files(version_files.clone()),
             )
         })

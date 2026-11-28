@@ -15,6 +15,12 @@ ignores = ["testdata/", "vendor/"]
 # goenv selects the Go version of the directory from `.go-version`
 # (https://github.com/go-nv/goenv/blob/master/docs/COMMANDS.md#goenv-local).
 versionFiles = [".go-version"]
+# goenv 3 points GOCACHE at a directory of its own per version
+# (`$GOENV_ROOT/versions/<v>/go-build-<os>-<arch>`), which the sandbox of a
+# program cannot create. With this the go command keeps its default build
+# cache in the user's cache directory, which the sandbox allows
+# (https://github.com/go-nv/goenv/blob/master/docs/ENVIRONMENT_VARIABLES.md).
+env = { GOENV_DISABLE_GOCACHE = "1" }
 catalog = "decisions"
 
 [spec.runtime]

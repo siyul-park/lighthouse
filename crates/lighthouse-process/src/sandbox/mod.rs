@@ -89,6 +89,10 @@ pub struct Policy {
     /// The places besides their own that they may write: paths below the
     /// project, or below the home directory with a `~/` in front.
     pub write: Vec<String>,
+    /// The variables the project's plugins add to the environment of every
+    /// program, which travel with the policy to each place a program is run;
+    /// a program's own `env` overrides them.
+    pub plugin_env: Vec<(String, String)>,
 }
 
 impl Default for Policy {
@@ -97,6 +101,7 @@ impl Default for Policy {
             enabled: true,
             network: Vec::new(),
             write: Vec::new(),
+            plugin_env: Vec::new(),
         }
     }
 }
@@ -130,6 +135,7 @@ impl Policy {
             enabled: self.enabled,
             network: joined(&self.network, network),
             write: joined(&self.write, write),
+            plugin_env: self.plugin_env.clone(),
         }
     }
 

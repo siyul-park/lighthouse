@@ -91,6 +91,7 @@ impl Agent {
             .transpose()
             .map_err(|e| failed(e.to_string()))?;
         let environment = Environment::new(
+            &self.policy.plugin_env,
             &BTreeMap::new(),
             Vec::new(),
             home.as_ref().map_or(Home::User, |h| Home::Own(h.path())),

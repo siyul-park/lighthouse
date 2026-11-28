@@ -86,7 +86,7 @@ No shell: the first element is the program, found on `PATH` or, when it has a `/
 
 ## The environment
 
-One allowlist, at every place: `PATH`, `USER`, `LOGNAME`, `LANG`, then `HOME` and `TMPDIR`, then `env`, then `LIGHTHOUSE_DECISION`, `LIGHTHOUSE_OPTIONS` and `LIGHTHOUSE_API_VERSION` where a decision is involved. An agent has a `HOME` and `XDG_*` of its own, empty, so it never sees the user's credentials or settings; every other program keeps the user's.
+One allowlist, at every place: `PATH`, `USER`, `LOGNAME`, `LANG`, then `HOME` and `TMPDIR`, then the `env` of the loaded plugins' manifests, then the program's own `env` (which overrides a plugin's), then `LIGHTHOUSE_DECISION`, `LIGHTHOUSE_OPTIONS` and `LIGHTHOUSE_API_VERSION` where a decision is involved. An agent has a `HOME` and `XDG_*` of its own, empty, so it never sees the user's credentials or settings; every other program keeps the user's. A plugin's `[spec] env` is static (no `${NAME}`), never `LIGHTHOUSE_*` or a forwarded name, and two plugins may not give one name two values; a change of it makes stored findings stale.
 
 ## Credentials
 

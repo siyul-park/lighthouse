@@ -147,6 +147,7 @@ impl CommandModel {
             .transpose()
             .map_err(|e| failed(e.to_string()))?;
         let environment = Environment::new_in(
+            &self.policy.plugin_env,
             &self.program.env,
             Vec::new(),
             home.as_ref().map_or(Home::User, |h| Home::Own(h.path())),

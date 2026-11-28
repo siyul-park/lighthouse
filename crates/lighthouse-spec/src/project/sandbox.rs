@@ -68,6 +68,7 @@ impl From<SandboxSpec> for Policy {
             enabled: spec.enabled.unwrap_or(true),
             network: spec.network.unwrap_or_default(),
             write: spec.write.unwrap_or_default(),
+            plugin_env: Vec::new(),
         }
     }
 }

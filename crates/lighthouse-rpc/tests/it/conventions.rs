@@ -150,3 +150,64 @@ fn plugin_version_files() {
 
     assert_eq!(found, [".p-version"]);
 }
+
+fn plugin_dir(root: &Path, name: &str, spec_extra: &str) {
+    let dir = root.join(".lighthouse/plugins").join(name);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("lighthouse-plugin.toml"),
+        format!(
+            "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Plugin\"\n[metadata]\nname = \"{name}\"\n[spec]\nversion = \"0\"\n{spec_extra}[spec.runtime]\ncommand = \"./does-not-exist\"\n"
+        ),
+    )
+    .unwrap();
+}
+
+fn plugin_env_of(root: &Path, plugins: &str) -> Result<Vec<(String, String)>, String> {
+    let config = lighthouse_spec::Config::parse_inline(&format!("plugins = {plugins}\n")).unwrap();
+    let search = lighthouse_rpc::search_dirs(root);
+    lighthouse_rpc::plugin_env(&config, root, &search).map_err(|e| e.to_string())
+}
+
+#[test]
+fn plugin_env_is_the_union_of_the_variables_the_plugins_declare() {
+    let root = tempfile::tempdir().unwrap();
+    plugin_dir(root.path(), "p", "env = { A = \"1\" }\n");
+    plugin_dir(root.path(), "q", "env = { A = \"1\", B = \"2\" }\n");
+
+    let found = plugin_env_of(root.path(), "[\"p\", \"q\"]").unwrap();
+
+    assert_eq!(
+        found,
+        [
+            ("A".to_owned(), "1".to_owned()),
+            ("B".to_owned(), "2".to_owned())
+        ]
+    );
+}
+
+#[test]
+fn plugin_env_refuses_one_name_with_two_values_naming_both_plugins() {
+    let root = tempfile::tempdir().unwrap();
+    plugin_dir(root.path(), "p", "env = { A = \"1\" }\n");
+    plugin_dir(root.path(), "q", "env = { A = \"2\" }\n");
+
+    let why = plugin_env_of(root.path(), "[\"p\", \"q\"]").unwrap_err();
+
+    assert!(
+        why.contains("`A`") && why.contains("`p`") && why.contains("`q`"),
+        "{why}"
+    );
+}
+
+#[test]
+fn plugin_env_refuses_the_names_lighthouse_sets_or_forwards() {
+    for name in ["LIGHTHOUSE_X", "PATH", "HOME", "TMPDIR", "LANG"] {
+        let root = tempfile::tempdir().unwrap();
+        plugin_dir(root.path(), "p", &format!("env = {{ {name} = \"1\" }}\n"));
+
+        let why = plugin_env_of(root.path(), "[\"p\"]").unwrap_err();
+
+        assert!(why.contains(name) && why.contains("`p`"), "{why}");
+    }
+}

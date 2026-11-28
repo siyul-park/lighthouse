@@ -112,19 +112,21 @@ pub struct Environment {
 impl Environment {
     /// The one environment of every program: `PATH`, `USER`, `LOGNAME` and
     /// `LANG`, the user's `HOME` and `TMPDIR` or a home of the run's own, the
-    /// declared variables (a `${NAME}` in a value is the user's variable
+    /// `plugin` variables, the declared variables (a `${NAME}` in a value is the user's variable
     /// `NAME`) and the `context` Lighthouse passes. A variable that is not set
     /// fails, naming the variable and never a value.
     pub fn new(
+        plugin: &[(String, String)],
         declared: &BTreeMap<String, String>,
         context: Vec<(String, String)>,
         home: Home<'_>,
     ) -> Result<Self, String> {
-        Self::new_in(declared, context, home, |name| env::var(name).ok())
+        Self::new_in(plugin, declared, context, home, |name| env::var(name).ok())
     }
 
     /// [`Environment::new`] reading the user's variables through `lookup`.
     pub fn new_in(
+        plugin: &[(String, String)],
         declared: &BTreeMap<String, String>,
         context: Vec<(String, String)>,
         home: Home<'_>,
@@ -141,6 +143,7 @@ impl Environment {
             Home::User => vars.extend(user(&PERSONAL)),
             Home::Own(dir) => vars.extend(isolated(dir)),
         }
+        vars.extend(plugin.iter().cloned());
         let mut secrets = Vec::new();
         for (key, value) in declared {
             let (expanded, used) = substitute(value, &lookup)?;
@@ -220,6 +223,16 @@ pub fn variables(value: &str) -> Result<Vec<&str>, String> {
         rest = &after[end + 1..];
     }
     Ok(names)
+}
+
+/// Why a plugin may not declare the variable `name`: `LIGHTHOUSE_*` is set by
+/// Lighthouse, and the names the allowlist forwards are the user's.
+pub fn plugin_env_problem(name: &str) -> Option<String> {
+    if name.is_empty() || name.contains('=') {
+        return Some(format!("`{name}` is not a variable"));
+    }
+    (name.starts_with("LIGHTHOUSE_") || INHERITED.contains(&name) || PERSONAL.contains(&name))
+        .then(|| format!("`{name}` is set by Lighthouse or forwarded from the user"))
 }
 
 /// `value` with each `${NAME}` replaced by the user's variable. A variable

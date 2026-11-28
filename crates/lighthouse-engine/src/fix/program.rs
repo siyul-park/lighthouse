@@ -128,6 +128,7 @@ pub(super) fn run(
         "evidence": finding.evidence,
     });
     let environment = Environment::new(
+        &workspace.sandbox.plugin_env,
         &program.env,
         context(
             &decision.to_string(),

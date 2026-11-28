@@ -15,6 +15,7 @@ mod plugin;
 mod shell;
 
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -330,12 +331,63 @@ pub fn plugin_of_pack(pack: &str, listed: &[PluginCatalog], search: &[PathBuf]) 
         .map_or_else(|| format!("lang-{pack}"), |one| one.id().to_owned())
 }
 
+/// The variables the listed plugins declare for every program, by name. A
+/// name two plugins declare with two values, or one a plugin may not declare,
+/// is an error that names the plugins.
+pub fn plugin_env(
+    config: &Config,
+    root: &Path,
+    search: &[PathBuf],
+) -> Result<Vec<(String, String)>, Error> {
+    let mut vars: BTreeMap<String, (String, String)> = BTreeMap::new();
+    for (id, spec) in listed_named(config, root, search)? {
+        for (name, value) in spec.env {
+            if let Some(reason) = lighthouse_process::plugin_env_problem(&name) {
+                return Err(Error::Plugin {
+                    id,
+                    reason: format!("`env`: {reason}"),
+                });
+            }
+            match vars.get(&name) {
+                Some((first, other)) if other != &value => {
+                    return Err(Error::Plugin {
+                        id,
+                        reason: format!(
+                            "`env` gives `{name}` a value other than the one of plugin `{first}`"
+                        ),
+                    });
+                }
+                Some(_) => {}
+                None => {
+                    vars.insert(name, (id.clone(), value));
+                }
+            }
+        }
+    }
+    Ok(vars
+        .into_iter()
+        .map(|(name, (_, value))| (name, value))
+        .collect())
+}
+
 /// The specs of the manifests of the listed plugins, in listing order.
 fn listed_specs(
     config: &Config,
     root: &Path,
     search: &[PathBuf],
 ) -> Result<Vec<PluginSpec>, Error> {
+    Ok(listed_named(config, root, search)?
+        .into_iter()
+        .map(|(_, spec)| spec)
+        .collect())
+}
+
+/// [`listed_specs`] with the id of each plugin.
+fn listed_named(
+    config: &Config,
+    root: &Path,
+    search: &[PathBuf],
+) -> Result<Vec<(String, PluginSpec)>, Error> {
     let discovered = discover(search)?;
     note_broken(discovered.broken, config, &mut Registered::default())?;
     let root = canonical(root);
@@ -345,7 +397,7 @@ fn listed_specs(
             .into_iter()
             .next()
         {
-            specs.push(one.resource.spec.clone());
+            specs.push((one.id().to_owned(), one.resource.spec.clone()));
         }
     }
     Ok(specs)

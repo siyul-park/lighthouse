@@ -14,8 +14,8 @@ mod sandbox;
 
 pub use copy::{clone_file, copy_project};
 pub use program::{
-    Environment, Home, INHERITED, Job, PERSONAL, context, expand, expand_value, referenced,
-    variables,
+    Environment, Home, INHERITED, Job, PERSONAL, context, expand, expand_value, plugin_env_problem,
+    referenced, variables,
 };
 /// Whether sandboxed programs can run on this machine, and if not, why.
 pub use sandbox::available as sandbox_available;

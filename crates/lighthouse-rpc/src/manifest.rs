@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     env, fs, io,
     path::{Path, PathBuf},
 };
@@ -130,6 +131,14 @@ pub struct PluginSpec {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub version_files: Vec<String>,
+    /// Variables every program Lighthouse runs gets while the plugin is
+    /// loaded (checks, fixes, verification, providers), as static values.
+    /// A program's own `env` overrides them. Not `LIGHTHOUSE_*`, and not a
+    /// name the environment of a program forwards from the user (`PATH`,
+    /// `USER`, `LOGNAME`, `LANG`, `HOME`, `TMPDIR`). Two plugins may not give
+    /// one name two values.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
     /// How the plugin's ecosystem marks its generated code: the same key,
     /// shape and merge as the project's `generated`.
     #[serde(default, skip_serializing_if = "GeneratedSpec::is_empty")]

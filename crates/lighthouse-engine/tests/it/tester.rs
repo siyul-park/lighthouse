@@ -354,6 +354,19 @@ fn engine_errors_in_an_example_are_failures_not_panics() {
 }
 
 #[test]
+fn rule_tester_plugin_env() {
+    let catalog = catalog(HOLDING);
+    let decision = catalog.decision("fake/marker").unwrap();
+
+    let failures = RuleTester::new(registry, &catalog, lighthouse_test_support::bundled())
+        .plugin_env(vec![("PLUGIN_VARIABLE".to_owned(), "1".to_owned())])
+        .tested(decision)
+        .failures;
+
+    assert!(failures.is_empty(), "{failures:?}");
+}
+
+#[test]
 fn rule_tester_version_files() {
     let catalog = catalog(HOLDING);
     let decision = catalog.decision("fake/marker").unwrap();

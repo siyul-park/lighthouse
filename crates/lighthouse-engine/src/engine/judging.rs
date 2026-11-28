@@ -211,6 +211,11 @@ impl Engine {
             hasher.update(&plugin.id);
             hasher.update(&plugin.version);
         }
+        // What the plugins add to the environment of every program.
+        for (name, value) in &self.ws.sandbox.plugin_env {
+            hasher.update(name);
+            hasher.update(value);
+        }
         // Maps of sorted keys: the same configuration is the same text.
         let maps = [
             serde_json::to_string(&self.ws.languages),

@@ -53,6 +53,7 @@ pub struct RuleTester<'a> {
     trusted: bool,
     planting: Option<Planting<'a>>,
     version_files: BTreeMap<String, String>,
+    plugin_env: Vec<(String, String)>,
 }
 
 /// How an example plants decisions of its own, and which of them order
@@ -91,6 +92,7 @@ impl<'a> RuleTester<'a> {
             trusted: false,
             planting: None,
             version_files: BTreeMap::new(),
+            plugin_env: Vec::new(),
         }
     }
 
@@ -105,6 +107,14 @@ impl<'a> RuleTester<'a> {
     /// Lets fix examples run commands, as a trusted project does.
     pub fn trusted(mut self, trusted: bool) -> Self {
         self.trusted = trusted;
+        self
+    }
+
+    /// The variables the project's plugins add to the environment of every
+    /// program an example runs.
+    #[must_use]
+    pub fn plugin_env(mut self, vars: Vec<(String, String)>) -> Self {
+        self.plugin_env = vars;
         self
     }
 
@@ -361,7 +371,7 @@ impl<'a> RuleTester<'a> {
         }
         let (mut together, engine, dir) = ExampleRun {
             registry,
-            config,
+            config: config.with_plugin_env(self.plugin_env.clone()),
             catalog,
             trusted: self.trusted,
             models: ModelOptions::default(),

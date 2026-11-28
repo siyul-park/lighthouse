@@ -326,6 +326,7 @@ fn a_program_adds_its_own_hosts_to_the_sandbox_of_the_project() {
         enabled: true,
         network: vec!["api.project.test".to_owned()],
         write: Vec::new(),
+        ..Policy::default()
     };
     let own = Program {
         sandbox: Some(Sandbox {

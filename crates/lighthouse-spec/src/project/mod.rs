@@ -434,6 +434,14 @@ impl Config {
         &self.sandbox
     }
 
+    /// The project with `vars`, which its plugins declare, added to the
+    /// environment of every program.
+    #[must_use]
+    pub fn with_plugin_env(mut self, vars: Vec<(String, String)>) -> Self {
+        self.sandbox.plugin_env = vars;
+        self
+    }
+
     /// What the project allows of fixes: whether a verified one that is not
     /// safe is written, the decisions a model may fix, the widest change, and
     /// the programs that must pass after them.

@@ -217,6 +217,7 @@ impl CommandRule {
             declared.extend(item);
         }
         let environment = Environment::new(
+            &ctx.workspace.sandbox.plugin_env,
             &declared,
             context(
                 &json!({ "id": meta.id }).to_string(),

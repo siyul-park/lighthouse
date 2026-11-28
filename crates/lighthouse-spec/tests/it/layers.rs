@@ -578,3 +578,12 @@ fn a_value_that_cannot_work_is_refused_with_the_file_the_line_and_the_key() {
         "{provider}"
     );
 }
+
+#[test]
+fn with_plugin_env_travels_in_the_sandbox_policy_of_the_project() {
+    let vars = vec![("GOENV_DISABLE_GOCACHE".to_owned(), "1".to_owned())];
+    let config = layers(&[]).0.with_plugin_env(vars.clone());
+
+    assert_eq!(config.sandbox().plugin_env, vars);
+    assert!(config.sandbox().enabled);
+}

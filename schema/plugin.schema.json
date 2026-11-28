@@ -67,6 +67,13 @@
             "null"
           ]
         },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Variables every program Lighthouse runs gets while the plugin is\nloaded (checks, fixes, verification, providers), as static values.\nA program's own `env` overrides them. Not `LIGHTHOUSE_*`, and not a\nname the environment of a program forwards from the user (`PATH`,\n`USER`, `LOGNAME`, `LANG`, `HOME`, `TMPDIR`). Two plugins may not give\none name two values.",
+          "type": "object"
+        },
         "generated": {
           "$ref": "#/$defs/GeneratedSpec",
           "description": "How the plugin's ecosystem marks its generated code: the same key,\nshape and merge as the project's `generated`."

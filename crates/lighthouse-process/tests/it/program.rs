@@ -9,7 +9,8 @@ use std::{
 };
 
 use lighthouse_process::{
-    Environment, Home, Job, Policy, Profile, context, expand, expand_value, referenced, variables,
+    Environment, Home, Job, Policy, Profile, context, expand, expand_value, plugin_env_problem,
+    referenced, variables,
 };
 
 fn line(parts: &[&str]) -> Vec<String> {
@@ -64,7 +65,7 @@ fn the_exit_code_is_read_against_the_codes_that_mean_the_program_ran() {
         ("exit 2", &[0, 2], Ok(2)),
         ("kill -9 $$", &[0, 1], Err("signal")),
     ];
-    let environment = Environment::new(&BTreeMap::new(), Vec::new(), Home::User).unwrap();
+    let environment = Environment::new(&[], &BTreeMap::new(), Vec::new(), Home::User).unwrap();
 
     for (script, success, want) in table {
         let got = ran(script, &environment, Duration::from_secs(5)).exit(success);
@@ -81,7 +82,7 @@ fn the_exit_code_is_read_against_the_codes_that_mean_the_program_ran() {
 
 #[test]
 fn a_program_that_outlives_its_timeout_is_an_error() {
-    let environment = Environment::new(&BTreeMap::new(), Vec::new(), Home::User).unwrap();
+    let environment = Environment::new(&[], &BTreeMap::new(), Vec::new(), Home::User).unwrap();
     let command = line(&["sleep", "5"]);
     let policy = unsandboxed();
     let profile = Profile::new(Path::new("."));
@@ -106,6 +107,7 @@ fn the_environment_is_the_allowlist_the_declared_variables_and_lighthouses_own()
     let users = users([("LIGHTHOUSE_PROGRAM_TEST_LEAK", "leaked")]);
     let declared = BTreeMap::from([("KEPT".to_owned(), "yes".to_owned())]);
     let environment = Environment::new_in(
+        &[],
         &declared,
         context("local/probe", "{}"),
         Home::Own(Path::new("/tmp/home-of-the-run")),
@@ -159,7 +161,7 @@ fn a_variable_in_a_value_is_the_users_and_an_unset_one_names_itself() {
         "Bearer ${LIGHTHOUSE_PROGRAM_TEST_KEY}".to_owned(),
     )]);
 
-    let environment = Environment::new_in(&declared, Vec::new(), Home::User, &users).unwrap();
+    let environment = Environment::new_in(&[], &declared, Vec::new(), Home::User, &users).unwrap();
 
     // The program holds the value; what it prints of it is scrubbed.
     let printed = ran(
@@ -181,7 +183,7 @@ fn a_variable_in_a_value_is_the_users_and_an_unset_one_names_itself() {
         "TOKEN".to_owned(),
         "${LIGHTHOUSE_PROGRAM_TEST_UNSET}".to_owned(),
     )]);
-    let error = Environment::new_in(&unset, Vec::new(), Home::User, &users).unwrap_err();
+    let error = Environment::new_in(&[], &unset, Vec::new(), Home::User, &users).unwrap_err();
     assert!(error.contains("LIGHTHOUSE_PROGRAM_TEST_UNSET"), "{error}");
     assert!(!error.contains("sk-test-value"), "{error}");
 }
@@ -193,7 +195,7 @@ fn a_value_a_program_echoes_on_stderr_is_scrubbed_from_what_the_error_shows() {
         "TOKEN".to_owned(),
         "${LIGHTHOUSE_PROGRAM_TEST_SECRET}".to_owned(),
     )]);
-    let environment = Environment::new_in(&declared, Vec::new(), Home::User, &users).unwrap();
+    let environment = Environment::new_in(&[], &declared, Vec::new(), Home::User, &users).unwrap();
 
     let failed = ran(
         "echo \"bad key $TOKEN\" >&2; exit 4",
@@ -217,7 +219,7 @@ fn a_value_a_program_echoes_on_stdout_is_scrubbed_too_unless_stdout_is_data() {
         "TOKEN".to_owned(),
         "${LIGHTHOUSE_PROGRAM_TEST_STDOUT}".to_owned(),
     )]);
-    let environment = Environment::new_in(&declared, Vec::new(), Home::User, &users).unwrap();
+    let environment = Environment::new_in(&[], &declared, Vec::new(), Home::User, &users).unwrap();
     let command = line(&["sh", "-c", "echo \"a/b.go:1: key $TOKEN\""]);
     let policy = unsandboxed();
     let profile = Profile::new(Path::new("."));
@@ -286,6 +288,7 @@ fn a_programs_own_hosts_and_places_are_added_to_the_projects() {
         enabled: true,
         network: vec!["api.project.test".to_owned()],
         write: vec!["~/.cache/project".to_owned()],
+        ..Policy::default()
     };
 
     let own = project.with(
@@ -307,7 +310,7 @@ fn a_programs_own_hosts_and_places_are_added_to_the_projects() {
 
 #[test]
 fn run_lines_hands_the_lines_over_and_scrubs_only_stderr() {
-    let environment = Environment::new(&BTreeMap::new(), Vec::new(), Home::User).unwrap();
+    let environment = Environment::new(&[], &BTreeMap::new(), Vec::new(), Home::User).unwrap();
     let command = line(&["sh", "-c", "echo one; echo two; echo err >&2"]);
     let policy = unsandboxed();
     let profile = Profile::new(Path::new("."));
@@ -333,4 +336,32 @@ fn run_lines_hands_the_lines_over_and_scrubs_only_stderr() {
     assert_eq!(*seen.lock().unwrap(), ["one", "two"]);
     assert!(ran.stdout.is_empty());
     assert_eq!(ran.stderr, b"err\n");
+}
+
+#[test]
+fn a_plugin_variable_reaches_a_program_and_its_own_env_overrides_it() {
+    let own = BTreeMap::from([("PLUGIN_B".to_owned(), "own".to_owned())]);
+    let plugin = [
+        ("PLUGIN_A".to_owned(), "a".to_owned()),
+        ("PLUGIN_B".to_owned(), "b".to_owned()),
+    ];
+    let environment = Environment::new(&plugin, &own, Vec::new(), Home::User).unwrap();
+
+    let last = |name: &str| {
+        environment
+            .vars()
+            .iter()
+            .rfind(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    };
+    assert_eq!(last("PLUGIN_A"), Some("a"));
+    assert_eq!(last("PLUGIN_B"), Some("own"));
+}
+
+#[test]
+fn a_plugin_may_not_declare_what_lighthouse_sets_or_forwards() {
+    for bad in ["LIGHTHOUSE_X", "PATH", "HOME", "", "A=B"] {
+        assert!(plugin_env_problem(bad).is_some(), "{bad}");
+    }
+    assert_eq!(plugin_env_problem("GOENV_DISABLE_GOCACHE"), None);
 }

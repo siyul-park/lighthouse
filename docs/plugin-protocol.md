@@ -565,22 +565,20 @@ arms + logic operators`; cognitive complexity follows Campbell, SonarSource 2018
 
 ### Comments
 
-`comments` holds the comments of the file in source order, which lets rules judge
-text no symbol carries (section banners, commented-out code). Adjacent line
-comments with nothing else between them form one comment. Each entry is `{ span,
-text, attached_to? }`: `text` is the source text with its comment markers, the
-lines of one comment joined by `\n`; `attached_to` is the id of the symbol the
-comment documents, set when the comment stands alone on the lines directly above
-that symbol's declaration (attributes may sit between). Doc comments appear here
-too, as written. The field was added to 0.1 before 1.0 and may be omitted by a
-plugin that does not report comments; hosts then see none.
+`comments` holds the comments of the file in source order, which lets rules judge text no symbol
+carries (section banners, commented-out code). Adjacent line comments with nothing else between them
+form one comment. Each entry is `{ span, text, attached_to? }`: `text` is the source text with its
+comment markers, the lines of one comment joined by `\n`; `attached_to` is the id of the symbol the
+comment documents, set when the comment stands alone on the lines directly above that symbol's
+declaration (attributes may sit between). Doc comments appear here too, as written. The field was
+added to 0.1 before 1.0 and may be omitted by a plugin that does not report comments; hosts then see
+none.
 
 ### Tests
 
-`tests` holds one entry per test case: `symbol` (a `test` symbol), `nesting`
-(depth of nested sub-tests), `style` (`table` when the test loops over cases
-written in the test, else `scenario`) and `targets` (edge targets the test calls
-or references, in order of first use).
+`tests` holds one entry per test case: `symbol` (a `test` symbol), `nesting` (depth of nested
+sub-tests), `style` (`table` when the test loops over cases written in the test, else `scenario`)
+and `targets` (edge targets the test calls or references, in order of first use).
 
 ## Discovery
 
@@ -607,41 +605,41 @@ languages = ["go"]                 # checked against what the process reports
 ```
 
 `spec.ignores` (optional) is what the plugin's toolchain leaves out of a project: the same key,
-syntax and meaning as the project's `ignores` (a list of `.gitignore` lines, rooted at the
-project), merged the same way and before the project's own. It applies when the plugin is listed,
-to every file. The same key in a language's declaration (`ignores` of the `LanguageManifest` that
-`initialize` returns, next to its `globs`) applies to the files that language claims only: the
-host does not send them to that provider, and other languages still see them.
-`spec.versionFiles` (optional) names the files, relative to the project root, that a version
-manager of the plugin's ecosystem reads to choose a toolchain (`.go-version` of goenv,
-`rust-toolchain.toml` of rustup). It has the key and meaning of the project's `versionFiles`, which
-is merged with it: `decision test` copies those that exist at the project root into each example's
-directory, so that a manager's shim finds the toolchain there as it does in the project.
-`[spec.generated]` (optional) has the shape of the project's `[generated]`: `files` patterns and
-`markers` (regular expressions searched in the head comments of any file), for the generated code of
-the plugin's ecosystem.
+syntax and meaning as the project's `ignores` (a list of `.gitignore` lines, rooted at the project),
+merged the same way and before the project's own. It applies when the plugin is listed, to every
+file. The same key in a language's declaration (`ignores` of the `LanguageManifest` that
+`initialize` returns, next to its `globs`) applies to the files that language claims only: the host
+does not send them to that provider, and other languages still see them. `spec.versionFiles`
+(optional) names the files, relative to the project root, that a version manager of the plugin's
+ecosystem reads to choose a toolchain (`.go-version` of goenv, `rust-toolchain.toml` of rustup). It
+has the key and meaning of the project's `versionFiles`, which is merged with it: `decision test`
+copies those that exist at the project root into each example's directory, so that a manager's shim
+finds the toolchain there as it does in the project. `spec.env` (optional, a table of static values)
+is given to every program Lighthouse runs while the plugin is listed (`GOENV_DISABLE_GOCACHE` of
+goenv). A program's own `env` overrides it; `LIGHTHOUSE_*` and inherited names (`PATH`, `HOME`, ...)
+are refused, as is one name with two values. `[spec.generated]` (optional) has the shape of the
+project's `[generated]`: `files` patterns and `markers` (regular expressions searched in the head
+comments of any file), for the generated code of the plugin's ecosystem.
 
-`provides` lists the `languages` and `models` the plugin offers, so tools can see them
-without starting it; both are checked against what the process reports.
+`provides` lists the `languages` and `models` the plugin offers, so tools can see them without
+starting it; both are checked against what the process reports.
 
-Only plugins listed in `lighthouse.toml` are started. Manifests that do not parse are ignored (with a notice) unless the directory
-is named after a listed id. A bare id is looked up in
+Only plugins listed in `lighthouse.toml` are started. Manifests that do not parse are ignored (with
+a notice) unless the directory is named after a listed id. A bare id is looked up in
 `./.lighthouse/plugins/*/`, `$XDG_DATA_HOME/lighthouse/plugins/*/` (default
-`~/.local/share/lighthouse/plugins/*/`) and `<executable
-dir>/plugins/*/`; an entry `{ id = "lang-go", path = "plugins/lang-go",
-timeout = "120s" }` names the directory itself (relative to the config) and is how
-a development checkout is used. A plugin the project names by a `path`, and one in
-`./.lighthouse/plugins`, is code the repository brings and starts only in a trusted
-project ([architecture](architecture.md#sandbox)); one in the user's plugin directory or
-next to the executable needs no trust. The same id in more than one place, an in-process
-plugin included, is an error: there is no shadowing.
+`~/.local/share/lighthouse/plugins/*/`) and `<executable dir>/plugins/*/`; an entry `{ id =
+"lang-go", path = "plugins/lang-go", timeout = "120s" }` names the directory itself (relative to the
+config) and is how a development checkout is used. A plugin the project names by a `path`, and one
+in `./.lighthouse/plugins`, is code the repository brings and starts only in a trusted project
+([architecture](architecture.md#sandbox)); one in the user's plugin directory or next to the
+executable needs no trust. The same id in more than one place, an in-process plugin included, is an
+error: there is no shadowing.
 
 ## Trust model
 
-Running `lighthouse check` executes the plugins that the project's
-`lighthouse.toml` names, with the user's privileges, exactly as running a
-project's build scripts does. There is no trust prompt or flag: check only
-projects whose configuration you trust. Plugins found by search are started only
+Running `lighthouse check` executes the plugins that the project's `lighthouse.toml` names, with the
+user's privileges, exactly as running a project's build scripts does. There is no trust prompt or
+flag: check only projects whose configuration you trust. Plugins found by search are started only
 when listed; an unlisted manifest is never executed.
 
 ## Conformance
@@ -678,17 +676,15 @@ Loads packages with `golang.org/x/tools/go/packages` (tests included) and
 type-checks with `go/types`.
 
 - Units: a package directory (all its variants, tests included). The `api` of a unit is
-  its text without function and method bodies and the `api` of every project directory it
-  imports, directly or not, so a body edit leaves every other unit's results alone (early
-  cutoff, as in rustc's incremental compilation and Go's build action IDs, which hash the
-  export data of dependencies rather than their sources), and the unit lists every one of
-  them as imported, so an edit of an `api` is settled in one round. Only the directories
-  asked for are loaded. A type that satisfies an interface of a package its unit does not import is
-  settled by the host from the method sets the unit states (see "Method sets").
-  `go.mod`, `go.sum`, `go.work`,
-  `go.work.sum` and the `go env` values that decide a build are the settings of every unit.
-  Edits of a module outside the project (a `replace` to `../x`) are not seen until a file
-  of the project changes.
+its text without function and method bodies and the `api` of every project directory it imports,
+directly or not, so a body edit leaves every other unit's results alone (early cutoff, as in rustc's
+incremental compilation and Go's build action IDs, which hash the export data of dependencies rather
+than their sources), and the unit lists every one of them as imported, so an edit of an `api` is
+settled in one round. Only the directories asked for are loaded. A type that satisfies an interface
+of a package its unit does not import is settled by the host from the method sets the unit states
+(see "Method sets"). `go.mod`, `go.sum`, `go.work`, `go.work.sum` and the `go env` values that
+decide a build are the settings of every unit. Edits of a module outside the project (a `replace` to
+`../x`) are not seen until a file of the project changes.
 - Context: `[languages.go]` accepts `tags` (build tags), `env` (for example
   `GOOS`, `GOARCH`, `GOTOOLCHAIN`), `go` and `small_interfaces`.
   - `go` is the go binary: an absolute path or a name looked up on `PATH`. The
@@ -703,8 +699,7 @@ type-checks with `go/types`.
   - Files excluded by the build context are reported once as an intentional
     notice, not as incomplete: one analysis has one build context.
 - Only targets inside the project become `calls`, `references` and `implements`
-  edges. No `accesses-private` edges: Go cannot reach an unexported member from
-  another package.
+edges. No `accesses-private` edges: Go cannot reach an unexported member from another package.
 - Packages are loaded per `go.mod`; Go files with no `go.mod` form one synthetic
   module. The go tool's own skips are `ignores`: `testdata` and `vendor` in the plugin manifest
   (for every language), names starting with `.` or `_` in the Go language declaration (for Go

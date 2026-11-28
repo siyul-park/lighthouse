@@ -291,6 +291,35 @@ fn a_file_scope_check_in_the_directory_of_its_file_keeps_findings_in_the_files_b
 }
 
 #[test]
+fn a_program_sees_the_variables_a_plugin_declares_and_its_own_env_overrides_them() {
+    let script = "echo \"$1:1: seen=$PLUGIN_SEEN other=$PLUGIN_OTHER\"; exit 1";
+    let rule = decision(&format!(
+        "  check:\n    type: command\n    command: [sh, -c, {script:?}, sh, \"{{file}}\"]\n    env: {{ PLUGIN_OTHER: own }}\n    files: [\"a.txt\"]\n"
+    ));
+    let dir = project(&rule);
+    write(
+        dir.path(),
+        ".lighthouse/plugins/fake-model/lighthouse-plugin.toml",
+        &format!(
+            "apiVersion = \"lighthouse/v1alpha1\"\nkind = \"Plugin\"\n[metadata]\nname = \"fake-model\"\n[spec]\nversion = \"0\"\nenv = {{ PLUGIN_SEEN = \"yes\", PLUGIN_OTHER = \"plugin\" }}\n[spec.runtime]\ncommand = {:?}\n[spec.provides]\nmodels = [\"fake-model\"]\n",
+            lighthouse_test_support::fake_model().join("fake-model")
+        ),
+    );
+    let config = fs::read_to_string(dir.path().join("lighthouse.toml")).unwrap();
+    write(
+        dir.path(),
+        "lighthouse.toml",
+        &lighthouse_test_support::listing(&config, "\"fake-model\""),
+    );
+    trust(dir.path());
+    let out = lighthouse(dir.path()).arg("check").output().unwrap();
+    let report = String::from_utf8_lossy(&out.stdout);
+
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(report.contains("seen=yes other=own"), "{report}{err}");
+}
+
+#[test]
 fn a_secret_a_check_prints_never_reaches_a_finding() {
     let rule = decision(
         "  check:\n    type: command\n    command: [sh, -c, \"echo \\\"$1:1: key $TOKEN\\\"; exit 1\", sh, \"{file}\"]\n    env: { TOKEN: \"${LIGHTHOUSE_CHECK_TEST_SECRET}\" }\n",
