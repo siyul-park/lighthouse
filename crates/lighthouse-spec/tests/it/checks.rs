@@ -3,7 +3,7 @@
 use lighthouse_process::Policy;
 use lighthouse_spec::{
     Batching, Catalog, Check, CheckKind, CommandCheck, Cwd, Decision, DecisionStatus, ModelCheck,
-    Output, Point, Program, ProgramSpec, Sandbox, Stdin,
+    Output, Point, Program, ProgramSpec, Sandbox, Stdin, Subject,
 };
 use lighthouse_test_support::catalog::*;
 use serde_json::json;
@@ -474,4 +474,26 @@ fn a_batch_tells_many_files_what_the_command_tells_one_and_cwd_file_needs_the_te
         ..one(&[], Stdin::None, Cwd::File)
     };
     assert_eq!(named.problem(Point::Check), None);
+}
+
+#[test]
+fn cwd_file_is_a_check_of_a_file_scope_decision_which_runs_for_one_file() {
+    let program = Program {
+        cwd: Cwd::File,
+        ..Program::of(vec!["gcassert".to_owned(), "./...".to_owned()])
+    };
+    assert_eq!(program.problem_in(Point::Check, Subject::File), None);
+    assert!(
+        program
+            .problem_in(Point::Check, Subject::Project)
+            .unwrap()
+            .contains("`cwd: file`")
+    );
+    // A fix has the file of its finding, not the scope of the decision.
+    assert!(
+        program
+            .problem_in(Point::Fix, Subject::File)
+            .unwrap()
+            .contains("`cwd: file`")
+    );
 }

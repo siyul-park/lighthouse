@@ -131,7 +131,7 @@ impl CheckKind {
                         )
                     })
             }),
-            Self::Command(command) => command.problem(),
+            Self::Command(command) => command.problem(subject),
             Self::Model(model) => model.problem(cel, subject),
         }
     }

@@ -4,7 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{DecisionSpec, Point, Program, Programs, glob_set};
+use crate::{DecisionSpec, Point, Program, Programs, Subject, glob_set};
 
 /// An external program that checks files, by the process contract. Its
 /// `output` says what it prints (`lines`, `sarif` or `status`); with `lines`,
@@ -41,9 +41,9 @@ impl CommandCheck {
     /// The first problem with the command, described. A check without a
     /// `command` takes its programs from the languages it covers, which the
     /// decision's validation looks for.
-    pub(crate) fn problem(&self) -> Option<String> {
+    pub(crate) fn problem(&self, subject: Subject) -> Option<String> {
         self.program
-            .problem(Point::Check)
+            .problem_in(Point::Check, subject)
             .filter(|_| !self.program.command.is_empty())
             .map(|why| format!("check: {why}"))
             .or_else(|| {

@@ -266,6 +266,31 @@ fn a_program_run_in_the_directory_of_its_file_names_it_and_places_its_findings_f
 }
 
 #[test]
+fn a_file_scope_check_in_the_directory_of_its_file_keeps_findings_in_the_files_beside_it() {
+    // One run for a module file, with no `{file}`: the program lints the files
+    // beside it and places them from the module's directory.
+    let script = "echo 'a.txt:1: beside'; echo '../a.txt:1: above'; exit 1";
+    let rule = decision(&format!(
+        "  check:\n    type: command\n    command: [sh, -c, {script:?}]\n    cwd: file\n    files: [\"**/m.mod\"]\n"
+    ));
+    let dir = project(&rule);
+    write(dir.path(), "sub/m.mod", "module sub\n");
+    write(dir.path(), "sub/a.txt", "x\n");
+    trust(dir.path());
+    let out = lighthouse(dir.path()).arg("check").output().unwrap();
+    let report = String::from_utf8_lossy(&out.stdout);
+
+    assert!(
+        report.contains("sub/a.txt:1:1: error local/probe: beside"),
+        "{report}"
+    );
+    assert!(
+        report.contains("a.txt:1:1: error local/probe: above"),
+        "{report}"
+    );
+}
+
+#[test]
 fn a_secret_a_check_prints_never_reaches_a_finding() {
     let rule = decision(
         "  check:\n    type: command\n    command: [sh, -c, \"echo \\\"$1:1: key $TOKEN\\\"; exit 1\", sh, \"{file}\"]\n    env: { TOKEN: \"${LIGHTHOUSE_CHECK_TEST_SECRET}\" }\n",

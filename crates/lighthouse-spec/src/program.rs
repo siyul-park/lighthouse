@@ -14,7 +14,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;
 
-use crate::{OptionType, OptionsSchema};
+use crate::{OptionType, OptionsSchema, Subject};
 
 /// How long a program may run when it names no `timeout`.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
@@ -165,10 +165,11 @@ pub struct Program {
     pub stdin: Stdin,
     /// Where it runs: the project's root, or the directory of `{file}`, which
     /// a tool that looks for its configuration from where it runs needs
-    /// (`rustfmt` on stdin). `file` needs `stdin: file` or `{file}` in `command`:
-    /// a run has one file. `{file}` is then the
-    /// file's name from that directory, and a relative path the program prints
-    /// is relative to it. A directory not on disk runs at the root.
+    /// (`rustfmt` on stdin). `file` needs `stdin: file` or `{file}` in `command`,
+    /// or a check of a decision whose scope subject is `file`: a run has one
+    /// file. `{file}` is then the file's name from that directory, and a
+    /// relative path the program prints is relative to it. A directory not on
+    /// disk runs at the root.
     #[serde(default, skip_serializing_if = "Cwd::is_root")]
     pub cwd: Cwd,
     /// What it prints, which decides the result. Default: `lines` for a
@@ -292,8 +293,20 @@ impl Program {
         }
     }
 
-    /// The first problem with the program bound at `point`, described.
+    /// The first problem with the program bound at `point`, described, when
+    /// a run has not the file of a decision's scope.
     pub fn problem(&self, point: Point) -> Option<String> {
+        self.problem_for(point, false)
+    }
+
+    /// The first problem with the program bound at `point`, described, for a
+    /// decision about `subject`: a check of a `file` decision is run for one
+    /// file, which `cwd: file` needs. A fix has the file of its finding.
+    pub fn problem_in(&self, point: Point, subject: Subject) -> Option<String> {
+        self.problem_for(point, point == Point::Check && subject == Subject::File)
+    }
+
+    fn problem_for(&self, point: Point, file_scope: bool) -> Option<String> {
         let first = self.command.first().map(|p| p.trim());
         if first.is_none_or(str::is_empty) {
             return Some("`command` needs a program".to_owned());
@@ -305,7 +318,7 @@ impl Program {
             .iter()
             .chain(&self.batch)
             .find_map(|arg| refused(arg, point))
-            .or_else(|| self.batch_problem(point))
+            .or_else(|| self.batch_problem(point, file_scope))
             .or_else(|| self.fact_problem(point))
             .or_else(|| self.output_problem(point))
             .or_else(|| self.env_problem())
@@ -315,8 +328,8 @@ impl Program {
 
     /// `batch` is a check's, tells files from `{files}`, and goes with a
     /// `command` that reads one file; `cwd: file` too, which a run of one file
-    /// has: `stdin: file` or `{file}`.
-    fn batch_problem(&self, point: Point) -> Option<String> {
+    /// has: `stdin: file`, `{file}`, or the check of a decision of scope `file`.
+    fn batch_problem(&self, point: Point, file_scope: bool) -> Option<String> {
         if !self.batch.is_empty() {
             if point != Point::Check {
                 return Some("`batch` is for a check".to_owned());
@@ -334,9 +347,13 @@ impl Program {
                 return Some("`batch` needs `{files}`".to_owned());
             }
         }
-        let one_file = self.stdin == Stdin::File || self.command.iter().any(|arg| arg == "{file}");
-        (self.cwd == Cwd::File && !one_file)
-            .then(|| "`cwd: file` needs `stdin: file` or `{file}`: a run has one file".to_owned())
+        let one_file = file_scope
+            || self.stdin == Stdin::File
+            || self.command.iter().any(|arg| arg == "{file}");
+        (self.cwd == Cwd::File && !one_file).then(|| {
+            "`cwd: file` needs `stdin: file`, `{file}` or a decision of scope `file`: a run has one file"
+                .to_owned()
+        })
     }
 
     /// A check reads a fact of a file for the files of a run, so the run must

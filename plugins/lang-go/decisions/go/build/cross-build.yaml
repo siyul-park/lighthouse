@@ -22,19 +22,22 @@ spec:
     the option `platforms`; with none the decision has nothing to run and is
     clean.
   scope:
-    subject: project
+    subject: file
+    generated: false
+    tests: include
+    examples: exclude
   requirement: >-
     Packages and their tests MUST compile for every platform the project lists.
   consequences: >-
-    The whole module is compiled once for each platform on every run. A finding
+    Each module is compiled once for each platform on every run. A finding
     starts with the platform (`GOARCH=arm64 GOOS=linux: `). Without Go on
     `PATH` the analysis is incomplete, never clean, and so is a run where
     `go test` fails without naming a line of the project (a module that
     cannot be loaded). Code that needs cgo for a target needs that target's C
-    toolchain; set `CGO_ENABLED=0` in the platform's entry to leave it out.
+    toolchain; set `CGO_ENABLED=0` in the platform's entry to leave it out. A
+    finding is kept for as long as go.mod, the subject of the run, is as it
+    was; a change to a `.go` file does not run it again by itself.
   severity: error
-  languages:
-    go: {}
   options:
     properties:
       platforms:
@@ -55,6 +58,8 @@ spec:
               type: string
   check:
     type: command
+    files: ["**/go.mod"]
+    cwd: file
     command: [go, test, -exec=true, -vet=off, "-run=^$", ./...]
     matrix: platforms
     output: lines
@@ -121,6 +126,37 @@ spec:
 
             func platform() string { return "darwin" }
         - path: lib_linux.go
+          body: |
+            package example
+
+            func platform() string { return other() }
+      expect:
+        - line: 3
+          message: undefined
+    - name: module in a subdirectory
+      language: go
+      kind: invalid
+      options:
+        platforms:
+          - { GOOS: linux, GOARCH: arm64 }
+      files:
+        - path: sub/go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: sub/a.go
+          body: |
+            package example
+
+            // Name is the name of the platform.
+            func Name() string { return platform() }
+        - path: sub/a_darwin.go
+          body: |
+            package example
+
+            func platform() string { return "darwin" }
+        - path: sub/a_linux.go
           body: |
             package example
 

@@ -20,8 +20,16 @@ spec:
     the lines that place themselves in a project file. A `//gcassert:inline`
     on a function is reported at each call site that was not inlined, with
     the line of the call.
+
+    The check runs once for each go.mod, in its directory, so a repository
+    whose module is not at the root, or that holds several modules, is judged
+    module by module: `./...` stops at a nested go.mod, and each module is a
+    run of its own.
   scope:
-    subject: project
+    subject: file
+    generated: false
+    tests: include
+    examples: exclude
   requirement: >-
     Every `//gcassert:inline` and `//gcassert:bce` directive MUST hold.
   consequences: >-
@@ -38,11 +46,11 @@ spec:
     <function>:`, so a variable that escapes is not found; hence the
     requirement names `inline` and `bce` only.
   severity: error
-  languages:
-    go: {}
   check:
     type: command
+    files: ["**/go.mod"]
     command: [gcassert, "./..."]
+    cwd: file
     output: lines
     stream: stderr
   provenance:
@@ -120,6 +128,26 @@ spec:
 
             go 1.22
         - path: example.go
+          body: |
+            package example
+
+            // At returns xs[i].
+            func At(xs []int, i int) int {
+            	//gcassert:bce
+            	return xs[i]
+            }
+      expect:
+        - line: 6
+    - name: module in a subdirectory
+      language: go
+      kind: invalid
+      files:
+        - path: sub/go.mod
+          body: |
+            module example
+
+            go 1.22
+        - path: sub/a.go
           body: |
             package example
 

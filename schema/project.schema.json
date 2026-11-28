@@ -1039,7 +1039,7 @@
         },
         "cwd": {
           "$ref": "#/$defs/Cwd",
-          "description": "Where it runs: the project's root, or the directory of `{file}`, which\na tool that looks for its configuration from where it runs needs\n(`rustfmt` on stdin). `file` needs `stdin: file` or `{file}` in `command`:\na run has one file. `{file}` is then the\nfile's name from that directory, and a relative path the program prints\nis relative to it. A directory not on disk runs at the root."
+          "description": "Where it runs: the project's root, or the directory of `{file}`, which\na tool that looks for its configuration from where it runs needs\n(`rustfmt` on stdin). `file` needs `stdin: file` or `{file}` in `command`,\nor a check of a decision whose scope subject is `file`: a run has one\nfile. `{file}` is then the file's name from that directory, and a\nrelative path the program prints is relative to it. A directory not on\ndisk runs at the root."
         },
         "env": {
           "additionalProperties": {

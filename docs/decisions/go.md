@@ -14,9 +14,9 @@ What the compiler decides is stated where the code is and held.
 
 ### Compiler assertions in comments hold
 
-`go/compiler-assertions` · project · error · command · go
+`go/compiler-assertions` · file · error · command
 
-*A small function that must inline, or an index whose bounds check must go, is a decision of the compiler. A change that pushes the function past the inliner's budget or hides the bound compiles and passes every test, and shows up only as a benchmark regression. A `//gcassert:` directive states the intent where the code is, and gcassert checks it against what the compiler decided. The program is gcassert, found on `PATH` like lychee. gcassert prints one `path:line:` line for each assertion that does not hold on stderr, and its stdout is only a pointer to a log; Lighthouse reads stderr and keeps the lines that place themselves in a project file. A `//gcassert:inline` on a function is reported at each call site that was not inlined, with the line of the call.*
+*A small function that must inline, or an index whose bounds check must go, is a decision of the compiler. A change that pushes the function past the inliner's budget or hides the bound compiles and passes every test, and shows up only as a benchmark regression. A `//gcassert:` directive states the intent where the code is, and gcassert checks it against what the compiler decided. The program is gcassert, found on `PATH` like lychee. gcassert prints one `path:line:` line for each assertion that does not hold on stderr, and its stdout is only a pointer to a log; Lighthouse reads stderr and keeps the lines that place themselves in a project file. A `//gcassert:inline` on a function is reported at each call site that was not inlined, with the line of the call. The check runs once for each go.mod, in its directory, so a repository whose module is not at the root, or that holds several modules, is judged module by module: `./...` stops at a nested go.mod, and each module is a run of its own.*
 
 Every `//gcassert:inline` and `//gcassert:bce` directive MUST hold.
 
@@ -103,13 +103,13 @@ Code builds on every platform the project supports.
 
 ### Packages and tests compile on every listed platform
 
-`go/cross-build` · project · error · command · go
+`go/cross-build` · file · error · command
 
 *A file named `_linux.go` or `_windows.go`, or a `//go:build` line, is compiled on some platforms only, so a change builds and tests on the developer's machine and breaks on another. Cross-compiling needs no other machine: the Go toolchain builds for a target from any host when the `GOOS` and `GOARCH` environment names it, so one run per listed platform finds what each platform's build would. The program is `go test` with `-exec=true` and `-run=^$`: it compiles each package and its test binary for the target, `-exec=true` runs nothing foreign, and `-run=^$` matches no test on the host. `go vet` is turned off (`-vet=off`) because its findings are those of the checks of the project, not of the platform. A package without tests is compiled too. The platforms are the option `platforms`; with none the decision has nothing to run and is clean.*
 
 Packages and their tests MUST compile for every platform the project lists.
 
-Consequences: The whole module is compiled once for each platform on every run. A finding starts with the platform (`GOARCH=arm64 GOOS=linux: `). Without Go on `PATH` the analysis is incomplete, never clean, and so is a run where `go test` fails without naming a line of the project (a module that cannot be loaded). Code that needs cgo for a target needs that target's C toolchain; set `CGO_ENABLED=0` in the platform's entry to leave it out.
+Consequences: Each module is compiled once for each platform on every run. A finding starts with the platform (`GOARCH=arm64 GOOS=linux: `). Without Go on `PATH` the analysis is incomplete, never clean, and so is a run where `go test` fails without naming a line of the project (a module that cannot be loaded). Code that needs cgo for a target needs that target's C toolchain; set `CGO_ENABLED=0` in the platform's entry to leave it out. A finding is kept for as long as go.mod, the subject of the run, is as it was; a change to a `.go` file does not run it again by itself.
 
 Derived from: Go, build constraints: https://pkg.go.dev/cmd/go#hdr-Build_constraints; go test: https://pkg.go.dev/cmd/go#hdr-Test_packages (`-exec`, `-vet=off`, `-run`; examples verified with Go 1.26.4); Go, environment variables `GOOS` and `GOARCH`: https://go.dev/doc/install/source#environment
 

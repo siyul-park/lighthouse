@@ -502,7 +502,10 @@ fn programs(decision: &Decision) -> Result<(), Error> {
                     format!("`languages.{language}.{what}`: {why}"),
                 ));
             }
-            if let Some(why) = program.as_ref().and_then(|p| p.problem(point)) {
+            if let Some(why) = program
+                .as_ref()
+                .and_then(|p| p.problem_in(point, decision.scope.subject))
+            {
                 return Err(Error::invalid(
                     id,
                     format!("`languages.{language}.{what}`: {why}"),
