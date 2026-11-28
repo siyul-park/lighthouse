@@ -12,5 +12,5 @@ plugins = [
   "lang-toml",
   "lang-markdown",
 ]
-# Only packs that need no outside program: the smoke test proves the build, not the runner's tools.
-extends = ["design/recommended", "go/recommended", "rust/recommended"]
+# Only packs that need no outside program (go/recommended runs gcassert and go): the smoke test proves the build, not the runner's tools.
+extends = ["design/recommended", "rust/recommended"]
